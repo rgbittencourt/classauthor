@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { RUBRIC_LEVELS, balanceWeights, levelScore, normalizeRubricData, rubricFileSlug, rubricIssues, rubricMoodleCsv, rubricSheets } from "../src/rubric-core.js";
+import { RUBRIC_LEVELS, balanceWeights, levelScore, normalizeRubricData, rubricFileSlug, rubricIssues, rubricMoodleCheck, rubricMoodleCsv, rubricSheets } from "../src/rubric-core.js";
 
 const aiAnswer = {
   criteria: [
@@ -48,13 +48,61 @@ test("aceita níveis em lista e rubrica já salva; avisa o que falta", () => {
   assert.ok(rubricIssues(rubric).some((issue) => /somam 90%/.test(issue)));
 });
 
-test("CSV do Moodle: cabeçalho do plugin, 4 níveis por critério, aspas e pontos", () => {
-  const rubric = normalizeRubricData({ criteria: [{ name: "Clareza, \"objetiva\"", weight: 100, levels: { excellent: "Ótimo", good: "Bom", fair: "Médio", insufficient: "Fraco" } }] }, { title: "T" });
-  const lines = rubricMoodleCsv(rubric).trim().split("\n");
+// Mesmas regras do importador do Moodle (scripts/validar_csv_moodle.php do Gerador de Rubricas do INOVALAB).
+function validatePluginCsv(csv, gradeMax) {
+  const lines = csv.split(/\r\n|\n|\r/);
+  const header = lines.shift().split(",").map((cell) => cell.trim().toLowerCase());
+  for (const name of ["criterion", "level", "level_description", "score"]) if (!header.includes(name)) throw new Error("cabeçalho");
+  const rubric = {};
+  for (const raw of lines) {
+    if (!raw) continue;
+    if ((raw.match(/,/g) || []).length !== 3 || /["';]/.test(raw.replace(/'/g, ""))) throw new Error("linha inválida: " + raw);
+    const [criterion, , description, score] = raw.split(",");
+    (rubric[criterion.replace(/<[^>]*>/g, "").trim()] ||= []).push({ description, score: Number(score) });
+  }
+  let sum = 0;
+  for (const [name, levels] of Object.entries(rubric)) {
+    const scores = levels.map((level) => level.score);
+    if (new Set(scores).size < scores.length) throw new Error("pontos repetidos em " + name);
+    if (scores.some((value, i) => i && value <= scores[i - 1])) throw new Error("níveis fora de ordem em " + name);
+    sum += Math.max(...scores);
+  }
+  if (Math.round(sum * 100) !== Math.round(gradeMax * 100)) throw new Error(`soma ${sum} != ${gradeMax}`);
+  return Object.keys(rubric).length;
+}
+
+test("CSV do Moodle: cabeçalho do plugin, níveis do menor para o maior e texto sem o que o importador rejeita", () => {
+  const rubric = normalizeRubricData({ criteria: [{ name: "Clareza, \"objetiva\"; <b>", weight: 100, levels: { excellent: "Ótimo, claro", good: "Bom; ok", fair: "Médio\nlinha", insufficient: "Fraco" } }] }, { title: "T" });
+  const csv = rubricMoodleCsv(rubric);
+  const lines = csv.trim().split("\n");
   assert.equal(lines[0], "criterion,level,level_description,score");
   assert.equal(lines.length, 1 + RUBRIC_LEVELS.length);
-  assert.ok(lines[1].startsWith('"Clareza, ""objetiva"" (100%)",1,Excelente: Ótimo,10'));
-  assert.ok(lines[4].endsWith(",0"));
+  assert.ok(lines[1].endsWith(",1,Fraco,0"));
+  assert.ok(lines[4].endsWith(",4,Ótimo\u201A claro,10"));
+  assert.ok(lines[1].startsWith("Clareza\u201A \u201Cobjetiva\u201D\u201A \u2039b\u203A,1"));
+  assert.equal(validatePluginCsv(csv, 10), 1);
+  assert.equal(csv.charCodeAt(0), "c".charCodeAt(0)); // sem BOM
+});
+
+test("CSV do Moodle passa nas regras do plugin com vários critérios, qualquer nota máxima e pesos quebrados", () => {
+  for (const maxScore of [10, 100, 7.5, 20]) {
+    const rubric = normalizeRubricData({ ...aiAnswer, maxScore, criteria: [{ name: "A", weight: 33, levels: {} }, { name: "A", weight: 33, levels: {} }, { name: "C", weight: 34, levels: { excellent: "x" } }] }, { title: "T" });
+    const csv = rubricMoodleCsv(rubric);
+    assert.equal(validatePluginCsv(csv, maxScore), 3, `nota ${maxScore}`);
+    assert.match(csv, /^A \(2\),/m);
+  }
+});
+
+test("o Moodle recusa pontos repetidos: o app bloqueia nota máxima pequena demais e peso 0", () => {
+  const tiny = normalizeRubricData({ maxScore: 0.05, criteria: [{ name: "A", weight: 50, levels: {} }, { name: "B", weight: 50, levels: {} }] }, { title: "T" });
+  assert.ok(rubricMoodleCheck(tiny).errors.length > 0);
+  assert.ok(rubricIssues(tiny).some((issue) => /^CSV do Moodle/.test(issue)));
+  const zero = normalizeRubricData({ criteria: [{ name: "A", weight: 100, levels: {} }, { name: "B", weight: 0, levels: {} }] }, { title: "T" });
+  zero.criteria[1].weight = 0; zero.criteria[0].weight = 100;
+  const check = rubricMoodleCheck(zero);
+  assert.equal(check.errors.length, 0);
+  assert.ok(check.warnings.some((warning) => /Ficam de fora/.test(warning)));
+  assert.equal(validatePluginCsv(rubricMoodleCsv(zero), 10), 1);
 });
 
 test("planilha: uma aba por rubrica, nomes únicos e linha de nota máxima", () => {

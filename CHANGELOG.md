@@ -8,6 +8,15 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.9.1 · 03/11/2026 · CSV de rubricas no formato exato do plugin do Moodle
+
+### Corrigido
+- O **CSV da rubrica** agora segue as regras do importador do Moodle (conferidas com o código do Gerador de Rubricas do INOVALAB): níveis do menor para o maior, textos sem aspas, ponto e vírgula nem vírgulas (trocados por símbolos parecidos), sem BOM, e **a soma dos máximos dos critérios igual à nota máxima** (distribuída em centésimos). O arquivo passa no validador `validar_csv_moodle.php` daquele projeto.
+- O app **bloqueia o CSV** quando o Moodle recusaria (pontos repetidos dentro de um critério, por exemplo com nota máxima muito pequena) e diz o motivo; critério com peso 0 fica de fora com aviso; nomes iguais ganham « (2)».
+
+### Novo
+- A IA devolve também um **resumo do que entendeu da atividade**, mostrado na rubrica para você conferir. O pedido à IA ganhou os princípios do Gerador de Rubricas: derivar os critérios do que foi pedido, respeitar critérios já informados e descrever o que o estudante fez, em linguagem de avaliação formativa.
+
 ## 1.9.0 · 03/11/2026 · Rubricas de avaliação
 
 ### Novo

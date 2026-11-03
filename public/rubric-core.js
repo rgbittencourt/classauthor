@@ -53,6 +53,7 @@ export function normalizeRubricData(raw = {}, meta = {}) {
     maxScore: Number(source.maxScore) > 0 ? Number(source.maxScore) : RUBRIC_MAX_SCORE,
     criteria: picked.map((criterion, index) => ({ ...criterion, weight: weights[index] })),
     notes: text(source.notes || source.guidance),
+    analysis: text(source.analysis || source.analise),
     createdAt: text(meta.createdAt || source.createdAt) || new Date().toISOString()
   };
 }
@@ -73,25 +74,75 @@ export function rubricIssues(rubric) {
     const empty = criterion.descriptions.filter((description) => !text(description)).length;
     if (empty) out.push(`O critério «${criterion.name}» tem ${empty} nível(is) sem descrição.`);
   });
+  if (rubric.criteria.length) rubricMoodleExport(rubric).errors.forEach((error) => out.push(`CSV do Moodle: ${error}`));
   return out;
 }
 
-const csvCell = (value) => {
-  const s = String(value ?? "");
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-};
+// ── Exportação para o Moodle ──
+// O Moodle puro não importa rubrica de arquivo. O CSV segue o formato do plugin «Rubric Importer»
+// (local_customgradingform_renderer + block_importrubric, Moodle 4.1+), cujas regras são rígidas:
+// cabeçalho criterion,level,level_description,score; exatamente 3 vírgulas por linha, sem aspas nem
+// ponto e vírgula; níveis do menor para o maior; pontos diferentes dentro de cada critério; e a
+// soma dos máximos dos critérios igual à nota máxima da tarefa. Regras e conversões conferidas com o
+// Gerador de Rubricas do INOVALAB (github.com/rgbittencourt/rubricas, docs/EXPORTAR_MOODLE.md).
 
-// CSV no formato do plugin «Rubric Importer» do Moodle (cabeçalho criterion,level,level_description,score).
-// O Moodle puro não importa rubricas de arquivo: o CSV exige esse plugin (Moodle 4.1 ou mais novo).
-// Nível 1 = melhor desempenho. A descrição leva o nome do nível para ficar legível no Moodle.
-export function rubricMoodleCsv(rubric) {
-  const rows = [["criterion", "level", "level_description", "score"]];
-  rubric.criteria.forEach((criterion) => {
-    RUBRIC_LEVELS.forEach((level, position) => {
-      rows.push([`${criterion.name} (${criterion.weight}%)`, position + 1, `${level.label}: ${text(criterion.descriptions[position])}`, levelScore(rubric, criterion, position)]);
-    });
+// Texto seguro para o importador: troca o que ele rejeita ou apaga por símbolos parecidos.
+export function moodleSafeText(value) {
+  let open = true;
+  return String(value ?? "").replace(/[\r\n\t]+/g, " ")
+    .replace(/</g, "\u2039").replace(/>/g, "\u203A")
+    .replace(/[,;]/g, "\u201A")
+    .replace(/"/g, () => { const c = open ? "\u201C" : "\u201D"; open = !open; return c; })
+    .replace(/ {2,}/g, " ").trim();
+}
+
+// Máximo de cada critério em centésimos, pelo método dos maiores restos: a soma é exatamente a nota máxima.
+function criterionMaxCents(rubric) {
+  const weights = rubric.criteria.map((criterion) => Math.max(0, Number(criterion.weight) || 0));
+  const total = weights.reduce((sum, value) => sum + value, 0);
+  const totalCents = Math.round(rubric.maxScore * 100);
+  if (!(total > 0)) return weights.map(() => 0);
+  const exact = weights.map((weight) => (weight / total) * totalCents);
+  const cents = exact.map((value) => Math.floor(value + 1e-9));
+  let missing = totalCents - cents.reduce((sum, value) => sum + value, 0);
+  exact.map((value, index) => ({ index, rest: value - cents[index] })).sort((a, b) => b.rest - a.rest || a.index - b.index)
+    .forEach((item) => { if (missing > 0) { cents[item.index] += 1; missing -= 1; } });
+  return cents;
+}
+
+// Rubrica convertida para o que o Moodle aceita: critérios com níveis em ordem crescente e pontos em centésimos.
+export function rubricMoodleExport(rubric) {
+  const errors = [], warnings = [], criteria = [];
+  const maxCents = criterionMaxCents(rubric);
+  const names = new Set();
+  const ignored = [];
+  rubric.criteria.forEach((criterion, index) => {
+    if (!(maxCents[index] > 0)) { ignored.push(criterion.name); return; }
+    let name = moodleSafeText(criterion.name) || `Critério ${index + 1}`;
+    const base = name; let n = 2;
+    while (names.has(name.toLowerCase())) name = `${base} (${n++})`;
+    names.add(name.toLowerCase());
+    const maxPoints = maxCents[index] / 100;
+    const levels = RUBRIC_LEVELS.map((level, position) => ({ label: level.label, position, points: position === 0 ? maxPoints : round2((level.pct / 100) * maxPoints), description: moodleSafeText(criterion.descriptions[position]) || `${level.label}` })).reverse();
+    criteria.push({ name, levels });
+    if (new Set(levels.map((level) => level.points)).size < levels.length) errors.push(`O critério «${criterion.name}» ficaria com níveis de mesma pontuação (o Moodle exige pontos diferentes em cada nível). Use uma nota máxima maior (por exemplo, 100) ou menos critérios.`);
   });
-  return rows.map((row) => row.map(csvCell).join(",")).join("\n") + "\n";
+  if (ignored.length) warnings.push(`Ficam de fora do CSV, por valerem 0 ponto: ${ignored.join("; ")}.`);
+  if (!criteria.length) errors.push("A rubrica não tem critério com pontuação maior que zero.");
+  return { criteria, errors, warnings };
+}
+
+// CSV do plugin. Níveis do menor para o maior; «level» é só a numeração. UTF-8 sem BOM, ponto decimal.
+export function rubricMoodleCsv(rubric) {
+  const lines = ["criterion,level,level_description,score"];
+  rubricMoodleExport(rubric).criteria.forEach((criterion) => criterion.levels.forEach((level, index) => lines.push(`${criterion.name},${index + 1},${level.description},${level.points}`)));
+  return lines.join("\n") + "\n";
+}
+
+// O que impede ou atrapalha o uso no Moodle (para mostrar antes de baixar).
+export function rubricMoodleCheck(rubric) {
+  const { errors, warnings } = rubricMoodleExport(rubric);
+  return { errors, warnings };
 }
 
 const sheetName = (title, used) => {

@@ -11,7 +11,15 @@ import { RUBRIC_LEVELS, RUBRIC_MAX_SCORE, normalizeRubricData } from "./rubric-c
 const clip = (value, max) => String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 const list = (value) => (Array.isArray(value) ? value : []);
 
-const SYSTEM = `Você é um especialista em avaliação da aprendizagem na educação profissional e tecnológica. Cria rubricas analíticas claras, observáveis e justas, em português do Brasil. Cada nível descreve o que o estudante FEZ (evidência observável), nunca traços de personalidade. Não invente fatos, normas ou referências. Responda apenas com JSON válido.`;
+const SYSTEM = `Você é especialista em avaliação educacional do IFSC (Instituto Federal de Santa Catarina), com experiência em cursos de pós-graduação a distância (TEDPRO e TGE) e na educação profissional e tecnológica. Sua tarefa é LER a atividade e propor uma rubrica de avaliação alinhada exatamente ao que foi pedido aos estudantes. Responda em português do Brasil, apenas com JSON válido.
+
+Princípios:
+- Os critérios devem derivar das entregas, etapas, formulários e requisitos que aparecem nas instruções. Não invente exigências que não estão lá.
+- Se houver formulário ou modelo a ser preenchido, avalie o preenchimento das partes relevantes.
+- Se as instruções já trazem critérios ou pontuações, respeite-os.
+- Descritores claros, observáveis, no estilo acadêmico brasileiro, humanizados (não robóticos), em linguagem de avaliação formativa: o que o estudante fez ou deixou de fazer, nunca traços de personalidade.
+- Não invente fatos, normas ou referências.
+- Nas descrições, não use aspas duplas, ponto e vírgula nem os sinais < e >.`;
 
 export function buildRubricPrompt(input, index, week, item, { instruction = "", criteriaCount = 0, maxScore = RUBRIC_MAX_SCORE, statement = "" } = {}) {
   const count = Math.min(6, Math.max(2, Number(criteriaCount) || 0)) || 0;
@@ -37,6 +45,7 @@ Monte uma rubrica analítica com ${count ? `exatamente ${count} critérios` : "3
 
 Devolva este JSON:
 {
+  "analysis": "resumo em 2 a 4 frases do que a atividade pede (entregas, formato, formulários), para o professor conferir se a leitura foi correta",
   "criteria": [
     { "name": "nome curto do critério", "weight": 30, "levels": { "excellent": "…", "good": "…", "fair": "…", "insufficient": "…" } }
   ],

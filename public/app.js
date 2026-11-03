@@ -3,7 +3,7 @@ import { parseSavedWeek, planPlacement } from "./week-import.js";
 import { alignmentSheets, bloomLabel, buildAlignmentMap } from "./alignment-map.js";
 import { createFichaDocx, fichaChecks, fichaDefaults, weightsTotal } from "./ficha-disciplina.js";
 import { deliveryReadme } from "./delivery-package.js";
-import { RUBRIC_LEVELS, RUBRIC_LEVELS_ASCENDING, levelScore, normalizeRubricData, rubricFieldValue, rubricFileSlug, rubricHtmlTable, rubricIssues, rubricMoodleCsv, rubricPlainText, rubricSheets, rubricTsv } from "./rubric-core.js";
+import { RUBRIC_LEVELS, RUBRIC_LEVELS_ASCENDING, levelScore, normalizeRubricData, rubricFieldValue, rubricFileSlug, rubricHtmlTable, rubricIssues, rubricMoodleCheck, rubricMoodleCsv, rubricPlainText, rubricSheets, rubricTsv } from "./rubric-core.js";
 import { addUsage, costOf, emptyUsage, estimateGeneration, formatBRL, formatInt, subtractUsage, totalTokens, USD_BRL_DEFAULT } from "./ai-cost.js";
 import { createMoodleXml, quizQuestions } from "./moodle-xml.js";
 import { createProductionWorkbook, createWorkbookFromSheets, hasProduction, productionMarkdown, productionVideos, formatDuration } from "./production-xlsx.js";
@@ -2179,7 +2179,7 @@ function renderRubrics() {
     const head = `<th scope="col">Critério</th><th scope="col" class="rb-w">Peso (%)</th>${RUBRIC_LEVELS.map((level) => `<th scope="col">${level.label} <small>(${level.pct}%)</small></th>`).join("")}`;
     const body = rubric.criteria.map((criterion, ci) => `<tr><td><textarea data-rb="${ri}:${ci}:name" rows="3" aria-label="Critério">${escapeHtml(criterion.name)}</textarea></td><td class="rb-w"><input type="number" min="0" max="100" data-rb="${ri}:${ci}:weight" value="${criterion.weight}" aria-label="Peso"></td>${RUBRIC_LEVELS.map((level, li) => `<td><textarea data-rb="${ri}:${ci}:level${li}" aria-label="${level.label}">${escapeHtml(criterion.descriptions[li])}</textarea><span class="rb-pts" data-rb-pts="${ri}:${ci}:${li}">${String(levelScore(rubric, criterion, li)).replace(".", ",")} pts</span></td>`).join("")}</tr>`).join("");
     const source = rubric.weekIndex !== null ? ` · ${L(`Semana ${rubric.weekIndex + 1}`)}` : "";
-    return `<details class="rb-card" ${ri === state.rubrics.length - 1 || rubricUi.open === rubric.id ? "open" : ""}><summary>${escapeHtml(rubric.title)}<small>${L(rubric.source?.kind === "practice" ? "Prática" : "Atividade")}${source} · nota máxima ${rubric.maxScore}</small></summary><div class="rb-inner"><div data-rb-issues="${ri}">${issues.length ? `<div class="rb-warn">${issues.map(escapeHtml).join("<br>")}</div>` : ""}</div><table class="rb-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>${rubric.notes ? `<p class="rb-notes"><strong>Como usar:</strong> ${escapeHtml(rubric.notes)}</p>` : ""}${rubricCopyPanel(rubric, ri)}<div class="rb-card-actions"><button type="button" class="button button-secondary" data-rb-redo="${ri}" ${rubricUi.busy ? "disabled" : ""}>Refazer com a IA (usa o pedido acima)</button><button type="button" class="button button-secondary" data-rb-del="${ri}" ${rubricUi.busy ? "disabled" : ""}>Excluir</button></div></div></details>`;
+    return `<details class="rb-card" ${ri === state.rubrics.length - 1 || rubricUi.open === rubric.id ? "open" : ""}><summary>${escapeHtml(rubric.title)}<small>${L(rubric.source?.kind === "practice" ? "Prática" : "Atividade")}${source} · nota máxima ${rubric.maxScore}</small></summary><div class="rb-inner"><div data-rb-issues="${ri}">${issues.length ? `<div class="rb-warn">${issues.map(escapeHtml).join("<br>")}</div>` : ""}</div><table class="rb-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>${rubric.analysis ? `<p class="rb-notes"><strong>Como a IA entendeu a atividade:</strong> ${escapeHtml(rubric.analysis)}</p>` : ""}${rubric.notes ? `<p class="rb-notes"><strong>Como usar:</strong> ${escapeHtml(rubric.notes)}</p>` : ""}${rubricCopyPanel(rubric, ri)}<div class="rb-card-actions"><button type="button" class="button button-secondary" data-rb-redo="${ri}" ${rubricUi.busy ? "disabled" : ""}>Refazer com a IA (usa o pedido acima)</button><button type="button" class="button button-secondary" data-rb-del="${ri}" ${rubricUi.busy ? "disabled" : ""}>Excluir</button></div></div></details>`;
   }).join("");
   $("#rubrics-body").innerHTML = pick + (cards || '<div class="rb-empty">Ainda não há rubricas neste projeto.</div>');
   const has = state.rubrics.length > 0;
@@ -2256,19 +2256,29 @@ async function generateRubrics(instruments, { replaceId = null } = {}) {
 }
 
 function rubricsBaseName() { return slugify(state.input?.title || formInput().title); }
+// Só baixa o que o plugin do Moodle aceitaria; o resto fica de fora, com o motivo na tela.
+function moodleReadyRubrics() {
+  const ready = [], blocked = [];
+  state.rubrics.forEach((rubric) => { const check = rubricMoodleCheck(rubric); if (check.errors.length) blocked.push(`«${rubric.title}»: ${check.errors.join(" ")}`); else ready.push(rubric); });
+  return { ready, blocked };
+}
 async function downloadRubricsCsv() {
   if (!state.rubrics.length) return;
+  const { ready, blocked } = moodleReadyRubrics();
+  rubricUi.status = blocked.length ? `Não baixei o CSV de: ${blocked.join(" | ")}` : "";
   const base = rubricsBaseName();
-  if (state.rubrics.length === 1) { downloadBlob(new Blob([rubricMoodleCsv(state.rubrics[0])], { type: "text/csv;charset=utf-8" }), `${base}-rubricas-${rubricFileSlug(state.rubrics[0].title)}.csv`); return; }
+  if (!ready.length) { renderRubrics(); return; }
+  if (ready.length === 1) { downloadBlob(new Blob([rubricMoodleCsv(ready[0])], { type: "text/csv;charset=utf-8" }), `${base}-rubricas-${rubricFileSlug(ready[0].title)}.csv`); if (blocked.length) renderRubrics(); return; }
   try {
     const zip = new window.JSZip();
     const used = new Set();
-    state.rubrics.forEach((rubric) => { let name = `rubrica-${rubricFileSlug(rubric.title)}`; let n = 2; const root = name; while (used.has(name)) name = `${root}-${n++}`; used.add(name); zip.file(`${name}.csv`, rubricMoodleCsv(rubric)); });
+    ready.forEach((rubric) => { let name = `rubrica-${rubricFileSlug(rubric.title)}`; let n = 2; const root = name; while (used.has(name)) name = `${root}-${n++}`; used.add(name); zip.file(`${name}.csv`, rubricMoodleCsv(rubric)); });
     zip.file("LEIA-ME.txt", rubricsCsvReadme());
     downloadBlob(await zip.generateAsync({ type: "blob" }), `${base}-rubricas-moodle.zip`);
+    if (blocked.length) renderRubrics();
   } catch (error) { showError(error.message); }
 }
-const rubricsCsvReadme = () => "RUBRICAS PARA O MOODLE\n\nCada arquivo .csv é uma rubrica (uma atividade). O Moodle sem plugin NÃO importa rubrica de arquivo.\nNa tarefa, use a mesma nota máxima da rubrica e o método de avaliação «Rubrica»; a tarefa não pode ter rubrica antes. Os pontos já vêm por nível, sem pesos.\nPara importar, instale o plugin «Rubric Importer» (local_customgradingform_renderer + block_importrubric, Moodle 4.1 ou mais novo),\nabra a tarefa, use o bloco «Import rubric from CSV» e envie o arquivo. A rubrica entra como rascunho para você revisar.\nCabeçalho do arquivo: criterion,level,level_description,score. Nível 1 = melhor desempenho.\nSem o plugin, use a planilha (.xlsx) ou o Material de Mediação para montar a rubrica à mão em Avaliação avançada > Rubrica.\n";
+const rubricsCsvReadme = () => "RUBRICAS PARA O MOODLE\n\nCada arquivo .csv é uma rubrica (uma atividade). O Moodle sem plugin NÃO importa rubrica de arquivo.\nNa tarefa, use a mesma nota máxima da rubrica e o método de avaliação «Rubrica»; a tarefa não pode ter rubrica antes. Os pontos já vêm por nível, sem pesos.\nPara importar, instale o plugin «Rubric Importer» (local_customgradingform_renderer + block_importrubric, Moodle 4.1 ou mais novo),\nabra a tarefa, use o bloco «Import rubric from CSV» e envie o arquivo. A rubrica entra como rascunho para você revisar.\nCabeçalho do arquivo: criterion,level,level_description,score. Níveis do menor para o maior desempenho; textos sem aspas, ponto e vírgula nem vírgulas (o plugin rejeita), UTF-8 sem BOM, ponto decimal.\nA tarefa não pode ter rubrica definida antes; a rubrica entra como rascunho para você revisar e salvar como pronta.\nSem o plugin, use a planilha (.xlsx) ou o Material de Mediação para montar a rubrica à mão em Avaliação avançada > Rubrica.\n";
 async function downloadRubricsXlsx() {
   try {
     if (!window.JSZip) throw new Error("O componente de ZIP ainda não carregou. Recarregue a página e tente novamente.");
@@ -3786,7 +3796,7 @@ async function addDeliveryDocuments(blob, title) {
   let rubricPending = null;
   if (state.rubrics.length) {
     const used = new Set();
-    state.rubrics.forEach((rubric) => { let name = `rubrica-${rubricFileSlug(rubric.title)}`; const root = name; let n = 2; while (used.has(name)) name = `${root}-${n++}`; used.add(name); zip.file(`moodle/rubricas/${name}.csv`, rubricMoodleCsv(rubric)); });
+    moodleReadyRubrics().ready.forEach((rubric) => { let name = `rubrica-${rubricFileSlug(rubric.title)}`; const root = name; let n = 2; while (used.has(name)) name = `${root}-${n++}`; used.add(name); zip.file(`moodle/rubricas/${name}.csv`, rubricMoodleCsv(rubric)); });
     zip.file("moodle/rubricas/LEIA-ME.txt", localizeUnitText(rubricsCsvReadme(), unit));
     zip.file("professor/rubricas.xlsx", await createWorkbookFromSheets(window.JSZip, deepLocalizeUnit(rubricSheets(state.rubrics), unit), "uint8array"));
     rubricPending = state.rubrics.flatMap((rubric) => rubricIssues(rubric).map((issue) => `${rubric.title}: ${issue}`));
