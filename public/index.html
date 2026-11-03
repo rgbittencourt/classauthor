@@ -44,7 +44,7 @@
               <strong>Prof. Rogério G. Bittencourt</strong>
               <div class="welcome-inovalab-credit"><img src="./brand/inovalab-signature.png" alt="Logotipo completo do INOVALAB" /></div>
             </aside>
-            <div class="welcome-footer-meta"><span class="welcome-footer-description">Laboratório de Inovação e Tecnologia Educacional</span><span class="welcome-footer-separator" aria-hidden="true">•</span><a href="https://github.com/rgbittencourt" target="_blank" rel="noreferrer">github.com/rgbittencourt</a><span class="welcome-footer-separator" aria-hidden="true">•</span><em class="semver" title="Versionamento Semântico: MAIOR.MENOR.CORREÇÃO">v1.6.0</em></div>
+            <div class="welcome-footer-meta"><span class="welcome-footer-description">Laboratório de Inovação e Tecnologia Educacional</span><span class="welcome-footer-separator" aria-hidden="true">•</span><a href="https://github.com/rgbittencourt" target="_blank" rel="noreferrer">github.com/rgbittencourt</a><span class="welcome-footer-separator" aria-hidden="true">•</span><em class="semver" title="Versionamento Semântico: MAIOR.MENOR.CORREÇÃO">v1.7.0</em></div>
           </div>
         </div>
       </div>
@@ -232,6 +232,14 @@
       </div>
     </section>
 
+    <section class="lesson-modal hidden" id="cost-modal" aria-hidden="true">
+      <div class="lesson-dialog cost-dialog" role="dialog" aria-modal="true" aria-labelledby="cost-modal-title">
+        <header class="lesson-dialog-header"><div><p class="eyebrow">ANTES DE GERAR</p><h2 id="cost-modal-title">Quanto isto deve custar</h2></div><button class="close-modal" type="button" id="close-cost-modal" aria-label="Cancelar">×</button></header>
+        <article class="lesson-reader cost-body" id="cost-body"></article>
+        <div class="alignment-actions cost-actions"><label class="cost-skip"><input type="checkbox" id="cost-skip"> Não mostrar de novo (o custo continua no painel do projeto)</label><button type="button" class="button button-secondary" id="cost-cancel">Cancelar</button><button type="button" class="button button-primary" id="cost-go">Gerar agora</button></div>
+      </div>
+    </section>
+
     <section class="lesson-modal hidden" id="alignment-modal" aria-hidden="true">
       <div class="lesson-dialog alignment-dialog" role="dialog" aria-modal="true" aria-labelledby="alignment-modal-title">
         <header class="lesson-dialog-header"><div><p class="eyebrow">MAPA DE ALINHAMENTO</p><h2 id="alignment-modal-title">Objetivos, atividades e avaliações</h2></div><button class="close-modal" type="button" id="close-alignment-modal" aria-label="Fechar o mapa">×</button></header>
@@ -260,8 +268,8 @@
 
     <section class="empty-state" id="empty-state"><span class="empty-mark">01</span><p>Preencha o briefing para montar a primeira trilha semanal.</p></section>
   </main>
-  <footer class="site-footer"><span>ClassAuthor <span class="semver" title="Versionamento Semântico: MAIOR.MENOR.CORREÇÃO">v1.6.0</span> · desenvolvido por Rogério Bittencourt, INOVALAB - IFSC</span><span>Saída compatível com ClassAtelier · revisão humana antes da publicação</span></footer>
+  <footer class="site-footer"><span>ClassAuthor <span class="semver" title="Versionamento Semântico: MAIOR.MENOR.CORREÇÃO">v1.7.0</span> · desenvolvido por Rogério Bittencourt, INOVALAB - IFSC</span><span>Saída compatível com ClassAtelier · revisão humana antes da publicação</span></footer>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script type="module" src="/app.js?v=20261103-v1.6.0"></script>
+  <script type="module" src="/app.js?v=20261103-v1.7.0"></script>
 </body>
 </html>

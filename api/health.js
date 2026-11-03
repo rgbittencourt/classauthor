@@ -1,6 +1,7 @@
 import { APP_VERSION } from "../src/version.js";
 import { accessRequired } from "../src/access.js";
 import { aiConfigStatus, getAIModel, getAIProvider, getAITokenSettings, isAIConfigured } from "../src/ai-client.js";
+import { aiPricingStatus } from "../src/ai-usage.js";
 
 export default function handler(_request, response) {
   response.setHeader("Cache-Control", "no-store");
@@ -18,6 +19,7 @@ export default function handler(_request, response) {
     youtubeConfigured: Boolean(process.env.YOUTUBE_API_KEY),
     openAlexFallback: process.env.AULA_OPENALEX_ENABLED !== "false",
     model: getAIModel(),
+    pricing: aiPricingStatus(getAIModel()),
     autoRepair: process.env.AULA_AUTO_REPAIR !== "false",
     academicPipeline: process.env.AULA_ACADEMIC_PIPELINE !== "false",
     academicReview: process.env.AULA_ACADEMIC_REVIEW !== "false",

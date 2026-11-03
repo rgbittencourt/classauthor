@@ -7,6 +7,7 @@ import { buildFallbackLesson, normalizeCourseInput, normalizeLesson, normalizeWe
 import { assistBriefing, generateOneWeek, generateWithAI, regenerateMediationMessageWithAI, regenerateWeekWithAI } from "./ai.js";
 import { APP_VERSION } from "./version.js";
 import { aiConfigStatus, getAIModel, getAIProvider, getAITokenSettings, isAIConfigured } from "./ai-client.js";
+import { aiPricingStatus } from "./ai-usage.js";
 import { enrichLessonsWithResources } from "./research.js";
 import { createWeeksZip } from "./zip.js";
 import { accessRequired, hasValidAccess } from "./access.js";
@@ -53,6 +54,7 @@ app.get("/api/health", (_req, res) => {
     youtubeConfigured: Boolean(process.env.YOUTUBE_API_KEY),
     openAlexFallback: process.env.AULA_OPENALEX_ENABLED !== "false",
     model: getAIModel(),
+    pricing: aiPricingStatus(getAIModel()),
     autoRepair: process.env.AULA_AUTO_REPAIR !== "false",
     academicPipeline: process.env.AULA_ACADEMIC_PIPELINE !== "false",
     academicReview: process.env.AULA_ACADEMIC_REVIEW !== "false",

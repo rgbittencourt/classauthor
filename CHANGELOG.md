@@ -8,6 +8,15 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.7.0 · 03/11/2026 · Controle de custo da IA
+
+### Novo
+- **Estimativa antes de gerar**: ao clicar em «Gerar com IA», uma janela mostra quantas chamadas à IA, quantos tokens e **quanto deve custar, em reais (R$)**, em faixa (mínimo a máximo, com o valor provável). No modo «aprovar cada aula antes de gerar a próxima», mostra a rodada de uma aula e também o total da disciplina. Há «Cancelar» e a opção «Não mostrar de novo».
+- **Custo real**: o servidor mede o que cada chamada consumiu e o ClassAuthor soma por projeto. A coluna «Ações do projeto» mostra «IA neste projeto: ≈ R$ …» e, ao fim da geração, o aviso informa o custo daquela geração. O total fica salvo com o projeto.
+- **A estimativa aprende**: depois de cada geração, o consumo médio por semana é guardado neste navegador e usado nas próximas estimativas (faixa mais estreita).
+- **Preços e dólar**: referência do Claude Sonnet 5.5 (US$ 2 por milhão de tokens de entrada e US$ 10 de saída) e dólar a R$ 4,97 (23/10/2026). Troque com `AI_PRICE_INPUT_USD`, `AI_PRICE_OUTPUT_USD` e `AI_USD_BRL` no servidor. Modelo sem preço conhecido mostra só chamadas e tokens.
+- Todos os valores são **aproximados**: quem cobra é o provedor da IA.
+
 ## 1.6.0 · 03/11/2026 · Pacote único de entrega
 
 ### Novo

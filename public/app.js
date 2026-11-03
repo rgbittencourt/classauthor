@@ -3,6 +3,7 @@ import { parseSavedWeek, planPlacement } from "./week-import.js";
 import { alignmentSheets, bloomLabel, buildAlignmentMap } from "./alignment-map.js";
 import { createFichaDocx, fichaChecks, fichaDefaults, weightsTotal } from "./ficha-disciplina.js";
 import { deliveryReadme } from "./delivery-package.js";
+import { addUsage, costOf, emptyUsage, estimateGeneration, formatBRL, formatInt, subtractUsage, totalTokens, USD_BRL_DEFAULT } from "./ai-cost.js";
 import { createMoodleXml, quizQuestions } from "./moodle-xml.js";
 import { createProductionWorkbook, createWorkbookFromSheets, hasProduction, productionMarkdown, productionVideos, formatDuration } from "./production-xlsx.js";
 import { SOURCE_USAGES, deleteSourceDoc, importSourceFile, sourceExcerptsForWeek } from "./source-materials.js";
@@ -14,6 +15,90 @@ const $ = (selector) => document.querySelector(selector);
 const isGitHubPages = window.location.hostname.endsWith(".github.io");
 const createReviewMarks = () => ({ resources: {}, checks: {}, academic: {}, quality: {} });
 const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null, reviewMarks: createReviewMarks(), weekApprovals: {}, studioEdits: {}, activeReviewGuidance: null, generation: null, flow: emptyFlow(), production: emptyProduction() };
+state.cost = emptyUsage();
+
+// ── Custo da IA ──
+// O servidor devolve `usage` (chamadas e tokens) em toda resposta que usou IA. Aqui somamos por projeto,
+// mostramos o total em reais e guardamos o consumo médio por semana para estimar as próximas gerações.
+const COST_HISTORY_KEY = "classauthor:cost-history:v1";
+const COST_CONFIRM_KEY = "classauthor:cost-confirm:v1";
+let aiPricing = null; // { model, price, usdBrl, usdBrlSource }, vem de /api/health
+const nativeFetch = window.fetch.bind(window);
+window.fetch = async function trackedFetch(input, init) {
+  const response = await nativeFetch(input, init);
+  try {
+    const url = String(typeof input === "string" ? input : input?.url || "").replace(location.origin, "");
+    if (url.startsWith("/api/") && !url.startsWith("/api/health") && /json/i.test(response.headers.get("content-type") || "")) {
+      response.clone().json().then((data) => { if (data?.usage?.calls) addProjectUsage(data.usage); }).catch(() => {});
+    }
+  } catch { /* medir o custo nunca atrapalha a chamada */ }
+  return response;
+};
+function readCostHistory() { try { const rows = JSON.parse(localStorage.getItem(COST_HISTORY_KEY) || "[]"); return Array.isArray(rows) ? rows : []; } catch { return []; } }
+function rememberGenerationCost(weeks, usage) {
+  if (!(weeks > 0) || !(usage?.calls > 0)) return;
+  try { localStorage.setItem(COST_HISTORY_KEY, JSON.stringify(readCostHistory().concat([{ model: aiPricing?.model || "", weeks, usage, at: new Date().toISOString() }]).slice(-12))); } catch { /* sem armazenamento */ }
+}
+function projectCostText(usage) {
+  const cost = costOf(usage, aiPricing?.price, aiPricing?.usdBrl);
+  return cost ? `≈ ${formatBRL(cost.brl)}` : `${formatInt(totalTokens(usage))} tokens`;
+}
+function updateCostChip() {
+  const chip = document.getElementById("ai-cost-chip");
+  if (!chip) return;
+  const usage = state.cost || emptyUsage();
+  chip.hidden = !(usage.calls > 0);
+  if (chip.hidden) return;
+  chip.innerHTML = `IA neste projeto: <strong>${projectCostText(usage)}</strong> <span>· ${formatInt(usage.calls)} chamada${usage.calls === 1 ? "" : "s"}</span>`;
+  const rate = aiPricing?.price ? ` · dólar a ${formatBRL(aiPricing.usdBrl || USD_BRL_DEFAULT)}` : "";
+  chip.title = `${formatInt(usage.input)} tokens de entrada, ${formatInt(usage.output)} de saída${usage.cacheRead ? `, ${formatInt(usage.cacheRead)} lidos do cache` : ""}. Valor aproximado${rate}.`;
+}
+function addProjectUsage(usage) {
+  state.cost = addUsage(state.cost, usage);
+  updateCostChip();
+}
+function normalizeCost(value) {
+  return value && typeof value === "object" ? addUsage(emptyUsage(), value) : emptyUsage();
+}
+
+// Janela de estimativa antes de gerar. Devolve true para seguir e false para cancelar.
+function confirmGenerationCost({ input, startIndex }) {
+  try { if (localStorage.getItem(COST_CONFIRM_KEY) === "off") return Promise.resolve(true); } catch { /* segue e mostra */ }
+  const modal = $("#cost-modal");
+  if (!modal) return Promise.resolve(true);
+  const remaining = Math.max(1, input.weeks - startIndex);
+  const stepMode = stepModeEnabled() && remaining > 1;
+  const unit = courseUnit();
+  const L = (value) => escapeHtml(localizeUnitText(String(value), unit));
+  const est = estimateGeneration({ weeks: stepMode ? 1 : remaining, allWeeks: remaining, model: aiPricing?.model, price: aiPricing?.price, usdBrl: aiPricing?.usdBrl || USD_BRL_DEFAULT, history: readCostHistory() });
+  const money = (range) => range ? `<strong>${formatBRL(range.low)} a ${formatBRL(range.high)}</strong> <span>(provável ${formatBRL(range.mid)})</span>` : "<strong>não calculado</strong> <span>(preço deste modelo desconhecido)</span>";
+  const rows = [
+    [stepMode ? L("Semanas nesta rodada (aprovação semana a semana)") : L(`Semanas a gerar`), stepMode ? "1" : String(remaining)],
+    ["Chamadas à IA", `${formatInt(est.run.calls.low)} a ${formatInt(est.run.calls.high)}`],
+    ["Texto processado", `≈ ${formatInt(Math.round(est.run.tokens / 1000))} mil tokens`],
+    ["Custo aproximado", money(est.run.brl)]
+  ];
+  if (stepMode) rows.push([L(`Se gerar todas as ${remaining} semanas`), money(est.whole.brl)]);
+  const price = aiPricing?.price;
+  const basis = est.learned ? `Baseada em ${est.samples} geração(ões) suas anteriores com este modelo.` : "Valor típico de uma semana: ele fica mais preciso conforme você gera, porque o ClassAuthor aprende o consumo real.";
+  const how = price ? `Modelo ${escapeHtml(aiPricing.model)}: US$ ${price.input.toLocaleString("pt-BR")} por milhão de tokens de entrada e US$ ${price.output.toLocaleString("pt-BR")} de saída, com o dólar a ${formatBRL(aiPricing.usdBrl)} (${escapeHtml(aiPricing.usdBrlSource || "")}).` : `Modelo ${escapeHtml(aiPricing?.model || "desconhecido")}: sem preço cadastrado. Defina AI_PRICE_INPUT_USD e AI_PRICE_OUTPUT_USD no servidor para ver o valor em reais.`;
+  $("#cost-body").innerHTML = `<table class="cost-table"><tbody>${rows.map(([label, value]) => `<tr><th scope="row">${label}</th><td>${value}</td></tr>`).join("")}</tbody></table><p class="cost-note">${basis}</p><p class="cost-note">${how} É uma estimativa: quem cobra é o provedor da IA, e o valor real aparece no fim da geração.</p>`;
+  const skip = $("#cost-skip"); if (skip) skip.checked = false;
+  modal.classList.remove("hidden"); modal.setAttribute("aria-hidden", "false");
+  return new Promise((resolve) => {
+    const done = (answer) => {
+      modal.classList.add("hidden"); modal.setAttribute("aria-hidden", "true");
+      if (answer && skip?.checked) { try { localStorage.setItem(COST_CONFIRM_KEY, "off"); } catch { /* sem armazenamento */ } }
+      $("#cost-go").onclick = null; $("#cost-cancel").onclick = null; $("#close-cost-modal").onclick = null;
+      resolve(answer);
+    };
+    $("#cost-go").onclick = () => done(true);
+    $("#cost-cancel").onclick = () => done(false);
+    $("#close-cost-modal").onclick = () => done(false);
+    $("#cost-go").focus();
+  });
+}
+
 const blockLabels = { hero: "Abertura", topic: "Tópico", prose: "Texto", titulo: "Título", video: "Vídeo", materiais: "Materiais", quiz: "Quiz", destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", imagem: "Imagem", externalembed: "Conteúdo externo", accordion: "FAQ", columns: "Colunas", referencias: "Referências" };
 const DRAFT_STORAGE_KEY = "classauthor:draft:v2";
 const DRAFT_MAX_AGE_DAYS = 30;
@@ -140,6 +225,11 @@ function enhanceLayout() {
     button.classList.add("sidebar-action");
     if (["recalculate-button", "alignment-map-button", "ficha-button", "teacher-pdf-button", "zip-button"].includes(id)) button.disabled = true;
     actions.appendChild(button);
+    if (id === "generate-button") {
+      const costChip = document.createElement("p");
+      costChip.id = "ai-cost-chip"; costChip.className = "ai-cost-chip"; costChip.hidden = true;
+      actions.appendChild(costChip);
+    }
   });
   document.querySelector(".form-actions")?.remove();
   document.querySelector(".results-actions")?.remove();
@@ -508,6 +598,8 @@ function resetDisciplineForm(preserveSession = true) {
   state.weekApprovals = {};
   state.studioEdits = {};
   state.ficha = null;
+  state.cost = emptyUsage();
+  updateCostChip();
   state.production = emptyProduction();
   state.flow = emptyFlow(); state.lessonPlans = {};
   state.activeReviewGuidance = null;
@@ -599,6 +691,7 @@ function currentSnapshot() {
       production: state.production,
       stepFlow: state.flow,
       ficha: state.ficha || null,
+      aiCost: state.cost || null,
       lessonPlans: state.lessonPlans || {},
       generation: state.generation,
       weeks: state.weeks
@@ -933,6 +1026,8 @@ function restoreSnapshot(snapshot) {
   state.production = normalizeProductionState(snapshot.results?.production);
   state.flow = normalizeFlow(snapshot.results?.stepFlow);
   state.ficha = snapshot.results?.ficha && typeof snapshot.results.ficha === "object" ? snapshot.results.ficha : null;
+  state.cost = normalizeCost(snapshot.results?.aiCost);
+  updateCostChip();
   state.lessonPlans = snapshot.results?.lessonPlans && typeof snapshot.results.lessonPlans === "object" ? snapshot.results.lessonPlans : {};
   state.generation = snapshot.results?.generation || snapshot.generation || null;
   if (["running", "consolidating"].includes(state.generation?.status)) state.generation = { ...state.generation, status: "partial" };
@@ -3284,6 +3379,7 @@ async function generate() {
     openLessonPreview(startIndex - 1);
     return;
   }
+  if (!isGitHubPages && !(await confirmGenerationCost({ input, startIndex }))) return;
   if (!resumeGeneration) {
     state.flow = emptyFlow(); state.lessonPlans = {};
     state.weeks = []; refreshStudioWeekSelect();
@@ -3307,6 +3403,12 @@ async function generate() {
   setBusy(button, true, "Gerando material…");
   setAiActivity(resumeGeneration ? "Retomando geração" : "Preparando geração", resumeGeneration ? `As semanas anteriores foram preservadas. Continuando pela semana ${startIndex + 1} de ${input.weeks}…` : `A IA vai construir ${input.weeks} semana(s), uma por vez, e depois consolidar o curso…`, { progress: resumeGeneration ? Math.round((startIndex / (input.weeks + 1)) * 100) : 0 });
   $("#result-alert").classList.add("hidden");
+  const costBase = { ...(state.cost || emptyUsage()) };
+  const costNote = (weeksDone) => {
+    const spent = subtractUsage(state.cost, costBase);
+    rememberGenerationCost(weeksDone, spent);
+    return spent.calls > 0 ? ` Custo desta geração: ${projectCostText(spent)} (${formatInt(spent.calls)} chamadas à IA).` : "";
+  };
   try {
     if (isGitHubPages) {
       throw new Error("A IA está disponível na URL Vercel, onde o backend protegido pode ser acessado. Abra o ClassAuthor pela versão publicada com IA.");
@@ -3314,14 +3416,14 @@ async function generate() {
     const data = await generateDistributed(input, accessCode, button, { startIndex, initialWeeks: resumeGeneration ? state.weeks : [], initialTeacherGuides: resumeGeneration ? state.teacherGuides : [], formSignature, stepMode: stepModeEnabled() });
     if (data?.stepPaused) {
       button.dataset.label = `Gerar a semana ${data.index + 2}`;
-      finishAiActivity("Semana pronta para revisão", `Revise a semana ${data.index + 1}, refaça se quiser e aprove para gerar a próxima.`, "success");
+      finishAiActivity("Semana pronta para revisão", `Revise a semana ${data.index + 1}, refaça se quiser e aprove para gerar a próxima.${costNote(1)}`, "success", 6000);
       openLessonPreview(data.index);
       return;
     }
     state.generation = null;
     button.dataset.label = "Gerar com IA";
     renderWeeks(data);
-    finishAiActivity("Geração concluída", `${input.weeks} semana(s) foram geradas e consolidadas. Revise o resultado antes de exportar.`, "success");
+    finishAiActivity("Geração concluída", `${input.weeks} semana(s) foram geradas e consolidadas. Revise o resultado antes de exportar.${costNote(input.weeks - startIndex)}`, "success", 8000);
   } catch (error) {
     const completedWeeks = Array.isArray(error.completedWeeks) ? error.completedWeeks : state.weeks;
     const completedTeacherGuides = Array.isArray(error.completedTeacherGuides) ? error.completedTeacherGuides : state.teacherGuides;
@@ -3592,6 +3694,8 @@ async function loadHealth() {
       const data = await response.json();
       if (!data || data.ok === false) throw new Error("health inválido");
       aiConfigured = Boolean(data.aiConfigured);
+      aiPricing = data.pricing || null;
+      updateCostChip();
       status.innerHTML = `<span class="status-dot ${data.aiConfigured ? "online" : "warning"}"></span>${data.aiConfigured ? (data.accessRequired ? "IA configurada · acesso protegido" : "IA configurada") : `modo exemplo · chave pendente${data.missingKey ? ` (${data.missingKey}${data.environment ? ` não definida no ambiente ${data.environment}` : ""})` : ""}`}${data.aiConfigured && data.resourceResearch && !data.youtubeConfigured ? " · vídeos aguardando chave" : ""}`;
       if (!data.aiConfigured) {
         setButtonLabel($("#assist-button"), "IA pendente");

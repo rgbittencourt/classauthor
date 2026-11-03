@@ -1,4 +1,5 @@
 import { localizeUnit } from "./unit.js";
+import { recordAIUsage } from "./ai-usage.js";
 const normalizeProvider = (value) => {
   const provider = String(value || "openai").trim().toLowerCase();
   return provider === "anthropic" || provider === "claude" ? "anthropic" : "openai";
@@ -323,6 +324,7 @@ export async function callJson(messages, options = {}) {
       body: JSON.stringify(request.body)
     });
     const payload = await response.json().catch(() => ({}));
+    recordAIUsage(payload, getAIModel());
     const providerError = providerErrorMessage(payload, response);
     if (!response.ok || providerError && !payload?.choices && !payload?.content) {
       // Configuração de raciocínio recusada por este modelo: volta ao padrão da API e tenta de novo.
@@ -410,6 +412,7 @@ export async function callText(messages, options = {}) {
     const request = buildRequest(messages, { ...options, plainText: true }, maxTokens);
     const response = await fetch(request.url, { method: "POST", headers: request.headers, body: JSON.stringify(request.body) });
     const payload = await response.json().catch(() => ({}));
+    recordAIUsage(payload, getAIModel());
     const providerError = providerErrorMessage(payload, response);
     if (!response.ok || providerError && !payload?.choices && !payload?.content) {
       // Configuração de raciocínio recusada por este modelo: volta ao padrão da API e tenta de novo.
