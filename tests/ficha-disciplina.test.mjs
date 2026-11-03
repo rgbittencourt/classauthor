@@ -78,3 +78,23 @@ test("o .docx tem as seções do modelo, o negrito das referências e o rodapé"
 test("public/ficha-disciplina.js e public/abnt.js são cópias idênticas de src/", () => {
   for (const file of ["ficha-disciplina.js", "abnt.js"]) assert.equal(read(`../public/${file}`), read(`../src/${file}`), file);
 });
+
+import { deliveryReadme } from "../src/delivery-package.js";
+
+test("o índice do pacote lista as pastas e diz a verdade sobre as pendências", () => {
+  const files = ["classatelier/a.json", "classauthor/a.json", "moodle/a.xml", "professor/m.pdf", "coordenacao/mapa-de-alinhamento.xlsx", "planejamento-geral.json"];
+  const full = deliveryReadme({ title: "Curso X", version: "1.6.0", files, pending: { weeks: [2, 3], alignment: { issues: 4, withoutActivity: 2, withoutQuestion: 1, withoutEvidence: 1 }, ficha: null } });
+  assert.match(full, /PACOTE DE ENTREGA — Curso X/);
+  assert.match(full, /classatelier\/ {2}\(1 arquivo\)/);
+  assert.match(full, /Semanas ainda não liberadas.*2, 3/);
+  assert.match(full, /4 lacuna\(s\)/);
+  assert.match(full, /Ficha da disciplina.*ainda não foi preenchida/);
+  assert.match(full, /Não há planilha de produção/);
+  assert.doesNotMatch(full, /\n {2}praticas\//, "pasta ausente não aparece");
+  const clean = deliveryReadme({ title: "Curso X", files: [...files, "producao/p.xlsx", "coordenacao/plano-de-ensino-x.docx"], pending: { weeks: [], alignment: { issues: 0 }, ficha: [] } });
+  assert.match(clean, /Nada pendente conhecido/);
+});
+
+test("public/delivery-package.js é cópia idêntica de src/", () => {
+  assert.equal(read("../public/delivery-package.js"), read("../src/delivery-package.js"));
+});

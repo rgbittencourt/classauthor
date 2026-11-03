@@ -15,6 +15,7 @@ export const SUBFOLDERS = Object.freeze([
   ["professor", "Material de Mediação do professor (PDF)"],
   ["praticas", "Roteiros das práticas, laboratórios e aulas síncronas (DOCX e anexos)"],
   ["producao", "Produção audiovisual: planilha e roteiros de vídeo"],
+  ["coordenacao", "Para a coordenação: Plano de Ensino (ficha da disciplina), Mapa de alinhamento e o índice do pacote"],
   ["pacotes", "Pacotes completos (ZIP)"],
   ["fontes", "Cópias das apostilas e livros anexados como fonte (PDF, DOCX)"],
   ["textos", "Textos editados e outros arquivos"]
@@ -95,6 +96,7 @@ export function subfolderFor(filename = "") {
   if (/-classauthor\.json$/.test(name)) return "classauthor";
   if (/\.xml$/.test(name)) return "moodle";
   if (/mediacao.*\.pdf$|\.pdf$/.test(name)) return "professor";
+  if (/^plano-de-ensino.*\.docx$|mapa-de-alinhamento.*\.xlsx$|^leia-me/.test(name)) return "coordenacao";
   if (/\.docx$|webpratica|pratica|laboratorio/.test(name)) return "praticas";
   if (/\.xlsx$|roteiros-de-video|producao/.test(name)) return "producao";
   if (/\.zip$/.test(name)) return "pacotes";

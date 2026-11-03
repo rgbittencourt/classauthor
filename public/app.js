@@ -2,6 +2,7 @@ import { toStudentLesson, toGeneratorWeek } from "./student-export.js";
 import { parseSavedWeek, planPlacement } from "./week-import.js";
 import { alignmentSheets, bloomLabel, buildAlignmentMap } from "./alignment-map.js";
 import { createFichaDocx, fichaChecks, fichaDefaults, weightsTotal } from "./ficha-disciplina.js";
+import { deliveryReadme } from "./delivery-package.js";
 import { createMoodleXml, quizQuestions } from "./moodle-xml.js";
 import { createProductionWorkbook, createWorkbookFromSheets, hasProduction, productionMarkdown, productionVideos, formatDuration } from "./production-xlsx.js";
 import { SOURCE_USAGES, deleteSourceDoc, importSourceFile, sourceExcerptsForWeek } from "./source-materials.js";
@@ -1935,14 +1936,17 @@ function fichaMutate(change) {
   scheduleSave();
 }
 
+async function fichaLogo(ficha) {
+  if (!ficha?.header) return null;
+  try { const response = await fetch("./brand/ifsc-institutional-mark.png"); if (response.ok) return new Uint8Array(await response.arrayBuffer()); } catch { /* sem logotipo: o documento sai sem cabeçalho */ }
+  return null;
+}
+
 async function downloadFicha() {
   try {
     if (!window.JSZip) throw new Error("O componente de ZIP ainda não carregou. Recarregue a página e tente novamente.");
     persistFicha();
-    let logo = null;
-    if (state.ficha.header) {
-      try { const response = await fetch("./brand/ifsc-institutional-mark.png"); if (response.ok) logo = new Uint8Array(await response.arrayBuffer()); } catch { /* sem logotipo: o documento sai sem cabeçalho */ }
-    }
+    const logo = await fichaLogo(state.ficha);
     const ficha = deepLocalizeUnit(state.ficha, courseUnit());
     const blob = await createFichaDocx(window.JSZip, ficha, { logo, output: "blob" });
     downloadBlob(blob, `plano-de-ensino-${slugify(state.ficha.unit || state.input?.title || "curso")}.docx`);
@@ -3480,6 +3484,30 @@ function downloadProductionMarkdown() {
   downloadBlob(new Blob([productionMarkdown(state.production, { title })], { type: "text/markdown;charset=utf-8" }), `${slugify(title)}-roteiros-de-video.md`);
 }
 
+// Acrescenta ao ZIP da aula os documentos da coordenação (Plano de Ensino e Mapa de alinhamento)
+// e o índice LEIA-ME.txt, que diz o que há em cada pasta e o que ainda está pendente.
+async function addDeliveryDocuments(blob, title) {
+  const unit = courseUnit();
+  const zip = await window.JSZip.loadAsync(blob);
+  const hasPlan = state.weeks.some((lesson) => lesson?.lessonPlan);
+  let alignment = null;
+  if (hasPlan) {
+    const map = alignmentMapData();
+    alignment = map.summary;
+    zip.file("coordenacao/mapa-de-alinhamento.xlsx", await createWorkbookFromSheets(window.JSZip, deepLocalizeUnit(alignmentSheets(map, { title }), unit), "uint8array"));
+  }
+  let fichaPending = null;
+  if (state.ficha && hasPlan) {
+    const logo = await fichaLogo(state.ficha);
+    zip.file(`coordenacao/plano-de-ensino-${slugify(state.ficha.unit || title)}.docx`, await createFichaDocx(window.JSZip, deepLocalizeUnit(state.ficha, unit), { logo, output: "uint8array" }));
+    fichaPending = fichaChecks(state.ficha);
+  }
+  const notReleased = state.weeks.map((_, index) => index).filter((index) => !weekReleased(index)).map((index) => index + 1);
+  const readme = deliveryReadme({ title, version: (document.querySelector(".site-footer .semver")?.textContent || "").replace(/^v/, ""), files: Object.keys(zip.files).filter((name) => !zip.files[name].dir), pending: { weeks: notReleased, alignment, ficha: fichaPending }, unitLabel: unit === "aula" ? "Aula" : "Semana" });
+  zip.file("LEIA-ME.txt", localizeUnitText(readme, unit));
+  return zip.generateAsync({ type: "blob", compression: "DEFLATE" });
+}
+
 async function downloadZip() {
   if (!state.weeks.length) return;
   const button = $("#zip-button");
@@ -3492,12 +3520,12 @@ async function downloadZip() {
       state.weeks.forEach((lesson, index) => { zip.file(`classatelier/${weekFileName(lesson, index, "ClassAtelier.json")}`, JSON.stringify(studentProjectFor(index), null, 2)); zip.file(`classauthor/${weekFileName(lesson, index, "ClassAuthor.json")}`, JSON.stringify(toGeneratorWeek(lesson, state.teacherGuides?.[index]), null, 2)); const xml = createMoodleXml(lesson, { courseTitle: currentInput.title, weekNumber: index + 1 }); if (xml) zip.file(`moodle/${weekFileName(lesson, index, "Quiz.xml")}`, xml); });
       if (state.generalPlan) zip.file("planejamento-geral.json", JSON.stringify(state.generalPlan, null, 2));
       zip.file("professor/LEIA-ME.txt", "O Material de Mediação em PDF é gerado na versão Vercel com backend. Este modo público contém apenas o exemplo do aluno.");
-      downloadBlob(await zip.generateAsync({ type: "blob", compression: "DEFLATE" }), `${slugify(currentInput.title)}-semanas.zip`);
+      downloadBlob(await addDeliveryDocuments(await zip.generateAsync({ type: "blob", compression: "DEFLATE" }), currentInput.title), `${slugify(currentInput.title)}-semanas.zip`);
       return;
     }
     const response = await fetch("/api/zip", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: currentInput, weeks: state.weeks, teacherGuides: state.teacherGuides, weekApprovals: state.weekApprovals, production: state.production }) });
     if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Não foi possível montar o ZIP."); }
-    downloadBlob(await response.blob(), `${slugify(currentInput.title)}-semanas.zip`);
+    downloadBlob(await addDeliveryDocuments(await response.blob(), currentInput.title), `${slugify(currentInput.title)}-semanas.zip`);
   } catch (error) { showError(error.message); }
   finally { button.disabled = false; button.classList.remove("is-loading"); }
 }

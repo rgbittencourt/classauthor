@@ -8,6 +8,13 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.6.0 · 03/11/2026 · Pacote único de entrega
+
+### Novo
+- **O pacote completo (ZIP) agora é o pacote de entrega**: além das semanas, ele leva a pasta `coordenacao/` com o **Mapa de alinhamento** (`mapa-de-alinhamento.xlsx`) e, se a Ficha da disciplina estiver preenchida, o **Plano de Ensino** (`plano-de-ensino-….docx`).
+- **LEIA-ME.txt** na raiz do ZIP: diz o que há em cada pasta e **o que ainda está pendente** (semanas não liberadas, lacunas do mapa de alinhamento, ficha por preencher ou com avisos, falta de planilha de produção). O pacote não finge estar completo.
+- Nova subpasta de projeto **coordenacao** (Ficha e Mapa agora são salvos nela, e não em «professor»).
+
 ## 1.5.0 · 03/11/2026 · Ficha da disciplina (Plano de Ensino)
 
 ### Novo

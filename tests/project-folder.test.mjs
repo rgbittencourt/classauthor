@@ -13,6 +13,8 @@ test("cada arquivo salvo vai para a subpasta certa da pasta do projeto", () => {
     "Aula01-webpratica.docx": "praticas",
     "banco-de-dados-planilha-de-producao.xlsx": "producao",
     "banco-de-dados-roteiros-de-video.md": "producao",
+    "plano-de-ensino-banco-de-dados.docx": "coordenacao",
+    "banco-de-dados-mapa-de-alinhamento.xlsx": "coordenacao",
     "banco-de-dados-aulas.zip": "pacotes",
     "Aula01-Texto-editado.txt": "textos"
   };
