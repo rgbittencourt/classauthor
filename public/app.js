@@ -22,7 +22,11 @@ state.cost = emptyUsage();
 // mostramos o total em reais e guardamos o consumo médio por semana para estimar as próximas gerações.
 const COST_HISTORY_KEY = "classauthor:cost-history:v1";
 const COST_CONFIRM_KEY = "classauthor:cost-confirm:v1";
+const USD_OVERRIDE_KEY = "classauthor:usd-brl:v1";
 let aiPricing = null; // { model, price, usdBrl, usdBrlSource }, vem de /api/health
+// Cotação em uso: a que você digitou na janela de estimativa; senão a do servidor (automática da internet ou fixada).
+function usdBrlOverride() { try { const v = Number(String(localStorage.getItem(USD_OVERRIDE_KEY) || "").replace(",", ".")); return v > 0 ? v : 0; } catch { return 0; } }
+function usdBrlRate() { return usdBrlOverride() || aiPricing?.usdBrl || USD_BRL_DEFAULT; }
 const nativeFetch = window.fetch.bind(window);
 window.fetch = async function trackedFetch(input, init) {
   const response = await nativeFetch(input, init);
@@ -40,7 +44,7 @@ function rememberGenerationCost(weeks, usage) {
   try { localStorage.setItem(COST_HISTORY_KEY, JSON.stringify(readCostHistory().concat([{ model: aiPricing?.model || "", weeks, usage, at: new Date().toISOString() }]).slice(-12))); } catch { /* sem armazenamento */ }
 }
 function projectCostText(usage) {
-  const cost = costOf(usage, aiPricing?.price, aiPricing?.usdBrl);
+  const cost = costOf(usage, aiPricing?.price, usdBrlRate());
   return cost ? `≈ ${formatBRL(cost.brl)}` : `${formatInt(totalTokens(usage))} tokens`;
 }
 function updateCostChip() {
@@ -50,7 +54,7 @@ function updateCostChip() {
   chip.hidden = !(usage.calls > 0);
   if (chip.hidden) return;
   chip.innerHTML = `IA neste projeto: <strong>${projectCostText(usage)}</strong> <span>· ${formatInt(usage.calls)} chamada${usage.calls === 1 ? "" : "s"}</span>`;
-  const rate = aiPricing?.price ? ` · dólar a ${formatBRL(aiPricing.usdBrl || USD_BRL_DEFAULT)}` : "";
+  const rate = aiPricing?.price ? ` · dólar a ${formatBRL(usdBrlRate())}` : "";
   chip.title = `${formatInt(usage.input)} tokens de entrada, ${formatInt(usage.output)} de saída${usage.cacheRead ? `, ${formatInt(usage.cacheRead)} lidos do cache` : ""}. Valor aproximado${rate}.`;
 }
 function addProjectUsage(usage) {
@@ -70,19 +74,29 @@ function confirmGenerationCost({ input, startIndex }) {
   const stepMode = stepModeEnabled() && remaining > 1;
   const unit = courseUnit();
   const L = (value) => escapeHtml(localizeUnitText(String(value), unit));
-  const est = estimateGeneration({ weeks: stepMode ? 1 : remaining, allWeeks: remaining, model: aiPricing?.model, price: aiPricing?.price, usdBrl: aiPricing?.usdBrl || USD_BRL_DEFAULT, history: readCostHistory() });
   const money = (range) => range ? `<strong>${formatBRL(range.low)} a ${formatBRL(range.high)}</strong> <span>(provável ${formatBRL(range.mid)})</span>` : "<strong>não calculado</strong> <span>(preço deste modelo desconhecido)</span>";
-  const rows = [
-    [stepMode ? L("Semanas nesta rodada (aprovação semana a semana)") : L(`Semanas a gerar`), stepMode ? "1" : String(remaining)],
-    ["Chamadas à IA", `${formatInt(est.run.calls.low)} a ${formatInt(est.run.calls.high)}`],
-    ["Texto processado", `≈ ${formatInt(Math.round(est.run.tokens / 1000))} mil tokens`],
-    ["Custo aproximado", money(est.run.brl)]
-  ];
-  if (stepMode) rows.push([L(`Se gerar todas as ${remaining} semanas`), money(est.whole.brl)]);
   const price = aiPricing?.price;
-  const basis = est.learned ? `Baseada em ${est.samples} geração(ões) suas anteriores com este modelo.` : "Valor típico de uma semana: ele fica mais preciso conforme você gera, porque o ClassAuthor aprende o consumo real.";
-  const how = price ? `Modelo ${escapeHtml(aiPricing.model)}: US$ ${price.input.toLocaleString("pt-BR")} por milhão de tokens de entrada e US$ ${price.output.toLocaleString("pt-BR")} de saída, com o dólar a ${formatBRL(aiPricing.usdBrl)} (${escapeHtml(aiPricing.usdBrlSource || "")}).` : `Modelo ${escapeHtml(aiPricing?.model || "desconhecido")}: sem preço cadastrado. Defina AI_PRICE_INPUT_USD e AI_PRICE_OUTPUT_USD no servidor para ver o valor em reais.`;
-  $("#cost-body").innerHTML = `<table class="cost-table"><tbody>${rows.map(([label, value]) => `<tr><th scope="row">${label}</th><td>${value}</td></tr>`).join("")}</tbody></table><p class="cost-note">${basis}</p><p class="cost-note">${how} É uma estimativa: quem cobra é o provedor da IA, e o valor real aparece no fim da geração.</p>`;
+  const renderFigures = () => {
+    const est = estimateGeneration({ weeks: stepMode ? 1 : remaining, allWeeks: remaining, model: aiPricing?.model, price, usdBrl: usdBrlRate(), history: readCostHistory() });
+    const rows = [
+      [stepMode ? L("Semanas nesta rodada (aprovação semana a semana)") : L("Semanas a gerar"), stepMode ? "1" : String(remaining)],
+      ["Chamadas à IA", `${formatInt(est.run.calls.low)} a ${formatInt(est.run.calls.high)}`],
+      ["Texto processado", `≈ ${formatInt(Math.round(est.run.tokens / 1000))} mil tokens`],
+      ["Custo aproximado", money(est.run.brl)]
+    ];
+    if (stepMode) rows.push([L(`Se gerar todas as ${remaining} semanas`), money(est.whole.brl)]);
+    const basis = est.learned ? `Baseada em ${est.samples} geração(ões) suas anteriores com este modelo.` : "Valor típico de uma semana: ele fica mais preciso conforme você gera, porque o ClassAuthor aprende o consumo real.";
+    const how = price ? `Modelo ${escapeHtml(aiPricing.model)}: US$ ${price.input.toLocaleString("pt-BR")} por milhão de tokens de entrada e US$ ${price.output.toLocaleString("pt-BR")} de saída.` : `Modelo ${escapeHtml(aiPricing?.model || "desconhecido")}: sem preço cadastrado. Defina AI_PRICE_INPUT_USD e AI_PRICE_OUTPUT_USD no servidor para ver o valor em reais.`;
+    $("#cost-figures").innerHTML = `<table class="cost-table"><tbody>${rows.map(([label, value]) => `<tr><th scope="row">${label}</th><td>${value}</td></tr>`).join("")}</tbody></table><p class="cost-note">${basis}</p><p class="cost-note">${how} É uma estimativa: quem cobra é o provedor da IA, e o valor real aparece no fim da geração.</p>`;
+  };
+  const serverRate = aiPricing?.usdBrl || USD_BRL_DEFAULT;
+  $("#cost-body").innerHTML = `<div id="cost-figures"></div><div class="cost-rate"><label for="cost-rate-input">Cotação do dólar (R$)</label><input id="cost-rate-input" type="text" inputmode="decimal" value="${usdBrlOverride() ? String(usdBrlOverride()).replace(".", ",") : ""}" placeholder="${String(serverRate.toFixed(2)).replace(".", ",")}" autocomplete="off"><small>${usdBrlOverride() ? "Valor que você digitou (apague para voltar à cotação automática)." : `Em uso: ${formatBRL(serverRate)} · ${escapeHtml(aiPricing?.usdBrlSource || "valor de referência")}. Digite outro valor para trocar.`}</small></div>`;
+  renderFigures();
+  $("#cost-rate-input").addEventListener("change", (event) => {
+    const value = Number(String(event.target.value).replace(",", "."));
+    try { if (value > 0) localStorage.setItem(USD_OVERRIDE_KEY, String(value)); else localStorage.removeItem(USD_OVERRIDE_KEY); } catch { /* sem armazenamento */ }
+    renderFigures(); updateCostChip();
+  });
   const skip = $("#cost-skip"); if (skip) skip.checked = false;
   modal.classList.remove("hidden"); modal.setAttribute("aria-hidden", "false");
   return new Promise((resolve) => {

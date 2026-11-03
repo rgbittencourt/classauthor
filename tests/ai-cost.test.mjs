@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { PRICE_TABLE, DEFAULT_PER_WEEK, addUsage, costOf, emptyUsage, estimateGeneration, formatBRL, learnedPerWeek, priceFor, subtractUsage, totalTokens } from "../src/ai-cost.js";
-import { aiPricingStatus, normalizeProviderUsage, recordAIUsage } from "../src/ai-usage.js";
+import { aiPricingStatus, liveUsdBrl, normalizeProviderUsage, recordAIUsage, resetUsdBrlCache } from "../src/ai-usage.js";
 import { withUnit } from "../src/unit.js";
 
 test("public/ai-cost.js é cópia idêntica de src/ai-cost.js", () => {
@@ -21,12 +21,12 @@ test("preço do Claude Sonnet 5.5 e custo em reais", () => {
   assert.ok(PRICE_TABLE.length >= 3);
 });
 
-test("variáveis de ambiente valem para qualquer modelo", () => {
+test("variáveis de ambiente valem para qualquer modelo", async () => {
   const price = priceFor("modelo-x", { input: "1", output: "4" });
   assert.equal(price.input, 1);
   assert.equal(price.output, 4);
   process.env.AI_PRICE_INPUT_USD = "3"; process.env.AI_PRICE_OUTPUT_USD = "15"; process.env.AI_USD_BRL = "5.5";
-  const status = aiPricingStatus("qualquer");
+  const status = await aiPricingStatus("qualquer");
   delete process.env.AI_PRICE_INPUT_USD; delete process.env.AI_PRICE_OUTPUT_USD; delete process.env.AI_USD_BRL;
   assert.equal(status.price.output, 15);
   assert.equal(status.usdBrl, 5.5);
@@ -113,4 +113,38 @@ test("rota sem chamada de IA não recebe `usage`; contadores de pedidos simultâ
     response.json({ n });
   })({ body: {} }, { json: (payload) => results.push(payload), setHeader() {} })));
   for (const row of results) assert.equal(row.usage.calls, row.n);
+});
+
+const okJson = (data) => async () => ({ ok: true, json: async () => data });
+
+test("cotação automática do dólar, com cache, fonte reserva e descarte de valor absurdo", async () => {
+  resetUsdBrlCache();
+  let calls = 0;
+  const first = await liveUsdBrl(async (url) => { calls += 1; return /awesomeapi/.test(url) ? { ok: true, json: async () => ({ USDBRL: { bid: "5.31" } }) } : { ok: false }; });
+  assert.equal(first.value, 5.31);
+  assert.equal(first.source, "AwesomeAPI");
+  await liveUsdBrl(async () => { calls += 1; throw new Error("não deveria chamar: tem cache"); });
+  assert.equal(calls, 1);
+  resetUsdBrlCache();
+  const backup = await liveUsdBrl(async (url) => (/awesomeapi/.test(url) ? { ok: false } : { ok: true, json: async () => ({ rates: { BRL: 5.2 } }) }));
+  assert.equal(backup.value, 5.2);
+  resetUsdBrlCache();
+  assert.equal(await liveUsdBrl(okJson({ USDBRL: { bid: "0.5" } })), null);
+  assert.equal(await liveUsdBrl(async () => { throw new Error("sem internet"); }), null);
+});
+
+test("preço: AI_USD_BRL fixo vence a automática, que vence a de referência", async () => {
+  resetUsdBrlCache();
+  const net = async () => ({ ok: true, json: async () => ({ USDBRL: { bid: "5.40" } }) });
+  const auto = await aiPricingStatus("claude-sonnet-5-5", net);
+  assert.equal(auto.usdBrl, 5.4);
+  assert.equal(auto.usdBrlAuto, true);
+  process.env.AI_USD_BRL = "6";
+  const fixed = await aiPricingStatus("claude-sonnet-5-5", net);
+  delete process.env.AI_USD_BRL;
+  assert.equal(fixed.usdBrl, 6);
+  resetUsdBrlCache();
+  const offline = await aiPricingStatus("claude-sonnet-5-5", async () => { throw new Error("off"); });
+  assert.equal(offline.usdBrl, 5.49);
+  assert.match(offline.usdBrlSource, /referência/);
 });

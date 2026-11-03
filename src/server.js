@@ -39,7 +39,7 @@ app.use(express.json({ limit: "4mb" }));
 app.use("/api", (req, res, next) => withUnit(() => next())(req, res));
 app.use(express.static(publicDir, { etag: true }));
 
-app.get("/api/health", (_req, res) => {
+app.get("/api/health", async (_req, res) => {
   const settings = getAITokenSettings();
   res.json({
     ok: true,
@@ -54,7 +54,7 @@ app.get("/api/health", (_req, res) => {
     youtubeConfigured: Boolean(process.env.YOUTUBE_API_KEY),
     openAlexFallback: process.env.AULA_OPENALEX_ENABLED !== "false",
     model: getAIModel(),
-    pricing: aiPricingStatus(getAIModel()),
+    pricing: await aiPricingStatus(getAIModel()),
     autoRepair: process.env.AULA_AUTO_REPAIR !== "false",
     academicPipeline: process.env.AULA_ACADEMIC_PIPELINE !== "false",
     academicReview: process.env.AULA_ACADEMIC_REVIEW !== "false",

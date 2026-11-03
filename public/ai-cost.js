@@ -5,7 +5,7 @@
 // podem ser trocados por variáveis de ambiente (AI_PRICE_INPUT_USD, AI_PRICE_OUTPUT_USD, AI_USD_BRL).
 // Tudo o que aparece para a pessoa é mostrado em reais (R$) e sempre como valor APROXIMADO.
 
-export const USD_BRL_DEFAULT = 4.97; // referência de 23/10/2026; ajuste com AI_USD_BRL
+export const USD_BRL_DEFAULT = 5.49; // referência de 03/11/2026 (informada pelo professor); ajuste com AI_USD_BRL
 
 // Dólares por MILHÃO de tokens. Ordem importa: a primeira regra que combinar vale.
 export const PRICE_TABLE = Object.freeze([

@@ -46,10 +46,43 @@ export function withUsage(handler) {
   };
 }
 
+// ── Cotação do dólar ──
+// Ordem: AI_USD_BRL (você fixou) > cotação automática da internet > valor de referência embutido.
+// A cotação automática vem de uma API pública gratuita (AwesomeAPI; se falhar, open.er-api.com),
+// fica em memória por 6 horas e, se a internet falhar, o servidor usa o valor de referência.
+const RATE_TTL_MS = 6 * 60 * 60 * 1000;
+const RATE_SOURCES = [
+  { name: "AwesomeAPI", url: "https://economia.awesomeapi.com.br/json/last/USD-BRL", read: (data) => Number(data?.USDBRL?.bid) },
+  { name: "open.er-api.com", url: "https://open.er-api.com/v6/latest/USD", read: (data) => Number(data?.rates?.BRL) }
+];
+let rateCache = null;
+
+export function resetUsdBrlCache() { rateCache = null; }
+
+export async function liveUsdBrl(fetchImpl = globalThis.fetch) {
+  if (rateCache && Date.now() - rateCache.at < RATE_TTL_MS) return rateCache;
+  for (const source of RATE_SOURCES) {
+    try {
+      const response = await fetchImpl(source.url, { signal: AbortSignal.timeout(2500), headers: { Accept: "application/json" } });
+      if (!response.ok) continue;
+      const value = source.read(await response.json());
+      // Cotação absurda (erro da fonte) é descartada.
+      if (Number.isFinite(value) && value > 2 && value < 15) { rateCache = { value, source: source.name, at: Date.now() }; return rateCache; }
+    } catch { /* tenta a próxima fonte */ }
+  }
+  return null;
+}
+
 // Preço e cotação em uso (ambiente > tabela), para o navegador converter em reais.
-export function aiPricingStatus(model) {
+export async function aiPricingStatus(model, fetchImpl) {
   const env = process.env;
   const price = priceFor(model, { input: env.AI_PRICE_INPUT_USD, output: env.AI_PRICE_OUTPUT_USD });
-  const usdBrl = Number(env.AI_USD_BRL) > 0 ? Number(env.AI_USD_BRL) : USD_BRL_DEFAULT;
-  return { model, price, usdBrl, usdBrlSource: Number(env.AI_USD_BRL) > 0 ? "ambiente" : "referência de 23/10/2026" };
+  const fixed = Number(env.AI_USD_BRL) > 0 ? Number(env.AI_USD_BRL) : 0;
+  if (fixed) return { model, price, usdBrl: fixed, usdBrlSource: "fixada no servidor (AI_USD_BRL)" };
+  const live = env.AI_USD_BRL_AUTO === "false" ? null : await liveUsdBrl(fetchImpl);
+  if (live) {
+    const when = new Date(live.at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    return { model, price, usdBrl: live.value, usdBrlSource: `cotação automática (${live.source}, ${when})`, usdBrlAuto: true };
+  }
+  return { model, price, usdBrl: USD_BRL_DEFAULT, usdBrlSource: "valor de referência de 03/11/2026; sem acesso à cotação da internet" };
 }
