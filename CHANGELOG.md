@@ -8,6 +8,10 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.12.1 · 03/11/2026 · Manual Class atualizado
+
+- O **Manual Class** descreve o alinhamento do texto do Parágrafo, novo no ClassAtelier 1.12.0. O ClassAuthor em si não mudou.
+
 ## 1.12.0 · 03/11/2026 · Chaves de API próprias (passar o ClassAuthor para outro professor)
 
 - **Sem o código de acesso, o ClassAuthor pede as chaves da própria pessoa.** Na entrada, o código passou a ser opcional: deixando em branco, abre a janela **Chaves de API** (provedor Anthropic ou OpenAI, chave de IA e, se quiser, chave do YouTube). O botão **Minhas chaves**, no cabeçalho, abre a mesma janela a qualquer momento.
