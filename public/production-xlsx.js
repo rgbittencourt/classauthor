@@ -226,7 +226,12 @@ const sheetName = (name, taken) => {
 // JSZipConstructor: window.JSZip no navegador, ou o import de "jszip" no servidor.
 // output: "blob" (navegador) | "nodebuffer" | "uint8array" | "base64".
 export async function createProductionWorkbook(JSZipConstructor, production, meta = {}, output = "uint8array") {
-  const sheets = productionSheets(production, meta);
+  return createWorkbookFromSheets(JSZipConstructor, productionSheets(production, meta), output);
+}
+
+// Monta um .xlsx a partir de abas { name, columns: [{ header, width, center }], rows: [[...]] }.
+// Também usado pelo Mapa de alinhamento.
+export async function createWorkbookFromSheets(JSZipConstructor, sheets, output = "uint8array") {
   const taken = new Set();
   const names = sheets.map((sheet) => sheetName(sheet.name, taken));
   const zip = new JSZipConstructor();

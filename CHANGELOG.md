@@ -8,6 +8,20 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.4.0 · 03/11/2026 · Mapa de alinhamento do curso
+
+### Novo
+- **Mapa de alinhamento** (botão na coluna «Ações do projeto»): cruza, semana a semana, os **objetivos** com as **atividades**, as **evidências**, as **questões da avaliação** e a **carga horária**, e aponta o que falta: objetivo sem atividade, sem questão ou sem evidência; verbo vago (nível de Bloom); atividade ou questão que não serve a nenhum objetivo; semana sem objetivos, sem atividade ou sem avaliação; carga calculada mais de 15% acima ou abaixo da meta; objetivo da UC que nenhuma semana parece cobrir (estimativa por palavras em comum, para você conferir); curso inteiro só nos níveis lembrar e entender. Cada lacuna tem o botão «Abrir semana» (ou «Abrir aula»). O mapa também baixa em **planilha (.xlsx)** com as abas Mapa, Carga e Lacunas.
+- **Só conta vínculo de verdade.** Quando a IA não ligou um objetivo a uma atividade, evidência ou questão, o app já preenchia por rodízio para o campo não ficar vazio. Agora esses preenchimentos ficam marcados como **estimados** (campos `activitiesInferred`, `evidenceInferred` e `questionsInferred` na matriz de alinhamento): aparecem em itálico no mapa e **não fecham a lacuna**. Semanas geradas antes dessa versão não têm a marca e são lidas como declaradas.
+- O mapa respeita «Aula» ou «Semana» nos rótulos, nos textos e na planilha.
+
+### Mudou por dentro
+- A taxonomia de Bloom foi para `src/bloom.js` (com cópia idêntica em `public/bloom.js`, que o navegador usa); `methodology.js` continua exportando as mesmas funções. `src/production-xlsx.js` ganhou `createWorkbookFromSheets`, que monta uma planilha a partir de abas; a planilha de produção funciona como antes.
+- Testes novos (`tests/alignment-map.test.mjs`) conferem as regras de lacuna, a marca de estimado e as cópias idênticas dos arquivos compartilhados.
+
+### Compatibilidade
+- Nada muda nos arquivos salvos: os campos novos são só acrescentados à matriz de alinhamento. Backups e semanas antigas abrem como antes.
+
 ## 1.3.1 · 03/11/2026 · Manual Class dentro do app
 
 **Acrescentado**

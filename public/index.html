@@ -44,7 +44,7 @@
               <strong>Prof. Rogério G. Bittencourt</strong>
               <div class="welcome-inovalab-credit"><img src="./brand/inovalab-signature.png" alt="Logotipo completo do INOVALAB" /></div>
             </aside>
-            <div class="welcome-footer-meta"><span class="welcome-footer-description">Laboratório de Inovação e Tecnologia Educacional</span><span class="welcome-footer-separator" aria-hidden="true">•</span><a href="https://github.com/rgbittencourt" target="_blank" rel="noreferrer">github.com/rgbittencourt</a><span class="welcome-footer-separator" aria-hidden="true">•</span><em class="semver" title="Versionamento Semântico: MAIOR.MENOR.CORREÇÃO">v1.3.1</em></div>
+            <div class="welcome-footer-meta"><span class="welcome-footer-description">Laboratório de Inovação e Tecnologia Educacional</span><span class="welcome-footer-separator" aria-hidden="true">•</span><a href="https://github.com/rgbittencourt" target="_blank" rel="noreferrer">github.com/rgbittencourt</a><span class="welcome-footer-separator" aria-hidden="true">•</span><em class="semver" title="Versionamento Semântico: MAIOR.MENOR.CORREÇÃO">v1.4.0</em></div>
           </div>
         </div>
       </div>
@@ -232,8 +232,16 @@
       </div>
     </section>
 
+    <section class="lesson-modal hidden" id="alignment-modal" aria-hidden="true">
+      <div class="lesson-dialog alignment-dialog" role="dialog" aria-modal="true" aria-labelledby="alignment-modal-title">
+        <header class="lesson-dialog-header"><div><p class="eyebrow">MAPA DE ALINHAMENTO</p><h2 id="alignment-modal-title">Objetivos, atividades e avaliações</h2></div><button class="close-modal" type="button" id="close-alignment-modal" aria-label="Fechar o mapa">×</button></header>
+        <article class="lesson-reader alignment-body" id="alignment-body"></article>
+        <div class="alignment-actions"><button type="button" class="button button-secondary" id="alignment-xlsx-button">Baixar planilha (.xlsx)</button><button type="button" class="button button-primary" id="alignment-close-button">Fechar</button></div>
+      </div>
+    </section>
+
     <details class="results-section hidden" id="results-section">
-      <summary class="results-header"><div><p class="eyebrow">RESULTADO</p><h2 id="results-title">Semanas geradas</h2><p id="results-subtitle"></p></div><div class="results-actions"><button class="button button-secondary" type="button" id="recalculate-button"><span class="button-label">Recalcular qualidade</span><span class="button-arrow">↻</span></button><button class="button button-secondary" type="button" id="production-sheet-button" disabled title="Roteiros de vídeo, slides e narração das semanas e da UC">Planilha de produção <span class="button-arrow">↓</span></button><button class="button button-secondary" type="button" id="teacher-pdf-button">Material de Mediação PDF <span class="button-arrow">↓</span></button><button class="button button-primary" type="button" id="zip-button">Pacote completo ZIP <span class="button-arrow">↓</span></button></div><span class="sector-chevron results-section-chevron" aria-hidden="true">⌄</span></summary>
+      <summary class="results-header"><div><p class="eyebrow">RESULTADO</p><h2 id="results-title">Semanas geradas</h2><p id="results-subtitle"></p></div><div class="results-actions"><button class="button button-secondary" type="button" id="alignment-map-button" title="Cruza objetivos, atividades, evidências, questões e carga de todas as semanas e aponta o que está faltando">Mapa de alinhamento</button><button class="button button-secondary" type="button" id="recalculate-button"><span class="button-label">Recalcular qualidade</span><span class="button-arrow">↻</span></button><button class="button button-secondary" type="button" id="production-sheet-button" disabled title="Roteiros de vídeo, slides e narração das semanas e da UC">Planilha de produção <span class="button-arrow">↓</span></button><button class="button button-secondary" type="button" id="teacher-pdf-button">Material de Mediação PDF <span class="button-arrow">↓</span></button><button class="button button-primary" type="button" id="zip-button">Pacote completo ZIP <span class="button-arrow">↓</span></button></div><span class="sector-chevron results-section-chevron" aria-hidden="true">⌄</span></summary>
       <div class="results-body">
         <div class="result-alert hidden" id="result-alert"></div>
         <div class="general-plan hidden" id="general-plan"></div>
@@ -244,8 +252,8 @@
 
     <section class="empty-state" id="empty-state"><span class="empty-mark">01</span><p>Preencha o briefing para montar a primeira trilha semanal.</p></section>
   </main>
-  <footer class="site-footer"><span>ClassAuthor <span class="semver" title="Versionamento Semântico: MAIOR.MENOR.CORREÇÃO">v1.3.1</span> · desenvolvido por Rogério Bittencourt, INOVALAB - IFSC</span><span>Saída compatível com ClassAtelier · revisão humana antes da publicação</span></footer>
+  <footer class="site-footer"><span>ClassAuthor <span class="semver" title="Versionamento Semântico: MAIOR.MENOR.CORREÇÃO">v1.4.0</span> · desenvolvido por Rogério Bittencourt, INOVALAB - IFSC</span><span>Saída compatível com ClassAtelier · revisão humana antes da publicação</span></footer>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script type="module" src="/app.js?v=20261103-v1.3.1b"></script>
+  <script type="module" src="/app.js?v=20261103-v1.4.0b"></script>
 </body>
 </html>

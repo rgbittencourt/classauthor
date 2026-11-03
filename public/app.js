@@ -1,7 +1,8 @@
 import { toStudentLesson, toGeneratorWeek } from "./student-export.js";
 import { parseSavedWeek, planPlacement } from "./week-import.js";
+import { alignmentSheets, bloomLabel, buildAlignmentMap } from "./alignment-map.js";
 import { createMoodleXml, quizQuestions } from "./moodle-xml.js";
-import { createProductionWorkbook, hasProduction, productionMarkdown, productionVideos, formatDuration } from "./production-xlsx.js";
+import { createProductionWorkbook, createWorkbookFromSheets, hasProduction, productionMarkdown, productionVideos, formatDuration } from "./production-xlsx.js";
 import { SOURCE_USAGES, deleteSourceDoc, importSourceFile, sourceExcerptsForWeek } from "./source-materials.js";
 import { deepLocalizeUnit, localizeUnitText } from "./unit-text.js";
 import { DRAFT_FILE, chooseProjectFolder, folderPermission, folderSupported, forgetProjectFolder, loadProjectFolder, openExistingProjectFolder, projectFolder, saveToProjectFolder, SUBFOLDERS } from "./project-folder.js";
@@ -129,13 +130,13 @@ function enhanceLayout() {
   const actions = document.createElement("section");
   actions.className = "sidebar-actions";
   actions.innerHTML = '<p class="sidebar-label">AÇÕES DO PROJETO</p>';
-  ["assist-button", "generate-button", "recalculate-button", "teacher-pdf-button", "zip-button"].forEach((id) => {
+  ["assist-button", "generate-button", "recalculate-button", "alignment-map-button", "teacher-pdf-button", "zip-button"].forEach((id) => {
     const button = $("#" + id);
     if (!button) return;
     // O seletor do fluxo semana a semana fica logo acima do botão de gerar.
     if (id === "generate-button") { const stepToggle = $(".step-mode-toggle"); if (stepToggle) actions.appendChild(stepToggle); }
     button.classList.add("sidebar-action");
-    if (["recalculate-button", "teacher-pdf-button", "zip-button"].includes(id)) button.disabled = true;
+    if (["recalculate-button", "alignment-map-button", "teacher-pdf-button", "zip-button"].includes(id)) button.disabled = true;
     actions.appendChild(button);
   });
   document.querySelector(".form-actions")?.remove();
@@ -1825,6 +1826,74 @@ function openLessonPreview(index) {
   document.body.style.overflow = "hidden";
 }
 
+// ---------- Mapa de alinhamento ----------
+function alignmentMapData() {
+  return buildAlignmentMap({ input: state.input || formInput(), weeks: state.weeks, workload: state.workload });
+}
+
+function openAlignmentMap() {
+  if (!state.weeks?.some((lesson) => lesson?.lessonPlan)) { showError("Gere pelo menos uma semana para montar o mapa de alinhamento."); return; }
+  const unit = courseUnit();
+  const L = (value) => escapeHtml(localizeUnitText(String(value ?? ""), unit));
+  const map = alignmentMapData();
+  const s = map.summary;
+  const chip = (label, value, bad) => `<span class="am-chip ${bad ? "am-chip-gap" : "am-chip-ok"}"><strong>${value}</strong> ${escapeHtml(label)}</span>`;
+  const chips = [
+    chip("objetivos", s.objectives, false),
+    chip("sem atividade", s.withoutActivity, s.withoutActivity > 0),
+    chip("sem questão na avaliação", s.withoutQuestion, s.withoutQuestion > 0),
+    chip("sem evidência", s.withoutEvidence, s.withoutEvidence > 0),
+    chip("atividades sem objetivo", s.orphanActivities, s.orphanActivities > 0),
+    chip(localizeUnitText("semanas acima da carga", unit), s.overloadedWeeks, s.overloadedWeeks > 0)
+  ].join("");
+  const sevLabel = { alta: "Alta", media: "Média", info: "Aviso" };
+  const issuesMarkup = map.issues.length
+    ? `<ol class="am-issues">${map.issues.map((item) => `<li class="am-sev-${item.severity}"><span class="am-sev">${sevLabel[item.severity]}</span> ${L(item.text)}${item.weekNumber ? ` <button type="button" class="am-open-week" data-week="${item.weekNumber - 1}">Abrir ${escapeHtml(localizeUnitText("semana", unit))}</button>` : ""}</li>`).join("")}</ol>`
+    : `<p class="am-allgood">Nenhuma lacuna encontrada nas ${escapeHtml(localizeUnitText("semanas", unit))} geradas.</p>`;
+  const estimatedNote = s.estimatedLinks ? `<p class="am-note">Em ${s.estimatedLinks} objetivo(s), a ligação com atividade ou questão foi apenas <em>estimada</em> pelo app (a IA não indicou). Elas aparecem em itálico e <strong>não contam</strong> como vínculo: a lacuna continua aberta até você ou a IA ligar de verdade.</p>` : "";
+  const courseMarkup = map.courseObjectives.length ? `<section class="am-section"><h3>Objetivos da UC</h3><p class="am-note">Estimativa por palavras em comum com os objetivos das ${escapeHtml(localizeUnitText("semanas", unit))}: serve para achar objetivo que ficou sem cobertura, mas confira com o seu olhar.</p><table class="am-table"><thead><tr><th>Objetivo da UC</th><th>${L("Semanas")} que parecem cobri-lo</th></tr></thead><tbody>${map.courseObjectives.map((item) => `<tr><td>${L(item.objective)}</td><td class="${item.covered ? "am-ok" : "am-gap"}">${item.covered ? item.weeks.map((week) => `${escapeHtml(localizeUnitText("Semana", unit))} ${week}`).join(", ") : "Nenhuma"}</td></tr>`).join("")}</tbody></table></section>` : "";
+  const mark = (ok, label, estimated) => `<td class="${ok ? "am-ok" : "am-gap"}${estimated ? " am-est" : ""}">${label}</td>`;
+  const weeksMarkup = map.weeks.map((week) => {
+    if (!week.generated) return `<details class="am-week"><summary><strong>${L("Semana")} ${week.weekNumber}</strong> <span class="am-muted">ainda não gerada</span></summary></details>`;
+    const loadLabel = { acima: "acima da meta", abaixo: "abaixo da meta", ok: "dentro da meta", "sem-dado": "" }[week.load.status];
+    const loadChip = loadLabel ? `<span class="am-load am-load-${week.load.status}">${Math.round(week.load.calculated)} de ${Math.round(week.load.target)} min · ${loadLabel}</span>` : "";
+    const rows = week.objectives.map((row) => `<tr>
+      <td><span class="am-num">${row.position}</span> ${L(row.objective)}</td>
+      <td class="am-center">${row.vague ? `<span class="am-gap-text">verbo vago</span>` : escapeHtml(bloomLabel(row.bloom))}</td>
+      ${mark(row.hasActivity, row.activities.length ? row.activities.map((item) => `<span class="${item.estimated ? "am-est-item" : ""}">${L(item.title)}${item.estimated ? " (estimada)" : ""}</span>`).join("<br>") : "Sem atividade", row.activities.length && !row.hasActivity)}
+      ${mark(row.hasEvidence, row.evidence ? `<span class="${row.evidenceEstimated ? "am-est-item" : ""}">${L(row.evidence)}${row.evidenceEstimated ? " (estimada)" : ""}</span>` : "Sem evidência", Boolean(row.evidence) && !row.hasEvidence)}
+      ${mark(row.hasQuestion, row.questions.length ? row.questions.map((item) => `<span class="${item.estimated ? "am-est-item" : ""}">Questão ${item.number}${item.estimated ? " (estimada)" : ""}</span>`).join(", ") : "Sem questão", row.questions.length && !row.hasQuestion)}
+    </tr>`).join("");
+    const orphans = [
+      week.orphanActivities.length ? `<li><strong>Atividades sem objetivo:</strong> ${week.orphanActivities.map((item) => L(item.title)).join("; ")}</li>` : "",
+      week.orphanQuestions.length ? `<li><strong>Questões sem objetivo:</strong> ${week.orphanQuestions.map((item) => item.number).join(", ")}</li>` : ""
+    ].join("");
+    return `<details class="am-week" open><summary><strong>${L("Semana")} ${week.weekNumber}</strong> <span>${L(week.theme)}</span> ${loadChip}</summary>
+      ${week.objectives.length ? `<div class="am-scroll"><table class="am-table"><thead><tr><th>Objetivo</th><th>Bloom</th><th>Atividade</th><th>Evidência</th><th>Avaliação</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="am-gap-text">Esta ${escapeHtml(localizeUnitText("semana", unit))} não tem objetivos.</p>`}
+      ${orphans ? `<ul class="am-orphans">${orphans}</ul>` : ""}</details>`;
+  }).join("");
+  $("#alignment-body").innerHTML = `<div class="am-chips">${chips}</div>${estimatedNote}<section class="am-section"><h3>O que falta</h3>${issuesMarkup}</section>${courseMarkup}<section class="am-section"><h3>Semana a semana</h3>${weeksMarkup}</section>`;
+  $("#alignment-body").querySelectorAll(".am-open-week").forEach((button) => button.addEventListener("click", () => { closeAlignmentMap(); openLessonPreview(Number(button.dataset.week)); }));
+  $("#alignment-modal").classList.remove("hidden");
+  $("#alignment-modal").setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+}
+
+function closeAlignmentMap() {
+  $("#alignment-modal").classList.add("hidden");
+  $("#alignment-modal").setAttribute("aria-hidden", "true");
+  document.body.style.overflow = "";
+}
+
+async function downloadAlignmentMap() {
+  try {
+    if (!window.JSZip) throw new Error("O componente de ZIP ainda não carregou. Recarregue a página e tente novamente.");
+    const title = state.input?.title || formInput().title;
+    const blob = await createWorkbookFromSheets(window.JSZip, deepLocalizeUnit(alignmentSheets(alignmentMapData(), { title }), courseUnit()), "blob");
+    downloadBlob(blob, `${slugify(title)}-mapa-de-alinhamento.xlsx`);
+  } catch (error) { showError(error.message); }
+}
+
 function closeLessonPreview() {
   $("#lesson-modal").classList.add("hidden");
   $("#lesson-modal").setAttribute("aria-hidden", "true");
@@ -2431,6 +2500,8 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
   if (teacherPdfButton) teacherPdfButton.disabled = aiActionBusy || !data.weeks.length;
   const zipButton = $("#zip-button");
   if (zipButton) zipButton.disabled = !complete;
+  const alignmentButton = $("#alignment-map-button");
+  if (alignmentButton) alignmentButton.disabled = !data.weeks.some((lesson) => lesson?.lessonPlan);
   updateProductionSheetButton();
   renderProductionUcCard();
   updateMediationExportHint();
@@ -3103,7 +3174,7 @@ async function generate() {
   const button = $("#generate-button");
   if (!beginAiAction(button)) return;
   button.dataset.label = resumeGeneration ? `Continuar da semana ${startIndex + 1}` : "Gerar com IA";
-  ["recalculate-button", "teacher-pdf-button", "zip-button"].forEach((id) => { const action = $("#" + id); if (action) action.disabled = true; });
+  ["recalculate-button", "alignment-map-button", "teacher-pdf-button", "zip-button"].forEach((id) => { const action = $("#" + id); if (action) action.disabled = true; });
   setBusy(button, true, "Gerando material…");
   setAiActivity(resumeGeneration ? "Retomando geração" : "Preparando geração", resumeGeneration ? `As semanas anteriores foram preservadas. Continuando pela semana ${startIndex + 1} de ${input.weeks}…` : `A IA vai construir ${input.weeks} semana(s), uma por vez, e depois consolidar o curso…`, { progress: resumeGeneration ? Math.round((startIndex / (input.weeks + 1)) * 100) : 0 });
   $("#result-alert").classList.add("hidden");
@@ -3423,6 +3494,10 @@ $("#production-sheet-button")?.addEventListener("click", downloadProductionSheet
 $("#teacher-pdf-button").addEventListener("click", downloadTeacherPdf);
 $("#recalculate-button").addEventListener("click", recalculateQuality);
 $("#close-lesson-modal").addEventListener("click", closeLessonPreview);
+$("#alignment-map-button")?.addEventListener("click", openAlignmentMap);
+$("#close-alignment-modal")?.addEventListener("click", closeAlignmentMap);
+$("#alignment-close-button")?.addEventListener("click", closeAlignmentMap);
+$("#alignment-xlsx-button")?.addEventListener("click", downloadAlignmentMap);
 $("#close-lesson-modal-secondary").addEventListener("click", closeLessonPreview);
 $("#regenerate-week-button").addEventListener("click", regenerateSelectedWeek);
 $("#lesson-modal").addEventListener("click", (event) => { if (event.target.id === "lesson-modal") closeLessonPreview(); });

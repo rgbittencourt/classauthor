@@ -78,6 +78,10 @@ export function buildAlignmentMatrix(plan = {}) {
     const section = sections[index % Math.max(1, sections.length)];
     const activity = activities[index % Math.max(1, activities.length)];
     const question = questions[index % Math.max(1, questions.length)];
+    // Quando a IA não ligou o objetivo a uma atividade, evidência ou questão, o app preenche por rodízio
+    // (para o campo nunca ficar vazio). Esses preenchimentos ficam marcados como estimados, para o Mapa
+    // de alinhamento não contá-los como vínculo de verdade. A marca se mantém se o plano for normalizado de novo.
+    const declared = (value) => Array.isArray(value) && value.some((item) => text(typeof item === "object" ? item.id || item.title || item.number : item));
     return {
       id: text(source.id, `alignment-${index + 1}`),
       objective,
@@ -85,6 +89,9 @@ export function buildAlignmentMatrix(plan = {}) {
       activities: ids(source.activities, activity ? text(activity.id || activity.title) : ""),
       evidence: text(source.evidence || activity?.evidence || activity?.product || activity?.delivery || (question ? "Resposta fundamentada na avaliação" : "Registro de aplicação ou reflexão")),
       assessmentQuestions: ids(source.assessmentQuestions, question ? text(question.id || `question-${index + 1}`) : ""),
+      activitiesInferred: source.activitiesInferred === true || !declared(source.activities),
+      evidenceInferred: source.evidenceInferred === true || !text(source.evidence),
+      questionsInferred: source.questionsInferred === true || !declared(source.assessmentQuestions),
       learningEvidence: text(source.learningEvidence || source.evidenceType, activity?.evidenceType || "produção observável do estudante"),
       alignmentNote: text(source.alignmentNote, "Verificar se conteúdo, atividade, evidência e avaliação exigem o mesmo verbo de ação do objetivo.")
     };
