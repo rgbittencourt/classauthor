@@ -1,3 +1,4 @@
+import { envKey } from "../src/user-keys.js";
 import { APP_VERSION } from "../src/version.js";
 import { accessRequired } from "../src/access.js";
 import { aiConfigStatus, getAIModel, getAIProvider, getAITokenSettings, isAIConfigured } from "../src/ai-client.js";
@@ -16,7 +17,7 @@ export default async function handler(_request, response) {
     environment: aiConfigStatus().environment,
     accessRequired: accessRequired(),
     resourceResearch: process.env.AULA_RESOURCE_RESEARCH !== "false",
-    youtubeConfigured: Boolean(process.env.YOUTUBE_API_KEY),
+    youtubeConfigured: Boolean(envKey("YOUTUBE_API_KEY")),
     openAlexFallback: process.env.AULA_OPENALEX_ENABLED !== "false",
     model: getAIModel(),
     pricing: await aiPricingStatus(getAIModel()),

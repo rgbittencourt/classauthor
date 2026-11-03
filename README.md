@@ -4,7 +4,7 @@ Aplicação para transformar um briefing de curso em uma trilha semanal de aulas
 
 ## Versão
 
-Versão atual: **1.11.1** (Versionamento Semântico). O histórico está em [`CHANGELOG.md`](CHANGELOG.md); o número aparece no rodapé do aplicativo e em `/api/health`.
+Versão atual: **1.12.0** (Versionamento Semântico). O histórico está em [`CHANGELOG.md`](CHANGELOG.md); o número aparece no rodapé do aplicativo e em `/api/health`.
 
 ## Manual
 
@@ -65,6 +65,18 @@ O ClassAuthor agora mantém uma camada compatível com OpenAI e Anthropic. A Ope
 Depois do Redeploy, o endpoint `/api/health` mostrará `provider: "anthropic"` e o modelo efetivo. A geração semanal, a assistência do briefing, a refação e as mensagens de mediação continuam usando o mesmo contrato JSON do ClassAuthor. A troca é reversível: remova `AI_PROVIDER` ou use `AI_PROVIDER=openai` para voltar à OpenAI.
 
 Claude pode ser melhor para coerência e redação longa em alguns testes, mas não é uma garantia automática. A Anthropic também aplica limites de RPM, tokens de entrada/saída por minuto e gasto mensal. Por isso, a comparação correta deve ser feita com o mesmo briefing, mesma quantidade de semanas e uma avaliação das semanas geradas, não apenas pela ausência de um erro de limite.
+
+## Passar o ClassAuthor para outro professor
+
+Há dois caminhos, e eles podem ser usados juntos:
+
+1. **Cópia própria (recomendado):** o outro professor cria a sua instalação, com as suas chaves. Nada dela passa pelo servidor do autor e nada usa as chaves do autor.
+
+   [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Frgbittencourt%2Fclassauthor&project-name=classauthor&repository-name=classauthor&env=AI_PROVIDER,ANTHROPIC_API_KEY,OPENAI_API_KEY,YOUTUBE_API_KEY,AULA_ACCESS_CODE&envDescription=Chaves%20de%20IA%20(Anthropic%20ou%20OpenAI)%2C%20YouTube%20(opcional)%20e%20um%20c%C3%B3digo%20de%20acesso%20%C3%A0%20sua%20escolha&envLink=https%3A%2F%2Fgithub.com%2Frgbittencourt%2Fclassauthor%23passar-o-classauthor-para-outro-professor)
+
+   No formulário da Vercel: `AI_PROVIDER` = `anthropic` (ou `openai`); a chave do provedor escolhido (`ANTHROPIC_API_KEY` ou `OPENAI_API_KEY`; a outra pode ficar com um traço); `YOUTUBE_API_KEY` (opcional, deixe um traço se não tiver); `AULA_ACCESS_CODE` com um código que só ele conhece. Depois do deploy, abra `/api/health` e confira provedor e modelo. O ClassAtelier e o ClassAcervo são páginas estáticas: ele os copia (fork) para o GitHub dele, liga o GitHub Pages e, no ClassAtelier, troca o endereço do ClassAuthor pelo da sua cópia.
+
+2. **Chaves próprias na instalação de outra pessoa:** quem não tem o código de acesso entra deixando o campo em branco; o ClassAuthor abre a janela **Chaves de API**, testa as chaves (sem gastar crédito) e passa a usar **só** as dele. Sem o código, o servidor nunca usa as chaves do dono. A chave fica só na memória da aba e o servidor não a guarda nem a registra. O **botão «Minhas chaves»** abre a mesma janela depois. Rota de teste: `POST /api/test-keys`.
 
 ## Passo a passo: publicar a versão com IA na Vercel
 

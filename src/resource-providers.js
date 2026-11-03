@@ -1,3 +1,4 @@
+import { youtubeKeyForRequest } from "./user-keys.js";
 const text = (value, fallback = "") => String(value ?? fallback).trim();
 const cleanHtml = (value) => text(value).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 const positive = (value) => { const number = Number(value); return Number.isFinite(number) && number > 0 ? number : 0; };
@@ -23,8 +24,8 @@ function isoDurationToMinutes(value) {
 }
 
 export async function searchYouTube(request, input) {
-  const key = process.env.YOUTUBE_API_KEY;
-  if (!key) return { request, provider: "youtube", status: "missing-api-key", candidates: [], note: "Cadastre YOUTUBE_API_KEY para pesquisar vídeos reais." };
+  const key = youtubeKeyForRequest();
+  if (!key) return { request, provider: "youtube", status: "missing-api-key", candidates: [], note: "Cadastre a chave do YouTube (variável YOUTUBE_API_KEY ou o botão Minhas chaves) para pesquisar vídeos reais." };
   try {
     const params = new URLSearchParams({ part: "snippet", q: request.query, type: "video", maxResults: "5", order: "relevance", regionCode: input.language === "pt-BR" ? "BR" : "US", relevanceLanguage: input.language === "pt-BR" ? "pt" : "en", safeSearch: "strict", videoEmbeddable: "true", videoSyndicated: "true", key });
     const result = await fetchJson(`https://www.googleapis.com/youtube/v3/search?${params}`);

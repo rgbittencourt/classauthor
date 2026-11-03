@@ -6,6 +6,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { localizeUnitText } from "../public/unit-text.js";
 import { withUsage } from "./ai-usage.js";
+import { withKeyContext } from "./access.js";
 
 export { localizeUnitText };
 
@@ -31,7 +32,7 @@ export function deepLocalize(value, unit = currentUnit(), depth = 0) {
 // Envolve um handler da API: com unidade "aula", o pedido é traduzido na entrada, o contexto fica
 // disponível para os geradores (IA, PDF, DOCX, ZIP) e a resposta JSON é traduzida na saída.
 export function withUnit(rawHandler) {
-  const handler = withUsage(rawHandler);
+  const handler = withKeyContext(withUsage(rawHandler));
   return async function unitHandler(request, response) {
     const unit = normalizeUnit(request?.body?.input?.unit || request?.body?.unit);
     if (unit !== "aula") return store.run({ unit }, () => handler(request, response));

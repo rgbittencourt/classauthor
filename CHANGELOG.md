@@ -8,6 +8,17 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.12.0 · 03/11/2026 · Chaves de API próprias (passar o ClassAuthor para outro professor)
+
+- **Sem o código de acesso, o ClassAuthor pede as chaves da própria pessoa.** Na entrada, o código passou a ser opcional: deixando em branco, abre a janela **Chaves de API** (provedor Anthropic ou OpenAI, chave de IA e, se quiser, chave do YouTube). O botão **Minhas chaves**, no cabeçalho, abre a mesma janela a qualquer momento.
+- **Regra de uso das chaves do servidor:** com o código certo, valem as chaves do servidor (a pessoa pode preferir a sua); **sem o código, o servidor nunca usa as suas próprias chaves**, nem a de IA nem a do YouTube. Quem traz chave própria usa o modelo padrão do provedor e só o endereço oficial dele.
+- **Como a chave é tratada:** fica só na memória da aba (some ao fechar ou recarregar), segue por conexão segura em cabeçalhos `x-aula-ai-key`, `x-aula-ai-provider` e `x-aula-youtube-key`, é usada na hora e **não é guardada nem registrada**. O formato é validado (impede injeção de cabeçalho).
+- **Testar chaves:** o botão **Usar estas chaves** primeiro confere cada uma com uma consulta gratuita ao provedor (lista de modelos; 1 unidade de cota no YouTube), sem gastar crédito de IA, e mostra o motivo se recusar. Rota nova `POST /api/test-keys` (ação `testkeys` em `api/regenerate-week.js`, sem nova função na Vercel).
+- **Custo em R$ com a chave própria:** o preço do modelo da pessoa entra no cálculo do custo.
+- **ClassAtelier:** na figura com IA e nas legendas do YouTube há o campo opcional «Sem o código? Use a sua chave de IA».
+- **Botão «Deploy to Vercel»** no README: o outro professor cria a própria cópia, com as próprias chaves, e nada passa pelo servidor do autor.
+- Código: `src/user-keys.js`, `src/keys-handler.js`, `public/own-keys.js`; `src/access.js` agora compara o código em tempo constante. Testes: `tests/own-keys.test.mjs`.
+
 ## 1.11.1 · 03/11/2026 · Manual Class atualizado
 
 - O **Manual Class** (aberto pelo botão **Manual ↗**) ganhou todos os recursos das versões 1.4.0 a 1.11.0: Mapa de alinhamento, Ficha da disciplina, pacote de entrega com LEIA-ME, custo da IA em reais e cotação do dólar, Rubricas de avaliação (cópia para o Moodle, CSV do Rubric Importer, planilha), Meu estilo de escrita e a rota de legendas do YouTube. Também traz as novidades do ClassAtelier (transcrição e legendas, modo apresentação, fóruns para criar no Moodle) e do ClassAcervo (miniaturas, testar links, relatório para o Moodle).

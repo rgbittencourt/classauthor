@@ -1,29 +1,36 @@
 import { localizeUnit } from "./unit.js";
 import { recordAIUsage } from "./ai-usage.js";
+import { ownAiContext, serverKeysBlocked, envKey } from "./user-keys.js";
 const normalizeProvider = (value) => {
   const provider = String(value || "openai").trim().toLowerCase();
   return provider === "anthropic" || provider === "claude" ? "anthropic" : "openai";
 };
 
 export function getAIProvider() {
+  const own = ownAiContext();
+  if (own) return own.provider;
   return normalizeProvider(process.env.AI_PROVIDER || process.env.AULA_AI_PROVIDER || "openai");
 }
 
 export function getAIModel() {
+  // Com chave própria, vale o modelo padrão do provedor (os ajustes de modelo do servidor são de quem o administra).
+  if (ownAiContext()) return getAIProvider() === "anthropic" ? "claude-sonnet-5-5" : "gpt-4o-mini";
   return getAIProvider() === "anthropic"
     ? (process.env.ANTHROPIC_MODEL || process.env.AI_MODEL || "claude-sonnet-5-5")
     : (process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || process.env.AI_MODEL || "gpt-4o-mini");
 }
 
 export function isAIConfigured() {
-  return Boolean(getAIProvider() === "anthropic" ? process.env.ANTHROPIC_API_KEY : process.env.OPENAI_API_KEY);
+  if (ownAiContext()) return true;
+  if (serverKeysBlocked()) return false;
+  return Boolean(envKey(getAIProvider() === "anthropic" ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY"));
 }
 
 // Diagnóstico sem segredos: qual variável falta e em que ambiente da Vercel o servidor está rodando.
 export function aiConfigStatus() {
   const provider = getAIProvider();
   const keyName = provider === "anthropic" ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY";
-  return { provider, keyName, configured: Boolean(process.env[keyName]), missingKey: process.env[keyName] ? null : keyName, environment: process.env.VERCEL_ENV || (process.env.VERCEL ? "vercel" : "local") };
+  return { provider, keyName, configured: Boolean(envKey(keyName)), missingKey: envKey(keyName) ? null : keyName, environment: process.env.VERCEL_ENV || (process.env.VERCEL ? "vercel" : "local") };
 }
 
 function providerNumberSetting(name, fallback) {
@@ -43,12 +50,16 @@ export function getAITokenSettings() {
 
 function providerBase() {
   const provider = getAIProvider();
-  const configured = provider === "anthropic" ? process.env.ANTHROPIC_BASE_URL : process.env.OPENAI_BASE_URL;
+  // Chave própria: sempre o endereço oficial do provedor (a chave nunca vai para um endereço configurado no servidor).
+  const configured = ownAiContext() ? "" : provider === "anthropic" ? process.env.ANTHROPIC_BASE_URL : process.env.OPENAI_BASE_URL;
   return (configured || (provider === "anthropic" ? "https://api.anthropic.com" : "https://api.openai.com/v1")).replace(/\/$/u, "");
 }
 
 function providerKey() {
-  return getAIProvider() === "anthropic" ? process.env.ANTHROPIC_API_KEY : process.env.OPENAI_API_KEY;
+  const own = ownAiContext();
+  if (own) return own.aiKey;
+  if (serverKeysBlocked()) return "";
+  return envKey(getAIProvider() === "anthropic" ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY");
 }
 
 function endpointUrl() {

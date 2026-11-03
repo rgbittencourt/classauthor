@@ -26,7 +26,7 @@ export function applyCors(request, response) {
     response.setHeader("Access-Control-Allow-Origin", origin);
     response.setHeader("Vary", "Origin");
     response.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    response.setHeader("Access-Control-Allow-Headers", "Content-Type, x-aula-access-code");
+    response.setHeader("Access-Control-Allow-Headers", "Content-Type, x-aula-access-code, x-aula-ai-key, x-aula-ai-provider, x-aula-youtube-key");
     response.setHeader("Access-Control-Max-Age", "600");
     return true;
   }

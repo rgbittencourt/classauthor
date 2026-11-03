@@ -726,3 +726,20 @@ button.studio-top-link img{width:24px;height:24px;border-radius:7px}
 .style-on{padding-top:8px}.style-add{display:flex;gap:8px;margin-top:10px}.style-add input{flex:1;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13.5px}
 .style-habits{margin:8px 0 10px;font-size:13px}.style-chip{display:inline-block;margin:2px 4px 2px 0;padding:2px 9px;border-radius:99px;background:#f3e4dc;color:#7a3a22;font-size:12.5px}.style-chip small{opacity:.7}
 .link-button{border:0;background:none;color:var(--accent,#c4553a);text-decoration:underline;cursor:pointer;font:inherit;padding:0}
+
+/* Janela de chaves de API próprias */
+.keys-body{display:grid;gap:14px}
+.keys-lead{margin:0;padding:12px 14px;border-radius:10px;background:#fff3e9;color:#7a3a1d;font-size:14px;line-height:1.55}
+.keys-field{display:flex;flex-direction:column;gap:6px;color:var(--ink);font-size:13px;font-weight:700}
+.keys-field input,.keys-field select{height:44px;width:100%;padding:0 12px;border:1px solid #cfd6dc;border-radius:9px;background:#fff;color:var(--ink);font:inherit;font-weight:400}
+.keys-field input:focus,.keys-field select:focus{outline:none;border-color:var(--coral);box-shadow:0 0 0 3px var(--coral-soft)}
+.keys-field small{font-weight:400;color:#5e6875;line-height:1.5}
+.keys-field small a{color:#456b87}
+.keys-safe{margin:0;padding:12px 14px;border-radius:10px;background:#edf2ed;color:#43584b;font-size:12.5px;line-height:1.55}
+.keys-status{margin:0;min-height:20px;font-size:13px;color:#5e6875}
+.keys-status.error{color:#9a3e2c;font-weight:700}
+.keys-status.ok{color:#24623a;font-weight:700}
+#keys-modal{z-index:1100}
+
+#keys-clear[hidden]{display:none}
+.keys-body p{max-width:none}

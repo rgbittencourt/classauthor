@@ -40,6 +40,10 @@
       "dest": "/api/regenerate-week"
     },
     {
+      "src": "/api/test-keys",
+      "dest": "/api/regenerate-week"
+    },
+    {
       "src": "/api/lesson-plan",
       "dest": "/api/regenerate-week"
     },

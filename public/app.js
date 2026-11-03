@@ -10,6 +10,7 @@ import { activeStyleGuide, blocksText, diffSentences, habitsFrom, normalizeStyle
 import { createProductionWorkbook, createWorkbookFromSheets, hasProduction, productionMarkdown, productionVideos, formatDuration } from "./production-xlsx.js";
 import { SOURCE_USAGES, deleteSourceDoc, importSourceFile, sourceExcerptsForWeek } from "./source-materials.js";
 import { deepLocalizeUnit, localizeUnitText } from "./unit-text.js";
+import { ownKeys, installKeyFetch, openKeysModal } from "./own-keys.js";
 import { DRAFT_FILE, chooseProjectFolder, folderPermission, folderSupported, forgetProjectFolder, loadProjectFolder, openExistingProjectFolder, projectFolder, saveToProjectFolder, SUBFOLDERS } from "./project-folder.js";
 import { applyAdjustment, applyRewrite, approveWeek, bridgesBefore, canGenerateNext, dismissIssue, emptyFlow, normalizeFlow, recordGenerated, weekFlowStatus } from "./step-flow.js";
 
@@ -20,12 +21,15 @@ const state = { input: null, weeks: [], workload: null, generalPlan: null, teach
 state.cost = emptyUsage();
 state.rubrics = [];
 
+installKeyFetch(); // chaves próprias seguem em cabeçalhos x-aula-* nos pedidos a /api/
+
 // ── Custo da IA ──
 // O servidor devolve `usage` (chamadas e tokens) em toda resposta que usou IA. Aqui somamos por projeto,
 // mostramos o total em reais e guardamos o consumo médio por semana para estimar as próximas gerações.
 const COST_HISTORY_KEY = "classauthor:cost-history:v1";
 const COST_CONFIRM_KEY = "classauthor:cost-confirm:v1";
 const USD_OVERRIDE_KEY = "classauthor:usd-brl:v1";
+let serverHealth = { accessRequired: true, aiConfigured: false }; // o que o servidor informou em /api/health
 let aiPricing = null; // { model, price, usdBrl, usdBrlSource }, vem de /api/health
 // Cotação em uso: a que você digitou na janela de estimativa; senão a do servidor (automática da internet ou fixada).
 function usdBrlOverride() { try { const v = Number(String(localStorage.getItem(USD_OVERRIDE_KEY) || "").replace(",", ".")); return v > 0 ? v : 0; } catch { return 0; } }
@@ -557,22 +561,42 @@ function initializeWelcome() {
   hideRecoveryDock();
 }
 
-function enterFromWelcome(event) {
+async function enterFromWelcome(event) {
   event.preventDefault();
   const author = $("#welcome-author")?.value.trim() || "";
   const institution = $("#welcome-institution")?.value.trim() || "";
   const accessCode = $("#welcome-access-code")?.value || "";
-  const requiredFields = [[author, "#welcome-author"], [institution, "#welcome-institution"], [accessCode.trim(), "#welcome-access-code"]];
+  const requiredFields = [[author, "#welcome-author"], [institution, "#welcome-institution"]];
   const missingField = requiredFields.find(([value]) => !value);
   if (missingField) {
     $(missingField[1])?.focus();
     return;
+  }
+  // Sem o código de acesso: a pessoa usa as próprias chaves de API (IA e YouTube).
+  if (!accessCode.trim() && !ownKeys.has() && !isGitHubPages && (serverHealth.accessRequired || !serverHealth.aiConfigured)) {
+    const saved = await openKeysModal({ required: true });
+    if (!saved) return;
   }
   $("#author").value = author;
   $("#institution").value = institution;
   $("#access-code").value = accessCode;
   enterWorkspace();
 }
+
+// Estado do app quando a pessoa usa a própria chave: IA liberada, preço do modelo dela e aviso no cabeçalho.
+function applyOwnKeyState() {
+  if (!ownKeys.has()) return;
+  aiConfigured = true;
+  if (ownKeys.pricing()) aiPricing = ownKeys.pricing();
+  updateCostChip();
+  const status = $("#api-status");
+  const name = ownKeys.provider() === "anthropic" ? "Anthropic" : "OpenAI";
+  if (status) status.innerHTML = `<span class="status-dot online"></span>IA com a sua chave (${name})${ownKeys.hasYoutube() ? " · vídeos ligados" : " · sem busca de vídeos"}`;
+  if (buttonLabelNode($("#generate-button"))?.textContent === "IA pendente") setButtonLabel($("#generate-button"), "Gerar com IA");
+  if (buttonLabelNode($("#assist-button"))?.textContent === "IA pendente") setButtonLabel($("#assist-button"), "Preencher vazios com IA");
+  refreshAiButtonAvailability();
+}
+ownKeys.onChange(() => { if (ownKeys.has()) applyOwnKeyState(); else loadHealth(); });
 
 function resetDisciplineForm(preserveSession = true) {
   const session = {
@@ -667,6 +691,7 @@ function exitSession() {
   clearTimeout(saveTimer);
   saveTimer = null;
   safeStorageRemove();
+  ownKeys.clear();
   resetDisciplineForm(false);
   $("#welcome-author").value = "";
   $("#welcome-institution").value = "";
@@ -4043,11 +4068,13 @@ async function loadHealth() {
       if (!response.ok) throw new Error(`health HTTP ${response.status}`);
       const data = await response.json();
       if (!data || data.ok === false) throw new Error("health inválido");
+      serverHealth = { accessRequired: Boolean(data.accessRequired), aiConfigured: Boolean(data.aiConfigured) };
       aiConfigured = Boolean(data.aiConfigured);
       aiPricing = data.pricing || null;
       updateCostChip();
       status.innerHTML = `<span class="status-dot ${data.aiConfigured ? "online" : "warning"}"></span>${data.aiConfigured ? (data.accessRequired ? "IA configurada · acesso protegido" : "IA configurada") : `modo exemplo · chave pendente${data.missingKey ? ` (${data.missingKey}${data.environment ? ` não definida no ambiente ${data.environment}` : ""})` : ""}`}${data.aiConfigured && data.resourceResearch && !data.youtubeConfigured ? " · vídeos aguardando chave" : ""}`;
-      if (!data.aiConfigured) {
+      if (ownKeys.has()) applyOwnKeyState();
+      else if (!data.aiConfigured) {
         setButtonLabel($("#assist-button"), "IA pendente");
         setButtonLabel($("#generate-button"), "IA pendente");
       }
@@ -4087,6 +4114,7 @@ addMaterial();
 $("#welcome-form").addEventListener("submit", enterFromWelcome);
 $("#new-project-link").addEventListener("click", startNewProject);
 $("#exit-session-button").addEventListener("click", exitSession);
+$("#keys-open-button")?.addEventListener("click", () => { openKeysModal({ required: false }); });
 $("#studio-open-button").addEventListener("click", () => { const chosen = $("#studio-week-select").value; openInStudio(chosen === "" ? null : Number(chosen)); });
 $("#course-form").addEventListener("submit", (event) => { event.preventDefault(); generate(); });
 initStepMode();

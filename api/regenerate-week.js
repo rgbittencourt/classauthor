@@ -17,6 +17,7 @@ import lessonPlanHandler from "../src/lesson-plan.js";
 import rubricHandler from "../src/rubric.js";
 import captionsHandler from "../src/captions-handler.js";
 import styleHandler from "../src/style-handler.js";
+import keysHandler from "../src/keys-handler.js";
 
 async function handler(request, response) {
   // /api/bridge e /api/derivatives são encaminhados para esta função (limite de 12 funções do plano Hobby).
@@ -30,6 +31,7 @@ async function handler(request, response) {
   if (request.body?.action === "plan") return lessonPlanHandler(request, response);
   if (request.body?.action === "style") return styleHandler(request, response);
   if (request.body?.action === "captions") return captionsHandler(request, response);
+  if (request.body?.action === "testkeys") return keysHandler(request, response);
   if (request.body?.action === "rubric") return rubricHandler(request, response);
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });
   if (accessRequired() && !hasValidAccess(request)) return response.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });

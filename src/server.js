@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { envKey } from "./user-keys.js";
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,6 +29,7 @@ import rubricHandler from "./rubric.js";
 import captionsHandler from "./captions-handler.js";
 import styleHandler from "./style-handler.js";
 import lessonPlanHandler from "./lesson-plan.js";
+import keysHandler from "./keys-handler.js";
 import { withUnit } from "./unit.js";
 import regenerateWeekHandler from "../api/regenerate-week.js";
 
@@ -54,7 +56,7 @@ app.get("/api/health", async (_req, res) => {
     environment: aiConfigStatus().environment,
     accessRequired: accessRequired(),
     resourceResearch: process.env.AULA_RESOURCE_RESEARCH !== "false",
-    youtubeConfigured: Boolean(process.env.YOUTUBE_API_KEY),
+    youtubeConfigured: Boolean(envKey("YOUTUBE_API_KEY")),
     openAlexFallback: process.env.AULA_OPENALEX_ENABLED !== "false",
     model: getAIModel(),
     pricing: await aiPricingStatus(getAIModel()),
@@ -87,6 +89,7 @@ app.post("/api/production", (req, res) => productionHandler(req, res));
 app.post("/api/lesson-plan", (req, res) => lessonPlanHandler(req, res));
 app.post("/api/rubric", (req, res) => rubricHandler(req, res));
 app.post("/api/style", (req, res) => styleHandler(req, res));
+app.post("/api/test-keys", (req, res) => keysHandler(req, res));
 app.options("/api/captions", (req, res) => captionsHandler(req, res));
 app.post("/api/captions", (req, res) => captionsHandler(req, res));
 
