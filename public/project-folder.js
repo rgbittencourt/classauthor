@@ -94,7 +94,8 @@ export function subfolderFor(filename = "") {
   if (/rascunho.*\.json$|backup.*\.json$/.test(name)) return "backup";
   if (/-classatelier\.json$/.test(name)) return "classatelier";
   if (/-classauthor\.json$/.test(name)) return "classauthor";
-  if (/\.xml$/.test(name)) return "moodle";
+  if (/\.xml$|rubricas.*\.csv$/.test(name)) return "moodle";
+  if (/rubricas.*\.(xlsx|zip)$/.test(name)) return "professor";
   if (/mediacao.*\.pdf$|\.pdf$/.test(name)) return "professor";
   if (/^plano-de-ensino.*\.docx$|mapa-de-alinhamento.*\.xlsx$|^leia-me/.test(name)) return "coordenacao";
   if (/\.docx$|webpratica|pratica|laboratorio/.test(name)) return "praticas";

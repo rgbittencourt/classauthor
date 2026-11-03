@@ -14,6 +14,7 @@ import illustrateHandler from "../src/illustrate-handler.js";
 import productionHandler from "../src/production-handler.js";
 import weekEditHandler from "../src/week-edit-handler.js";
 import lessonPlanHandler from "../src/lesson-plan.js";
+import rubricHandler from "../src/rubric.js";
 
 async function handler(request, response) {
   // /api/bridge e /api/derivatives são encaminhados para esta função (limite de 12 funções do plano Hobby).
@@ -25,6 +26,7 @@ async function handler(request, response) {
   if (request.body?.action === "production") return productionHandler(request, response);
   if (request.body?.action === "edit") return weekEditHandler(request, response);
   if (request.body?.action === "plan") return lessonPlanHandler(request, response);
+  if (request.body?.action === "rubric") return rubricHandler(request, response);
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });
   if (accessRequired() && !hasValidAccess(request)) return response.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
   try {

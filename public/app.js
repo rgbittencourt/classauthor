@@ -3,6 +3,7 @@ import { parseSavedWeek, planPlacement } from "./week-import.js";
 import { alignmentSheets, bloomLabel, buildAlignmentMap } from "./alignment-map.js";
 import { createFichaDocx, fichaChecks, fichaDefaults, weightsTotal } from "./ficha-disciplina.js";
 import { deliveryReadme } from "./delivery-package.js";
+import { RUBRIC_LEVELS, RUBRIC_LEVELS_ASCENDING, levelScore, normalizeRubricData, rubricFieldValue, rubricFileSlug, rubricHtmlTable, rubricIssues, rubricMoodleCsv, rubricPlainText, rubricSheets, rubricTsv } from "./rubric-core.js";
 import { addUsage, costOf, emptyUsage, estimateGeneration, formatBRL, formatInt, subtractUsage, totalTokens, USD_BRL_DEFAULT } from "./ai-cost.js";
 import { createMoodleXml, quizQuestions } from "./moodle-xml.js";
 import { createProductionWorkbook, createWorkbookFromSheets, hasProduction, productionMarkdown, productionVideos, formatDuration } from "./production-xlsx.js";
@@ -16,6 +17,7 @@ const isGitHubPages = window.location.hostname.endsWith(".github.io");
 const createReviewMarks = () => ({ resources: {}, checks: {}, academic: {}, quality: {} });
 const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null, reviewMarks: createReviewMarks(), weekApprovals: {}, studioEdits: {}, activeReviewGuidance: null, generation: null, flow: emptyFlow(), production: emptyProduction() };
 state.cost = emptyUsage();
+state.rubrics = [];
 
 // ── Custo da IA ──
 // O servidor devolve `usage` (chamadas e tokens) em toda resposta que usou IA. Aqui somamos por projeto,
@@ -231,13 +233,13 @@ function enhanceLayout() {
   const actions = document.createElement("section");
   actions.className = "sidebar-actions";
   actions.innerHTML = '<p class="sidebar-label">AÇÕES DO PROJETO</p>';
-  ["assist-button", "generate-button", "recalculate-button", "alignment-map-button", "ficha-button", "teacher-pdf-button", "zip-button"].forEach((id) => {
+  ["assist-button", "generate-button", "recalculate-button", "alignment-map-button", "rubrics-button", "ficha-button", "teacher-pdf-button", "zip-button"].forEach((id) => {
     const button = $("#" + id);
     if (!button) return;
     // O seletor do fluxo semana a semana fica logo acima do botão de gerar.
     if (id === "generate-button") { const stepToggle = $(".step-mode-toggle"); if (stepToggle) actions.appendChild(stepToggle); }
     button.classList.add("sidebar-action");
-    if (["recalculate-button", "alignment-map-button", "ficha-button", "teacher-pdf-button", "zip-button"].includes(id)) button.disabled = true;
+    if (["recalculate-button", "alignment-map-button", "rubrics-button", "ficha-button", "teacher-pdf-button", "zip-button"].includes(id)) button.disabled = true;
     actions.appendChild(button);
     if (id === "generate-button") {
       const costChip = document.createElement("p");
@@ -613,6 +615,7 @@ function resetDisciplineForm(preserveSession = true) {
   state.studioEdits = {};
   state.ficha = null;
   state.cost = emptyUsage();
+  state.rubrics = [];
   updateCostChip();
   state.production = emptyProduction();
   state.flow = emptyFlow(); state.lessonPlans = {};
@@ -706,6 +709,7 @@ function currentSnapshot() {
       stepFlow: state.flow,
       ficha: state.ficha || null,
       aiCost: state.cost || null,
+      rubrics: state.rubrics || [],
       lessonPlans: state.lessonPlans || {},
       generation: state.generation,
       weeks: state.weeks
@@ -1041,6 +1045,7 @@ function restoreSnapshot(snapshot) {
   state.flow = normalizeFlow(snapshot.results?.stepFlow);
   state.ficha = snapshot.results?.ficha && typeof snapshot.results.ficha === "object" ? snapshot.results.ficha : null;
   state.cost = normalizeCost(snapshot.results?.aiCost);
+  state.rubrics = Array.isArray(snapshot.results?.rubrics) ? snapshot.results.rubrics.map((item) => normalizeRubricData(item)).filter((item) => item.criteria.length) : [];
   updateCostChip();
   state.lessonPlans = snapshot.results?.lessonPlans && typeof snapshot.results.lessonPlans === "object" ? snapshot.results.lessonPlans : {};
   state.generation = snapshot.results?.generation || snapshot.generation || null;
@@ -2115,6 +2120,163 @@ function openAlignmentMap() {
   document.body.style.overflow = "hidden";
 }
 
+// ── Rubricas de avaliação ──
+// Só nascem quando o professor escolhe uma atividade ou prática e pede. Uma chamada à IA por rubrica.
+const rubricUi = { checked: new Set(), instruction: "", statement: "", criteriaCount: 4, maxScore: 10, busy: false, status: "" };
+
+// Painel «Copiar para o Moodle»: o editor de rubrica do Moodle não recebe tabela colada (cada critério e nível é um campo),
+// então cada texto e cada pontuação tem o seu botão «Copiar», na ordem do editor (do menor para o maior desempenho).
+function rubricCopyPanel(rubric, ri) {
+  const levels = RUBRIC_LEVELS_ASCENDING;
+  const rows = rubric.criteria.map((criterion, ci) => `<tr><th scope="row">${ci + 1}. ${escapeHtml(criterion.name)}<br><button type="button" class="rb-copy" data-rb-copy="${ri}:${ci}:name">Copiar o critério</button></th>${levels.map((level) => `<td><span class="rb-lv">${level.label}</span><button type="button" class="rb-copy" data-rb-copy="${ri}:${ci}:def${level.position}">Texto</button><button type="button" class="rb-copy" data-rb-copy="${ri}:${ci}:pts${level.position}">Pontos</button></td>`).join("")}</tr>`).join("");
+  return `<details class="rb-moodle" ${rubricUi.copyOpen === rubric.id ? "open" : ""} data-rb-moodle="${escapeHtml(rubric.id)}"><summary>Copiar para o Moodle</summary><div class="rb-moodle-body"><ol class="rb-steps"><li>No Moodle, abra a tarefa → <em>Avaliação avançada</em> → escolha <em>Rubrica</em> → <em>Definir nova rubrica a partir do zero</em>.</li><li>Em cada campo do editor do Moodle, volte aqui, clique no botão «Copiar» correspondente e cole (Ctrl+V) lá. A ordem abaixo é a do editor: do menor para o maior desempenho. Use «Adicionar nível» no Moodle até ter 4 níveis por critério.</li><li>Na tarefa, use a mesma nota máxima da rubrica (${rubric.maxScore}); assim a nota final no Moodle é a mesma daqui. Se o Moodle recusar a vírgula nos pontos, troque por ponto.</li></ol><div class="rb-bar"><button type="button" class="button button-secondary" data-rb-copy="${ri}:0:html">Copiar a tabela formatada</button><button type="button" class="button button-secondary" data-rb-copy="${ri}:0:text">Copiar como texto</button><button type="button" class="button button-secondary" data-rb-copy="${ri}:0:tsv">Copiar para planilha</button><span class="rb-status" data-rb-copied="${ri}" role="status"></span></div><p class="rb-notes">A tabela formatada serve para colar numa descrição de tarefa, página ou fórum do Moodle e no Word. O texto e a planilha servem para qualquer outro lugar.</p><div class="rb-grid-wrap"><table class="rb-grid"><tbody>${rows}</tbody></table></div></div></details>`;
+}
+
+async function rubricCopy(target) {
+  const [ri, ci, field] = String(target.dataset.rbCopy).split(":");
+  const rubric = state.rubrics[Number(ri)];
+  if (!rubric) return;
+  let plain, html = "", label = "Copiado.";
+  if (field === "html") { html = rubricHtmlTable(rubric); plain = rubricPlainText(rubric); label = "Tabela copiada: cole no editor de texto do Moodle ou no Word."; }
+  else if (field === "text") { plain = rubricPlainText(rubric); label = "Texto copiado."; }
+  else if (field === "tsv") { plain = rubricTsv(rubric); label = "Copiado: cole numa planilha."; }
+  else { plain = rubricFieldValue(rubric, Number(ci), field); label = "Copiado: cole no campo do Moodle."; }
+  let ok = false;
+  try {
+    if (html && window.ClipboardItem) { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([html], { type: "text/html" }), "text/plain": new Blob([plain], { type: "text/plain" }) })]); ok = true; }
+    else { await navigator.clipboard.writeText(plain); ok = true; }
+  } catch {
+    try { const area = document.createElement("textarea"); area.value = plain; area.style.position = "fixed"; area.style.opacity = "0"; document.body.appendChild(area); area.select(); ok = document.execCommand("copy"); area.remove(); } catch { ok = false; }
+  }
+  rubricUi.copyOpen = rubric.id;
+  const note = document.querySelector(`[data-rb-copied="${ri}"]`);
+  target.classList.toggle("rb-copied", ok);
+  if (note) note.textContent = ok ? label : "Não consegui copiar sozinho. Selecione o texto na tabela acima e copie com Ctrl+C.";
+  if (ok && !html && field.match(/^(name|def|pts)/)) { target.textContent = "Copiado ✓"; setTimeout(() => { target.textContent = field === "name" ? "Copiar o critério" : /^def/.test(field) ? "Texto" : "Pontos"; target.classList.remove("rb-copied"); }, 1400); }
+}
+
+function rubricInstruments() {
+  const out = [];
+  state.weeks.forEach((lesson, weekIndex) => {
+    const plan = lesson?.lessonPlan;
+    if (!plan) return;
+    (plan.activities || []).forEach((activity) => out.push({ key: `${weekIndex}:activity:${activity.id}`, weekIndex, kind: "activity", id: activity.id, title: activity.title, type: activity.type || "atividade", item: { kind: "activity", id: activity.id, title: activity.title, type: activity.type, instructions: activity.instructions, evidence: activity.evidence, assessment: activity.feedback, criteria: activity.criteria } }));
+    (plan.webPractices || []).forEach((practice) => out.push({ key: `${weekIndex}:practice:${practice.id}`, weekIndex, kind: "practice", id: practice.id, title: practice.title, type: practice.type || "prática", item: { kind: "practice", id: practice.id, title: practice.title, type: practice.type, objective: practice.objective, instructions: practice.instructions, product: practice.product || practice.deliverable, assessment: practice.assessment, criteria: practice.criteria } }));
+  });
+  return out;
+}
+const rubricFor = (instrument) => state.rubrics.find((rubric) => rubric.weekIndex === instrument.weekIndex && rubric.source?.kind === instrument.kind && rubric.source?.id === instrument.id);
+
+function renderRubrics() {
+  const unit = courseUnit();
+  const L = (value) => escapeHtml(localizeUnitText(String(value ?? ""), unit));
+  const instruments = rubricInstruments();
+  const rows = instruments.map((item) => `<label class="rb-row"><input type="checkbox" data-rb-pick="${escapeHtml(item.key)}" ${rubricUi.checked.has(item.key) ? "checked" : ""} ${rubricUi.busy ? "disabled" : ""}><span><strong>${L(`Semana ${item.weekIndex + 1}`)}</strong> · ${escapeHtml(item.title)} <small>(${escapeHtml(item.kind === "practice" ? "prática" : item.type)})</small>${rubricFor(item) ? '<span class="rb-has">já tem rubrica</span>' : ""}</span></label>`).join("");
+  const picked = instruments.filter((item) => rubricUi.checked.has(item.key)).length;
+  const pick = `<section class="rb-pick"><h3>Onde criar rubrica?</h3><p>Nada é criado sozinho: marque as atividades ou práticas que precisam de rubrica. Cada rubrica usa 1 chamada à IA.</p>${instruments.length ? `<div class="rb-list">${rows}</div>` : '<div class="rb-empty">Nenhuma atividade ou prática encontrada nas semanas geradas.</div>'}<div class="rb-opts"><label>Número de critérios <select id="rb-count" ${rubricUi.busy ? "disabled" : ""}>${[3, 4, 5, 6].map((n) => `<option value="${n}" ${n === rubricUi.criteriaCount ? "selected" : ""}>${n}</option>`).join("")}</select></label><label>Nota máxima <input id="rb-max" type="number" min="1" max="1000" step="any" value="${rubricUi.maxScore}" ${rubricUi.busy ? "disabled" : ""}></label><span class="rb-hint">Use a mesma nota máxima na tarefa do Moodle: a nota final fica igual à da rubrica.</span></div>${picked === 1 ? `<label class="rb-stmt">Enunciado da atividade, como foi passado aos estudantes (opcional; a rubrica passa a avaliar exatamente o que ele pede)<textarea class="rb-ask" id="rb-statement" rows="4" ${rubricUi.busy ? "disabled" : ""}>${escapeHtml(rubricUi.statement)}</textarea></label>` : ""}<textarea class="rb-ask" id="rb-instruction" placeholder="Pedido opcional para a IA (ex.: dar mais peso à argumentação; incluir um critério de ética; usar linguagem simples)" ${rubricUi.busy ? "disabled" : ""}>${escapeHtml(rubricUi.instruction)}</textarea><div class="rb-bar"><button type="button" class="button button-primary" id="rb-generate" ${rubricUi.busy || !picked ? "disabled" : ""}>${picked ? `Criar ${picked} rubrica${picked > 1 ? "s" : ""}` : "Criar rubricas"}</button><span class="rb-status" id="rb-status" role="status">${escapeHtml(rubricUi.status)}</span></div></section>`;
+  const cards = state.rubrics.map((rubric, ri) => {
+    const issues = rubricIssues(rubric);
+    const head = `<th scope="col">Critério</th><th scope="col" class="rb-w">Peso (%)</th>${RUBRIC_LEVELS.map((level) => `<th scope="col">${level.label} <small>(${level.pct}%)</small></th>`).join("")}`;
+    const body = rubric.criteria.map((criterion, ci) => `<tr><td><textarea data-rb="${ri}:${ci}:name" rows="3" aria-label="Critério">${escapeHtml(criterion.name)}</textarea></td><td class="rb-w"><input type="number" min="0" max="100" data-rb="${ri}:${ci}:weight" value="${criterion.weight}" aria-label="Peso"></td>${RUBRIC_LEVELS.map((level, li) => `<td><textarea data-rb="${ri}:${ci}:level${li}" aria-label="${level.label}">${escapeHtml(criterion.descriptions[li])}</textarea><span class="rb-pts" data-rb-pts="${ri}:${ci}:${li}">${String(levelScore(rubric, criterion, li)).replace(".", ",")} pts</span></td>`).join("")}</tr>`).join("");
+    const source = rubric.weekIndex !== null ? ` · ${L(`Semana ${rubric.weekIndex + 1}`)}` : "";
+    return `<details class="rb-card" ${ri === state.rubrics.length - 1 || rubricUi.open === rubric.id ? "open" : ""}><summary>${escapeHtml(rubric.title)}<small>${L(rubric.source?.kind === "practice" ? "Prática" : "Atividade")}${source} · nota máxima ${rubric.maxScore}</small></summary><div class="rb-inner"><div data-rb-issues="${ri}">${issues.length ? `<div class="rb-warn">${issues.map(escapeHtml).join("<br>")}</div>` : ""}</div><table class="rb-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>${rubric.notes ? `<p class="rb-notes"><strong>Como usar:</strong> ${escapeHtml(rubric.notes)}</p>` : ""}${rubricCopyPanel(rubric, ri)}<div class="rb-card-actions"><button type="button" class="button button-secondary" data-rb-redo="${ri}" ${rubricUi.busy ? "disabled" : ""}>Refazer com a IA (usa o pedido acima)</button><button type="button" class="button button-secondary" data-rb-del="${ri}" ${rubricUi.busy ? "disabled" : ""}>Excluir</button></div></div></details>`;
+  }).join("");
+  $("#rubrics-body").innerHTML = pick + (cards || '<div class="rb-empty">Ainda não há rubricas neste projeto.</div>');
+  const has = state.rubrics.length > 0;
+  $("#rubrics-csv-button").disabled = !has; $("#rubrics-xlsx-button").disabled = !has;
+}
+
+function openRubrics() {
+  if (!state.weeks?.some((lesson) => lesson?.lessonPlan)) { showError("Gere pelo menos uma semana para criar rubricas."); return; }
+  renderRubrics();
+  $("#rubrics-modal").classList.remove("hidden");
+  $("#rubrics-modal").setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+}
+function closeRubrics() {
+  $("#rubrics-modal").classList.add("hidden");
+  $("#rubrics-modal").setAttribute("aria-hidden", "true");
+  document.body.style.overflow = "";
+}
+
+// Edição direta na tabela: atualiza o estado, os pontos e os avisos sem redesenhar (não perde o foco).
+function rubricEdited(target) {
+  const [ri, ci, field] = String(target.dataset.rb).split(":");
+  const rubric = state.rubrics[Number(ri)];
+  const criterion = rubric?.criteria[Number(ci)];
+  if (!criterion) return;
+  if (field === "name") criterion.name = target.value.replace(/\s+/g, " ").trim();
+  else if (field === "weight") criterion.weight = Math.max(0, Math.min(100, Number(target.value) || 0));
+  else if (/^level\d$/.test(field)) criterion.descriptions[Number(field.slice(5))] = target.value.replace(/\s+/g, " ").trim();
+  rubric.criteria.forEach((item, index) => RUBRIC_LEVELS.forEach((_, li) => {
+    const label = document.querySelector(`[data-rb-pts="${ri}:${index}:${li}"]`);
+    if (label) label.textContent = `${String(levelScore(rubric, item, li)).replace(".", ",")} pts`;
+  }));
+  const issues = rubricIssues(rubric);
+  const box = document.querySelector(`[data-rb-issues="${ri}"]`);
+  if (box) box.innerHTML = issues.length ? `<div class="rb-warn">${issues.map(escapeHtml).join("<br>")}</div>` : "";
+  scheduleSave?.();
+}
+
+async function generateRubrics(instruments, { replaceId = null } = {}) {
+  if (aiActionBusy || rubricUi.busy || !instruments.length) return;
+  const button = $("#rb-generate");
+  if (!beginAiAction(button)) return;
+  rubricUi.busy = true;
+  const failures = [];
+  let made = 0;
+  try {
+    const { input, headers } = productionHeaders();
+    for (let i = 0; i < instruments.length; i += 1) {
+      const instrument = instruments[i];
+      rubricUi.status = `Criando a rubrica ${i + 1} de ${instruments.length}: ${instrument.title}…`;
+      setAiActivity("Criando rubricas", rubricUi.status, { progress: Math.round((i / instruments.length) * 100) });
+      renderRubrics();
+      try {
+        const response = await fetch("/api/rubric", { method: "POST", headers, signal: AbortSignal.timeout(280000), body: JSON.stringify({ action: "rubric", input, weekIndex: instrument.weekIndex, week: state.weeks[instrument.weekIndex], item: instrument.item, instruction: rubricUi.instruction, criteriaCount: rubricUi.criteriaCount, maxScore: rubricUi.maxScore, statement: instruments.length === 1 ? rubricUi.statement : "" }) });
+        const done = await readApiResponse(response, `Não foi possível criar a rubrica de «${instrument.title}».`);
+        const rubric = normalizeRubricData(done.rubric);
+        const existing = state.rubrics.findIndex((item) => replaceId ? item.id === replaceId : (item.weekIndex === rubric.weekIndex && item.source?.kind === rubric.source?.kind && item.source?.id === rubric.source?.id));
+        if (existing >= 0) state.rubrics[existing] = { ...rubric, id: state.rubrics[existing].id }; else state.rubrics.push(rubric);
+        rubricUi.checked.delete(instrument.key);
+        rubricUi.open = rubric.id;
+        made += 1;
+        saveDraft("rubrica-criada");
+      } catch (error) {
+        failures.push(`«${instrument.title}»: ${error.message}`);
+      }
+    }
+    rubricUi.status = made ? `${made} rubrica${made > 1 ? "s" : ""} criada${made > 1 ? "s" : ""}.${failures.length ? ` Falhou: ${failures.join(" | ")}` : ""}` : `Nenhuma rubrica criada. ${failures.join(" | ")}`;
+    finishAiActivity(made ? "Rubricas criadas" : "Rubricas não criadas", rubricUi.status, failures.length ? "error" : "success");
+  } finally {
+    rubricUi.busy = false;
+    endAiAction();
+    renderRubrics();
+  }
+}
+
+function rubricsBaseName() { return slugify(state.input?.title || formInput().title); }
+async function downloadRubricsCsv() {
+  if (!state.rubrics.length) return;
+  const base = rubricsBaseName();
+  if (state.rubrics.length === 1) { downloadBlob(new Blob([rubricMoodleCsv(state.rubrics[0])], { type: "text/csv;charset=utf-8" }), `${base}-rubricas-${rubricFileSlug(state.rubrics[0].title)}.csv`); return; }
+  try {
+    const zip = new window.JSZip();
+    const used = new Set();
+    state.rubrics.forEach((rubric) => { let name = `rubrica-${rubricFileSlug(rubric.title)}`; let n = 2; const root = name; while (used.has(name)) name = `${root}-${n++}`; used.add(name); zip.file(`${name}.csv`, rubricMoodleCsv(rubric)); });
+    zip.file("LEIA-ME.txt", rubricsCsvReadme());
+    downloadBlob(await zip.generateAsync({ type: "blob" }), `${base}-rubricas-moodle.zip`);
+  } catch (error) { showError(error.message); }
+}
+const rubricsCsvReadme = () => "RUBRICAS PARA O MOODLE\n\nCada arquivo .csv é uma rubrica (uma atividade). O Moodle sem plugin NÃO importa rubrica de arquivo.\nNa tarefa, use a mesma nota máxima da rubrica e o método de avaliação «Rubrica»; a tarefa não pode ter rubrica antes. Os pontos já vêm por nível, sem pesos.\nPara importar, instale o plugin «Rubric Importer» (local_customgradingform_renderer + block_importrubric, Moodle 4.1 ou mais novo),\nabra a tarefa, use o bloco «Import rubric from CSV» e envie o arquivo. A rubrica entra como rascunho para você revisar.\nCabeçalho do arquivo: criterion,level,level_description,score. Nível 1 = melhor desempenho.\nSem o plugin, use a planilha (.xlsx) ou o Material de Mediação para montar a rubrica à mão em Avaliação avançada > Rubrica.\n";
+async function downloadRubricsXlsx() {
+  try {
+    if (!window.JSZip) throw new Error("O componente de ZIP ainda não carregou. Recarregue a página e tente novamente.");
+    const blob = await createWorkbookFromSheets(window.JSZip, deepLocalizeUnit(rubricSheets(state.rubrics), courseUnit()), "blob");
+    downloadBlob(blob, `${rubricsBaseName()}-rubricas.xlsx`);
+  } catch (error) { showError(error.message); }
+}
+
 function closeAlignmentMap() {
   $("#alignment-modal").classList.add("hidden");
   $("#alignment-modal").setAttribute("aria-hidden", "true");
@@ -2738,6 +2900,8 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
   if (zipButton) zipButton.disabled = !complete;
   const alignmentButton = $("#alignment-map-button");
   if (alignmentButton) alignmentButton.disabled = !data.weeks.some((lesson) => lesson?.lessonPlan);
+  const rubricsButton = $("#rubrics-button");
+  if (rubricsButton) rubricsButton.disabled = !data.weeks.some((lesson) => lesson?.lessonPlan);
   const fichaButton = $("#ficha-button");
   if (fichaButton) fichaButton.disabled = !data.weeks.some((lesson) => lesson?.lessonPlan);
   updateProductionSheetButton();
@@ -3413,7 +3577,7 @@ async function generate() {
   const button = $("#generate-button");
   if (!beginAiAction(button)) return;
   button.dataset.label = resumeGeneration ? `Continuar da semana ${startIndex + 1}` : "Gerar com IA";
-  ["recalculate-button", "alignment-map-button", "ficha-button", "teacher-pdf-button", "zip-button"].forEach((id) => { const action = $("#" + id); if (action) action.disabled = true; });
+  ["recalculate-button", "alignment-map-button", "rubrics-button", "ficha-button", "teacher-pdf-button", "zip-button"].forEach((id) => { const action = $("#" + id); if (action) action.disabled = true; });
   setBusy(button, true, "Gerando material…");
   setAiActivity(resumeGeneration ? "Retomando geração" : "Preparando geração", resumeGeneration ? `As semanas anteriores foram preservadas. Continuando pela semana ${startIndex + 1} de ${input.weeks}…` : `A IA vai construir ${input.weeks} semana(s), uma por vez, e depois consolidar o curso…`, { progress: resumeGeneration ? Math.round((startIndex / (input.weeks + 1)) * 100) : 0 });
   $("#result-alert").classList.add("hidden");
@@ -3618,8 +3782,17 @@ async function addDeliveryDocuments(blob, title) {
     zip.file(`coordenacao/plano-de-ensino-${slugify(state.ficha.unit || title)}.docx`, await createFichaDocx(window.JSZip, deepLocalizeUnit(state.ficha, unit), { logo, output: "uint8array" }));
     fichaPending = fichaChecks(state.ficha);
   }
+  // Rubricas: só entram se o professor pediu alguma. CSV por rubrica (plugin do Moodle) e planilha para montar à mão.
+  let rubricPending = null;
+  if (state.rubrics.length) {
+    const used = new Set();
+    state.rubrics.forEach((rubric) => { let name = `rubrica-${rubricFileSlug(rubric.title)}`; const root = name; let n = 2; while (used.has(name)) name = `${root}-${n++}`; used.add(name); zip.file(`moodle/rubricas/${name}.csv`, rubricMoodleCsv(rubric)); });
+    zip.file("moodle/rubricas/LEIA-ME.txt", localizeUnitText(rubricsCsvReadme(), unit));
+    zip.file("professor/rubricas.xlsx", await createWorkbookFromSheets(window.JSZip, deepLocalizeUnit(rubricSheets(state.rubrics), unit), "uint8array"));
+    rubricPending = state.rubrics.flatMap((rubric) => rubricIssues(rubric).map((issue) => `${rubric.title}: ${issue}`));
+  }
   const notReleased = state.weeks.map((_, index) => index).filter((index) => !weekReleased(index)).map((index) => index + 1);
-  const readme = deliveryReadme({ title, version: (document.querySelector(".site-footer .semver")?.textContent || "").replace(/^v/, ""), files: Object.keys(zip.files).filter((name) => !zip.files[name].dir), pending: { weeks: notReleased, alignment, ficha: fichaPending }, unitLabel: unit === "aula" ? "Aula" : "Semana" });
+  const readme = deliveryReadme({ title, version: (document.querySelector(".site-footer .semver")?.textContent || "").replace(/^v/, ""), files: Object.keys(zip.files).filter((name) => !zip.files[name].dir), pending: { weeks: notReleased, alignment, ficha: fichaPending, rubrics: rubricPending }, unitLabel: unit === "aula" ? "Aula" : "Semana" });
   zip.file("LEIA-ME.txt", localizeUnitText(readme, unit));
   return zip.generateAsync({ type: "blob", compression: "DEFLATE" });
 }
@@ -3639,7 +3812,7 @@ async function downloadZip() {
       downloadBlob(await addDeliveryDocuments(await zip.generateAsync({ type: "blob", compression: "DEFLATE" }), currentInput.title), `${slugify(currentInput.title)}-semanas.zip`);
       return;
     }
-    const response = await fetch("/api/zip", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: currentInput, weeks: state.weeks, teacherGuides: state.teacherGuides, weekApprovals: state.weekApprovals, production: state.production }) });
+    const response = await fetch("/api/zip", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: currentInput, weeks: state.weeks, teacherGuides: state.teacherGuides, weekApprovals: state.weekApprovals, production: state.production, rubrics: state.rubrics }) });
     if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Não foi possível montar o ZIP."); }
     downloadBlob(await addDeliveryDocuments(await response.blob(), currentInput.title), `${slugify(currentInput.title)}-semanas.zip`);
   } catch (error) { showError(error.message); }
@@ -3653,7 +3826,7 @@ async function downloadTeacherPdf() {
   button.disabled = true; button.classList.add("is-loading");
   try {
     const currentInput = formInput();
-    const response = await fetch("/api/teacher-pdf", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: currentInput, weeks: state.weeks, teacherGuides: state.teacherGuides, weekApprovals: state.weekApprovals, production: state.production }) });
+    const response = await fetch("/api/teacher-pdf", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: currentInput, weeks: state.weeks, teacherGuides: state.teacherGuides, weekApprovals: state.weekApprovals, production: state.production, rubrics: state.rubrics }) });
     if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Não foi possível criar o Material de Mediação em PDF."); }
     downloadBlob(await response.blob(), `${slugify(currentInput.title)}-material-de-mediacao.pdf`);
   } catch (error) { showError(error.message); }
@@ -3766,6 +3939,39 @@ $("#teacher-pdf-button").addEventListener("click", downloadTeacherPdf);
 $("#recalculate-button").addEventListener("click", recalculateQuality);
 $("#close-lesson-modal").addEventListener("click", closeLessonPreview);
 $("#alignment-map-button")?.addEventListener("click", openAlignmentMap);
+$("#rubrics-button")?.addEventListener("click", openRubrics);
+$("#close-rubrics-modal")?.addEventListener("click", closeRubrics);
+$("#rubrics-close-button")?.addEventListener("click", closeRubrics);
+$("#rubrics-csv-button")?.addEventListener("click", downloadRubricsCsv);
+$("#rubrics-xlsx-button")?.addEventListener("click", downloadRubricsXlsx);
+$("#rubrics-body")?.addEventListener("change", (event) => {
+  if (event.target.id === "rb-count") { rubricUi.criteriaCount = Number(event.target.value) || 4; return; }
+  const pickKey = event.target.dataset?.rbPick;
+  if (pickKey) { if (event.target.checked) rubricUi.checked.add(pickKey); else rubricUi.checked.delete(pickKey); renderRubrics(); }
+});
+$("#rubrics-body")?.addEventListener("input", (event) => {
+  if (event.target.id === "rb-instruction") { rubricUi.instruction = event.target.value; return; }
+  if (event.target.id === "rb-statement") { rubricUi.statement = event.target.value; return; }
+  if (event.target.id === "rb-max") { const value = Number(String(event.target.value).replace(",", ".")); if (value > 0) rubricUi.maxScore = value; return; }
+  if (event.target.dataset?.rb) rubricEdited(event.target);
+});
+$("#rubrics-body")?.addEventListener("click", (event) => {
+  const target = event.target.closest("button");
+  if (!target) return;
+  if (target.dataset.rbCopy !== undefined) { rubricCopy(target); return; }
+  if (target.id === "rb-generate") { generateRubrics(rubricInstruments().filter((item) => rubricUi.checked.has(item.key))); return; }
+  if (target.dataset.rbDel !== undefined) {
+    const rubric = state.rubrics[Number(target.dataset.rbDel)];
+    if (rubric && window.confirm(`Excluir a rubrica «${rubric.title}»?`)) { state.rubrics.splice(Number(target.dataset.rbDel), 1); saveDraft("rubrica-excluida"); renderRubrics(); }
+    return;
+  }
+  if (target.dataset.rbRedo !== undefined) {
+    const rubric = state.rubrics[Number(target.dataset.rbRedo)];
+    const instrument = rubric && rubricInstruments().find((item) => item.weekIndex === rubric.weekIndex && item.kind === rubric.source?.kind && item.id === rubric.source?.id);
+    if (!instrument) { rubricUi.status = "Não encontrei mais a atividade desta rubrica; exclua-a e crie de novo."; renderRubrics(); return; }
+    if (window.confirm("Refazer substitui a rubrica atual, inclusive o que você editou. Continuar?")) generateRubrics([instrument], { replaceId: rubric.id });
+  }
+});
 $("#ficha-button")?.addEventListener("click", openFicha);
 $("#close-ficha-modal")?.addEventListener("click", closeFicha);
 $("#ficha-close-button")?.addEventListener("click", closeFicha);

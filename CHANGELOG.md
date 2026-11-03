@@ -8,6 +8,17 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.9.0 · 03/11/2026 · Rubricas de avaliação
+
+### Novo
+- **Rubricas de avaliação** (botão na coluna «Ações do projeto»): você escolhe quais atividades e práticas recebem rubrica e pede. **Nada é criado automaticamente.** Cada rubrica usa 1 chamada à IA (o custo aparece no contador em R$).
+- Você define o **número de critérios** (3 a 6) e a **nota máxima** (use a mesma na tarefa do Moodle). Com uma atividade marcada, pode colar o **enunciado exato** que os estudantes receberam, e a rubrica avalia só o que ele pede. Há também um campo de pedido livre à IA e o botão «Refazer».
+- Cada rubrica tem critérios com **peso (%)** e **4 níveis** (Excelente, Bom, Regular, Insuficiente). A pontuação de cada nível é calculada do peso e da nota máxima, e muda na hora quando você edita os pesos. Tudo é editável na tabela; avisos mostram pesos que não somam 100% e níveis sem descrição.
+- **Copiar para o Moodle**: o editor de rubrica do Moodle não recebe tabela colada, então cada critério, texto de nível e pontuação tem um botão «Copiar», na ordem do editor (do menor para o maior desempenho). Também copia a **tabela formatada** (para descrição de tarefa, página, fórum e Word), o **texto** e uma versão para **planilha**.
+- **CSV para o Moodle** no formato do plugin «Rubric Importer» (o Moodle sem plugin não importa rubrica de arquivo): um arquivo por rubrica, com a pontuação por nível. Mais **planilha (.xlsx)** com uma aba por rubrica.
+- As rubricas entram no **Material de Mediação (PDF)** e no **pacote completo (ZIP)** (`moodle/rubricas/*.csv`, `professor/rubricas.xlsx`), e o LEIA-ME aponta pendências nelas. Ficam salvas com o projeto.
+- Ideias do Gerador de Rubricas do INOVALAB: nota máxima igual à da tarefa, enunciado exato como base e aviso sobre o plugin do Moodle.
+
 ## 1.8.0 · 03/11/2026 · Cotação do dólar automática
 
 ### Novo

@@ -14,6 +14,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { DIDACTIC_PHASE_LABELS } from "./pedagogy.js";
 import { buildCourseProgression, progressionForWeek } from "./curriculum.js";
 import { formatDuration, productionVideos } from "./production-xlsx.js";
+import { RUBRIC_LEVELS, levelScore, normalizeRubricData } from "./rubric-core.js";
 import { GENERATOR_CREDIT } from "./student-export.js";
 
 // ---------- texto seguro para as fontes padrão do PDF (WinAnsi) ----------
@@ -333,7 +334,8 @@ export async function createMediationMaterialPdf(input, teacherGuides = [], gene
   heading("Sumário", 1);
   const tocPage = page;
   const tocTop = y;
-  const tocEntries = 3 + (videos.some((video) => video.week === "UC") ? 1 : 0) + teacherGuides.length + (pendingCount ? 1 : 0);
+  const rubricList = (Array.isArray(options.rubrics) ? options.rubrics : []).map((item) => normalizeRubricData(item)).filter((item) => item.criteria.length);
+  const tocEntries = 3 + (rubricList.length ? 1 : 0) + (videos.some((video) => video.week === "UC") ? 1 : 0) + teacherGuides.length + (pendingCount ? 1 : 0);
   y -= tocEntries * 15 + 12;
 
   mark("Mapa da UC");
@@ -611,6 +613,23 @@ export async function createMediationMaterialPdf(input, teacherGuides = [], gene
 
   teacherGuides.forEach(weekSection);
   runningLabel = "MATERIAL DE MEDIAÇÃO";
+
+  // Rubricas pedidas pelo professor (nunca entram sozinhas).
+  if (rubricList.length) {
+    newPage();
+    mark("Rubricas de avaliação");
+    runningLabel = "RUBRICAS DE AVALIAÇÃO";
+    heading("Rubricas de avaliação", 1);
+    paragraph("Critérios e níveis de desempenho das atividades e práticas escolhidas por você. A nota máxima de cada rubrica é distribuída pelos pesos dos critérios; os pontos de cada nível aparecem entre colchetes.", { color: muted });
+    rubricList.forEach((rubric) => {
+      heading(rubric.title, 2);
+      if (rubric.weekIndex !== null) paragraph(`${rubric.source?.kind === "practice" ? "Prática" : "Atividade"} da semana ${rubric.weekIndex + 1} · nota máxima ${rubric.maxScore}`, { color: muted, size: 8.6, after: 3 });
+      table([{ label: "Critério (peso)", width: 16 }].concat(RUBRIC_LEVELS.map((level) => ({ label: `${level.label} (${level.pct}%)`, width: 21 }))), rubric.criteria.map((criterion) => [`${criterion.name} (${criterion.weight}%)`].concat(RUBRIC_LEVELS.map((_, position) => `[${levelScore(rubric, criterion, position)} pts] ${display(criterion.descriptions[position])}`))), { boldFirst: true, size: 8 });
+      if (rubric.notes) paragraph(`Como usar: ${rubric.notes}`, { size: 8.8, color: muted });
+      y -= 6;
+    });
+    runningLabel = "MATERIAL DE MEDIAÇÃO";
+  }
 
   if (pendingCount) {
     newPage();

@@ -20,7 +20,8 @@ async function handler(request, response) {
     const buffer = await createMediationMaterialPdf(input, teacherGuides, generalPlan, {
       explicitScope: scope.explicit,
       releasedWeekIndexes: scope.releasedIndexes,
-      production: request.body?.production
+      production: request.body?.production,
+      rubrics: request.body?.rubrics
     });
     response.setHeader("Content-Type", "application/pdf");
     response.setHeader("Content-Disposition", `attachment; filename="${slugify(input.title, "curso")}-material-de-mediacao.pdf"`);

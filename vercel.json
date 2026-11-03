@@ -28,6 +28,10 @@
       "dest": "/api/regenerate-week"
     },
     {
+      "src": "/api/rubric",
+      "dest": "/api/regenerate-week"
+    },
+    {
       "src": "/api/lesson-plan",
       "dest": "/api/regenerate-week"
     },

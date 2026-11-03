@@ -23,7 +23,8 @@ async function handler(request, response) {
       explicitScope: scoped.explicit,
       releasedWeekIndexes: scoped.releasedIndexes,
       mediationGuides: teacherGuides,
-      production: request.body?.production
+      production: request.body?.production,
+      rubrics: request.body?.rubrics
     });
     response.setHeader("Content-Type", "application/zip");
     response.setHeader("Content-Disposition", `attachment; filename="${slugify(input.title, "curso")}-semanas.zip"`);

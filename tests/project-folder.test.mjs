@@ -15,6 +15,9 @@ test("cada arquivo salvo vai para a subpasta certa da pasta do projeto", () => {
     "banco-de-dados-roteiros-de-video.md": "producao",
     "plano-de-ensino-banco-de-dados.docx": "coordenacao",
     "banco-de-dados-mapa-de-alinhamento.xlsx": "coordenacao",
+    "banco-de-dados-rubricas-estudo-de-caso.csv": "moodle",
+    "banco-de-dados-rubricas.xlsx": "professor",
+    "banco-de-dados-rubricas-moodle.zip": "professor",
     "banco-de-dados-aulas.zip": "pacotes",
     "Aula01-Texto-editado.txt": "textos"
   };

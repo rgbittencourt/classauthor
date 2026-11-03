@@ -44,7 +44,7 @@
               <strong>Prof. Rogério G. Bittencourt</strong>
               <div class="welcome-inovalab-credit"><img src="./brand/inovalab-signature.png" alt="Logotipo completo do INOVALAB" /></div>
             </aside>
-            <div class="welcome-footer-meta"><span class="welcome-footer-description">Laboratório de Inovação e Tecnologia Educacional</span><span class="welcome-footer-separator" aria-hidden="true">•</span><a href="https://github.com/rgbittencourt" target="_blank" rel="noreferrer">github.com/rgbittencourt</a><span class="welcome-footer-separator" aria-hidden="true">•</span><em class="semver" title="Versionamento Semântico: MAIOR.MENOR.CORREÇÃO">v1.8.0</em></div>
+            <div class="welcome-footer-meta"><span class="welcome-footer-description">Laboratório de Inovação e Tecnologia Educacional</span><span class="welcome-footer-separator" aria-hidden="true">•</span><a href="https://github.com/rgbittencourt" target="_blank" rel="noreferrer">github.com/rgbittencourt</a><span class="welcome-footer-separator" aria-hidden="true">•</span><em class="semver" title="Versionamento Semântico: MAIOR.MENOR.CORREÇÃO">v1.9.0</em></div>
           </div>
         </div>
       </div>
@@ -240,6 +240,14 @@
       </div>
     </section>
 
+    <section class="lesson-modal hidden" id="rubrics-modal" aria-hidden="true">
+      <div class="lesson-dialog alignment-dialog rubrics-dialog" role="dialog" aria-modal="true" aria-labelledby="rubrics-modal-title">
+        <header class="lesson-dialog-header"><div><p class="eyebrow">RUBRICAS DE AVALIAÇÃO</p><h2 id="rubrics-modal-title">Critérios e níveis de desempenho</h2></div><button class="close-modal" type="button" id="close-rubrics-modal" aria-label="Fechar">×</button></header>
+        <article class="lesson-reader rubrics-body" id="rubrics-body"></article>
+        <div class="alignment-actions"><button type="button" class="button button-secondary" id="rubrics-csv-button">Baixar para o Moodle (.csv)</button><button type="button" class="button button-secondary" id="rubrics-xlsx-button">Baixar planilha (.xlsx)</button><button type="button" class="button button-primary" id="rubrics-close-button">Fechar</button></div>
+      </div>
+    </section>
+
     <section class="lesson-modal hidden" id="alignment-modal" aria-hidden="true">
       <div class="lesson-dialog alignment-dialog" role="dialog" aria-modal="true" aria-labelledby="alignment-modal-title">
         <header class="lesson-dialog-header"><div><p class="eyebrow">MAPA DE ALINHAMENTO</p><h2 id="alignment-modal-title">Objetivos, atividades e avaliações</h2></div><button class="close-modal" type="button" id="close-alignment-modal" aria-label="Fechar o mapa">×</button></header>
@@ -257,7 +265,7 @@
     </section>
 
     <details class="results-section hidden" id="results-section">
-      <summary class="results-header"><div><p class="eyebrow">RESULTADO</p><h2 id="results-title">Semanas geradas</h2><p id="results-subtitle"></p></div><div class="results-actions"><button class="button button-secondary" type="button" id="ficha-button" title="Monta o Plano de Ensino (ementa, objetivos, conteúdo, método, avaliação, referências) a partir do planejamento, para você conferir e baixar em Word">Ficha da disciplina</button><button class="button button-secondary" type="button" id="alignment-map-button" title="Cruza objetivos, atividades, evidências, questões e carga de todas as semanas e aponta o que está faltando">Mapa de alinhamento</button><button class="button button-secondary" type="button" id="recalculate-button"><span class="button-label">Recalcular qualidade</span><span class="button-arrow">↻</span></button><button class="button button-secondary" type="button" id="production-sheet-button" disabled title="Roteiros de vídeo, slides e narração das semanas e da UC">Planilha de produção <span class="button-arrow">↓</span></button><button class="button button-secondary" type="button" id="teacher-pdf-button">Material de Mediação PDF <span class="button-arrow">↓</span></button><button class="button button-primary" type="button" id="zip-button">Pacote completo ZIP <span class="button-arrow">↓</span></button></div><span class="sector-chevron results-section-chevron" aria-hidden="true">⌄</span></summary>
+      <summary class="results-header"><div><p class="eyebrow">RESULTADO</p><h2 id="results-title">Semanas geradas</h2><p id="results-subtitle"></p></div><div class="results-actions"><button class="button button-secondary" type="button" id="ficha-button" title="Monta o Plano de Ensino (ementa, objetivos, conteúdo, método, avaliação, referências) a partir do planejamento, para você conferir e baixar em Word">Ficha da disciplina</button><button class="button button-secondary" type="button" id="alignment-map-button" title="Cruza objetivos, atividades, evidências, questões e carga de todas as semanas e aponta o que está faltando">Mapa de alinhamento</button><button class="button button-secondary" type="button" id="rubrics-button" title="Cria rubricas de avaliação das atividades e práticas que você escolher (só quando você pedir) e exporta para o Moodle e para o Material de Mediação">Rubricas de avaliação</button><button class="button button-secondary" type="button" id="recalculate-button"><span class="button-label">Recalcular qualidade</span><span class="button-arrow">↻</span></button><button class="button button-secondary" type="button" id="production-sheet-button" disabled title="Roteiros de vídeo, slides e narração das semanas e da UC">Planilha de produção <span class="button-arrow">↓</span></button><button class="button button-secondary" type="button" id="teacher-pdf-button">Material de Mediação PDF <span class="button-arrow">↓</span></button><button class="button button-primary" type="button" id="zip-button">Pacote completo ZIP <span class="button-arrow">↓</span></button></div><span class="sector-chevron results-section-chevron" aria-hidden="true">⌄</span></summary>
       <div class="results-body">
         <div class="result-alert hidden" id="result-alert"></div>
         <div class="general-plan hidden" id="general-plan"></div>
@@ -268,8 +276,8 @@
 
     <section class="empty-state" id="empty-state"><span class="empty-mark">01</span><p>Preencha o briefing para montar a primeira trilha semanal.</p></section>
   </main>
-  <footer class="site-footer"><span>ClassAuthor <span class="semver" title="Versionamento Semântico: MAIOR.MENOR.CORREÇÃO">v1.8.0</span> · desenvolvido por Rogério Bittencourt, INOVALAB - IFSC</span><span>Saída compatível com ClassAtelier · revisão humana antes da publicação</span></footer>
+  <footer class="site-footer"><span>ClassAuthor <span class="semver" title="Versionamento Semântico: MAIOR.MENOR.CORREÇÃO">v1.9.0</span> · desenvolvido por Rogério Bittencourt, INOVALAB - IFSC</span><span>Saída compatível com ClassAtelier · revisão humana antes da publicação</span></footer>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script type="module" src="/app.js?v=20261103-v1.8.0"></script>
+  <script type="module" src="/app.js?v=20261103-v1.9.0"></script>
 </body>
 </html>

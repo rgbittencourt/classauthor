@@ -24,6 +24,7 @@ import derivativesHandler from "./derivatives-handler.js";
 import figureHandler from "./figure-handler.js";
 import illustrateHandler from "./illustrate-handler.js";
 import productionHandler from "./production-handler.js";
+import rubricHandler from "./rubric.js";
 import lessonPlanHandler from "./lesson-plan.js";
 import { withUnit } from "./unit.js";
 import regenerateWeekHandler from "../api/regenerate-week.js";
@@ -82,6 +83,7 @@ app.options("/api/figure", (req, res) => figureHandler(req, res));
 app.post("/api/figure", (req, res) => figureHandler(req, res));
 app.post("/api/production", (req, res) => productionHandler(req, res));
 app.post("/api/lesson-plan", (req, res) => lessonPlanHandler(req, res));
+app.post("/api/rubric", (req, res) => rubricHandler(req, res));
 
 app.post("/api/enrich-week", async (req, res) => {
   if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
@@ -198,7 +200,8 @@ app.post("/api/zip", async (req, res) => {
       explicitScope: scoped.explicit,
       releasedWeekIndexes: scoped.releasedIndexes,
       mediationGuides: teacherGuides,
-      production: req.body?.production
+      production: req.body?.production,
+      rubrics: req.body?.rubrics
     });
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${slugify(input.title, "curso")}-semanas.zip"`);
@@ -222,7 +225,8 @@ app.post("/api/teacher-pdf", async (req, res) => {
     const buffer = await createMediationMaterialPdf(input, teacherGuides, generalPlan, {
       explicitScope: scoped.explicit,
       releasedWeekIndexes: scoped.releasedIndexes,
-      production: req.body?.production
+      production: req.body?.production,
+      rubrics: req.body?.rubrics
     });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${slugify(input.title, "curso")}-material-de-mediacao.pdf"`);
