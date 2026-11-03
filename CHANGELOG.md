@@ -8,6 +8,14 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.3.1 · 03/11/2026 · Manual Class dentro do app
+
+**Acrescentado**
+- Botão **Manual ↗** no cabeçalho: abre o Manual Class (HTML) numa aba nova, direto no capítulo do ClassAuthor. O manual é servido pelo próprio app, em `/manual/`.
+
+**Corrigido**
+- O título da aba do navegador voltou a ser «ClassAuthor - Planejamento pedagógico» (tinha ficado «ClassAuthor · TESTE», da cópia de teste). Os três apps seguem o mesmo padrão: «Nome - Frase com inicial maiúscula».
+
 ## 1.3.0 · 30/10/2026 · metodologia, plano da aula e pasta do projeto
 
 Aprovada na cópia de teste (ramo `metodologia`). Compatível com os backups e rascunhos da 1.2.1: planejamentos antigos continuam em "Semana" e, sem metodologia escolhida, a geração segue como antes.
