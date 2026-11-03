@@ -32,6 +32,10 @@
       "dest": "/api/regenerate-week"
     },
     {
+      "src": "/api/style",
+      "dest": "/api/regenerate-week"
+    },
+    {
       "src": "/api/captions",
       "dest": "/api/regenerate-week"
     },

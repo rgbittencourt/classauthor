@@ -8,6 +8,15 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.11.0 · 03/11/2026 · Meu estilo de escrita (aprender com as suas correções)
+
+- Novo botão **Meu estilo de escrita**. O ClassAuthor compara, frase a frase e sem IA, o texto que ele escreveu com a versão que você corrigiu no ClassAtelier e devolveu («Devolver ao ClassAuthor»): frases **reescritas**, **cortadas** e **acrescentadas**, e as **expressões que você costuma tirar** (ex.: «neste contexto»).
+- **Só quando você pedir** («Aprender com as correções marcadas»), 1 chamada curta à IA transforma essas diferenças em **sugestões de regras de estilo** (até 8, em português, sobre estilo e não sobre assunto). Só as diferenças vão para a IA, não a aula inteira.
+- As sugestões só valem depois de você **Adotar** (pode editar o texto antes) ou **Descartar**. Você também pode escrever regras à mão, ligar e desligar cada uma e apagar.
+- As regras **ligadas** vão em cada redação de semana, num bloco «ESTILO DO PROFESSOR», para a IA evitar os mesmos hábitos. Ficam neste navegador e valem para todos os projetos; **Baixar minhas regras (.json)** e **Importar regras** levam para outro computador.
+- Rota nova `POST /api/style` (ação `style` em `api/regenerate-week.js`, sem nova função na Vercel). Código sem rede em `src/style-learning.js` (cópia idêntica em `public/`).
+- Testes: `tests/style-learning.test.mjs` e `tests/style-handler.test.mjs`.
+
 ## 1.10.0 · 03/11/2026 · Legendas do YouTube para o ClassAtelier
 
 - Nova rota `POST /api/captions` (ação `captions` em `api/regenerate-week.js`, sem nova função na Vercel): recebe o endereço ou o código de um vídeo do YouTube e devolve a transcrição em parágrafos, lida das legendas que o YouTube publica (de preferência as feitas por pessoa, em português; depois as automáticas; depois inglês). Informa idioma, se é automática e quantos parágrafos.

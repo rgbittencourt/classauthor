@@ -1,6 +1,7 @@
 import { compositionPlanForWeek, figureCountsAsked } from "./composition.js";
 import { sourceMaterialBlock } from "./source-material.js";
 import { approvedPlanBlock } from "./lesson-plan.js";
+import { styleGuideBlock } from "./style-learning.js";
 // Modo de escrita em prosa ("como o Claude escreve").
 //
 // Em vez de pedir à IA um JSON de ~40 campos (o que a faz escrever "para preencher
@@ -86,7 +87,7 @@ Como revisar: reescreva o documento inteiro já com o pedido incorporado. O que 
     askedQuotes ? `- O professor pediu até ${askedQuotes} citação(ões) direta(s) (📜), mas SÓ com frase exata e fonte completa (autor, obra, ano e página); se não houver uma citação real e segura, não invente: deixe sem.` : "",
     figureAsk(composition.figures)
   ].filter(Boolean).join("\n");
-  const methodology = [blocksAsk ? `BLOCOS PEDIDOS PELO PROFESSOR\n${blocksAsk}` : "", approvedPlanBlock(input), writerMethodologyBlock(input, index), sourceMaterialBlock(input, "writer")].filter(Boolean).join("\n\n");
+  const methodology = [blocksAsk ? `BLOCOS PEDIDOS PELO PROFESSOR\n${blocksAsk}` : "", styleGuideBlock(input.styleGuide), approvedPlanBlock(input), writerMethodologyBlock(input, index), sourceMaterialBlock(input, "writer")].filter(Boolean).join("\n\n");
   return `Escreva a unidade da semana ${weekNumber} do curso "${input.title}". ${intro}
 
 PÚBLICO E NÍVEL: ${input.audience || "estudantes de pós-graduação"} (${input.level || "pós-graduação"}), em ${input.language || "português do Brasil"}.

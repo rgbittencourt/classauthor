@@ -1,4 +1,5 @@
 import { normalizeUnit } from "./unit.js";
+import { activeStyleGuide } from "./style-learning.js";
 import { normalizeSourceExcerpts, sourceUsedSummary } from "./source-material.js";
 import { normalizeApproach, normalizeMethodologyPlan, methodForWeek } from "./methodology.js";
 import { normalizeDidacticArc, buildAlignmentMatrix, buildProgression, pedagogicalReview } from "./pedagogy.js";
@@ -630,6 +631,8 @@ export function normalizeCourseInput(raw = {}) {
   const materials = Array.isArray(raw.materials) ? raw.materials.map(normalizeMaterial).filter((material) => material.title || material.objective || material.alignment || material.link || material.use) : [];
   return {
     title: text(raw.title || raw.generalTheme, "Curso sem título"),
+    // Regras de estilo aprendidas das correções do professor (só as ligadas; ver src/style-learning.js).
+    styleGuide: activeStyleGuide(raw.styleGuide),
     audience: text(raw.audience, "Adultos em formação"),
     level: text(raw.level, "Intermediário"),
     objectives: splitLines(raw.objectives),

@@ -6,6 +6,7 @@ import { deliveryReadme } from "./delivery-package.js";
 import { RUBRIC_LEVELS, RUBRIC_LEVELS_ASCENDING, levelScore, normalizeRubricData, rubricFieldValue, rubricFileSlug, rubricHtmlTable, rubricIssues, rubricMoodleCheck, rubricMoodleCsv, rubricPlainText, rubricSheets, rubricTsv } from "./rubric-core.js";
 import { addUsage, costOf, emptyUsage, estimateGeneration, formatBRL, formatInt, subtractUsage, totalTokens, USD_BRL_DEFAULT } from "./ai-cost.js";
 import { createMoodleXml, quizQuestions } from "./moodle-xml.js";
+import { activeStyleGuide, blocksText, diffSentences, habitsFrom, normalizeStyleRules, STYLE_RULE_LIMIT } from "./style-learning.js";
 import { createProductionWorkbook, createWorkbookFromSheets, hasProduction, productionMarkdown, productionVideos, formatDuration } from "./production-xlsx.js";
 import { SOURCE_USAGES, deleteSourceDoc, importSourceFile, sourceExcerptsForWeek } from "./source-materials.js";
 import { deepLocalizeUnit, localizeUnitText } from "./unit-text.js";
@@ -233,7 +234,7 @@ function enhanceLayout() {
   const actions = document.createElement("section");
   actions.className = "sidebar-actions";
   actions.innerHTML = '<p class="sidebar-label">AÇÕES DO PROJETO</p>';
-  ["assist-button", "generate-button", "recalculate-button", "alignment-map-button", "rubrics-button", "ficha-button", "teacher-pdf-button", "zip-button"].forEach((id) => {
+  ["assist-button", "generate-button", "recalculate-button", "alignment-map-button", "rubrics-button", "style-button", "ficha-button", "teacher-pdf-button", "zip-button"].forEach((id) => {
     const button = $("#" + id);
     if (!button) return;
     // O seletor do fluxo semana a semana fica logo acima do botão de gerar.
@@ -1133,6 +1134,157 @@ function openSavedWeekFile(file) {
   reader.readAsText(file);
 }
 
+/* ───────────── Meu estilo: aprender com as correções do professor ───────────── */
+// O professor corrige a semana no ClassAtelier e devolve; aqui comparamos o texto gerado com o corrigido
+// (frase a frase, sem IA) e, só quando ele pede, a IA transforma as diferenças em regras de estilo curtas.
+// As regras ficam NESTE NAVEGADOR (valem para todos os projetos) e as ligadas vão em cada geração.
+const STYLE_KEY = "classauthor.style.v1";
+const styleUi = { rules: [], pending: [], status: "", busy: false, loaded: false, picked: new Set(), pickedInit: false };
+function loadStyle() {
+  if (styleUi.loaded) return;
+  styleUi.loaded = true;
+  try {
+    const data = JSON.parse(localStorage.getItem(STYLE_KEY) || "null");
+    styleUi.rules = normalizeStyleRules(data?.rules);
+    styleUi.pending = normalizeStyleRules(data?.pending).map((rule) => ({ ...rule, on: false }));
+  } catch { /* sem armazenamento: começa vazio */ }
+}
+function saveStyle() { try { localStorage.setItem(STYLE_KEY, JSON.stringify({ rules: styleUi.rules, pending: styleUi.pending })); } catch { /* sem armazenamento */ } }
+function styleGuideForInput() { loadStyle(); return activeStyleGuide(styleUi.rules); }
+
+// Semanas devolvidas pelo ClassAtelier, com o que mudou em relação ao texto gerado.
+function studioCorrections() {
+  const out = [];
+  Object.entries(state.studioEdits || {}).forEach(([key, edit]) => {
+    const index = Number(key), week = state.weeks?.[index];
+    if (!week || !edit?.project?.blocks?.length) return;
+    let diff;
+    try { diff = diffSentences(blocksText(toStudentLesson(week).blocks), blocksText(edit.project.blocks)); } catch { return; }
+    out.push({ index, edit, diff, title: String(week.meta?.title || week.lessonPlan?.theme || "").slice(0, 80) });
+  });
+  return out.sort((a, b) => a.index - b.index);
+}
+
+function renderStyle() {
+  loadStyle();
+  const unit = courseUnit();
+  const L = (value) => escapeHtml(localizeUnitText(String(value ?? ""), unit));
+  const all = studioCorrections();
+  const fresh = all.filter((item) => !item.edit.learnedAt), learned = all.filter((item) => item.edit.learnedAt);
+  if (!styleUi.pickedInit) { fresh.forEach((item) => styleUi.picked.add(item.index)); styleUi.pickedInit = true; }
+  const pickedItems = fresh.filter((item) => styleUi.picked.has(item.index));
+  const habits = habitsFrom(pickedItems.flatMap((item) => item.diff.pairs));
+  const rows = fresh.map((item) => {
+    const c = item.diff.counts;
+    const detail = item.diff.changed ? `${c.rewritten} reescrita${c.rewritten === 1 ? "" : "s"} · ${c.cut} cortada${c.cut === 1 ? "" : "s"} · ${c.added} acrescentada${c.added === 1 ? "" : "s"}` : "nenhuma frase mudou";
+    return `<label class="rb-row"><input type="checkbox" data-style-pick="${item.index}" ${styleUi.picked.has(item.index) ? "checked" : ""} ${item.diff.changed ? "" : "disabled"} ${styleUi.busy ? "disabled" : ""}><span><strong>${L(`Semana ${item.index + 1}`)}${item.title ? ` — ${escapeHtml(item.title)}` : ""}</strong><br><small>${detail}</small></span></label>`;
+  }).join("");
+  const totalChanged = pickedItems.reduce((sum, item) => sum + item.diff.changed, 0);
+  const learnBlock = `<section class="rb-pick"><h3>Correções que você fez</h3>
+    ${all.length ? "" : `<p>Ainda não há correções. Abra uma semana no ClassAtelier, corrija o texto do seu jeito e use <b>Exportar → Devolver ao ClassAuthor</b>. As diferenças aparecem aqui.</p>`}
+    ${fresh.length ? `<p>Nada é aprendido sozinho: marque as semanas e peça. O ClassAuthor compara o texto gerado com o seu, frase a frase, e a IA (1 chamada curta) sugere regras de estilo. Só as diferenças vão para a IA, não a aula inteira.</p><div class="rb-list">${rows}</div>
+    ${habits.length ? `<p class="style-habits"><b>Expressões que você costuma tirar:</b> ${habits.map((h) => `<span class="style-chip">${escapeHtml(h.text)} <small>×${h.n}</small></span>`).join(" ")}</p>` : ""}
+    <div class="rb-bar"><button type="button" class="button button-primary" id="style-learn" ${pickedItems.length && totalChanged >= 3 && !styleUi.busy ? "" : "disabled"}>Aprender com as correções marcadas</button>${totalChanged && totalChanged < 3 ? '<span class="rb-hint">Poucas diferenças (menos de 3 frases): corrija um pouco mais.</span>' : ""}</div>` : (all.length ? "<p>Todas as semanas devolvidas já foram aprendidas.</p>" : "")}
+    ${learned.length ? `<p class="rb-hint">Já aprendidas: ${learned.map((item) => L(`Semana ${item.index + 1}`)).join(", ")}. <button type="button" class="link-button" data-style-act="relearn">Aprender de novo</button></p>` : ""}
+    ${styleUi.status ? `<p class="rb-status" role="status">${escapeHtml(styleUi.status)}</p>` : ""}</section>`;
+  const pendingBlock = styleUi.pending.length ? `<section class="rb-pick"><h3>Sugestões novas <small>(confirme antes de valerem)</small></h3>${styleUi.pending.map((rule) => `<div class="style-rule is-new"><textarea data-style-text="p:${escapeHtml(rule.id)}" rows="2" aria-label="Sugestão de regra">${escapeHtml(rule.text)}</textarea>${rule.evidence ? `<small>${escapeHtml(rule.evidence)}</small>` : ""}<div class="rb-card-actions"><button type="button" class="button button-primary" data-style-act="adopt" data-id="${escapeHtml(rule.id)}">Adotar</button><button type="button" class="button button-secondary" data-style-act="discard" data-id="${escapeHtml(rule.id)}">Descartar</button></div></div>`).join("")}</section>` : "";
+  const ruleRows = styleUi.rules.map((rule) => `<div class="style-rule"><label class="style-on"><input type="checkbox" data-style-on="${escapeHtml(rule.id)}" ${rule.on ? "checked" : ""}> <span class="sr-only">Ligada</span></label><textarea data-style-text="r:${escapeHtml(rule.id)}" rows="2" aria-label="Regra de estilo">${escapeHtml(rule.text)}</textarea><button type="button" class="remove-item" data-style-act="remove" data-id="${escapeHtml(rule.id)}" aria-label="Apagar a regra">×</button></div>`).join("");
+  const on = styleUi.rules.filter((rule) => rule.on).length;
+  const rulesBlock = `<section class="rb-pick"><h3>Minhas regras de estilo</h3>
+    <p>${on ? `${on} regra${on === 1 ? "" : "s"} ligada${on === 1 ? "" : "s"}: vão junto em cada texto que o ClassAuthor escrever.` : "Nenhuma regra ligada. As que você adotar ou escrever aqui passam a valer na próxima geração."} As regras ficam neste navegador e valem para todos os seus projetos.</p>
+    ${ruleRows || '<div class="rb-empty">Ainda não há regras.</div>'}
+    <div class="style-add"><input type="text" id="style-new" maxlength="260" placeholder="Escreva uma regra, por exemplo: Prefira frases curtas e evite «neste contexto»."><button type="button" class="button button-secondary" id="style-add-button" ${styleUi.rules.length >= STYLE_RULE_LIMIT ? "disabled" : ""}>Adicionar</button></div></section>`;
+  $("#style-body").innerHTML = learnBlock + pendingBlock + rulesBlock;
+}
+
+function openStyle() {
+  styleUi.pickedInit = false; styleUi.picked = new Set(); styleUi.status = "";
+  renderStyle();
+  $("#style-modal").classList.remove("hidden");
+  $("#style-modal").setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+}
+function closeStyle() {
+  $("#style-modal").classList.add("hidden");
+  $("#style-modal").setAttribute("aria-hidden", "true");
+  document.body.style.overflow = "";
+}
+
+async function learnFromCorrections() {
+  if (aiActionBusy || styleUi.busy) return;
+  const items = studioCorrections().filter((item) => !item.edit.learnedAt && styleUi.picked.has(item.index) && item.diff.changed);
+  if (!items.length) return;
+  const button = $("#style-learn");
+  if (!beginAiAction(button)) return;
+  styleUi.busy = true; styleUi.status = "Lendo as suas correções…";
+  setAiActivity("Aprendendo seu estilo", styleUi.status, { progress: 30 });
+  renderStyle();
+  try {
+    const share = Math.max(6, Math.floor(40 / items.length));
+    const pairs = items.flatMap((item) => item.diff.pairs.slice(0, share)).slice(0, 40);
+    const cuts = items.flatMap((item) => item.diff.cuts).slice(0, 15), adds = items.flatMap((item) => item.diff.adds).slice(0, 10);
+    const { headers } = productionHeaders();
+    const existing = [...styleUi.rules, ...styleUi.pending].map((rule) => rule.text);
+    const response = await fetch("/api/style", { method: "POST", headers, signal: AbortSignal.timeout(120000), body: JSON.stringify({ action: "style", pairs, cuts, adds, habits: habitsFrom(items.flatMap((item) => item.diff.pairs)), existing }) });
+    const done = await readApiResponse(response, "Não foi possível aprender com as correções.");
+    const found = normalizeStyleRules(done.rules).map((rule) => ({ ...rule, on: false, at: new Date().toISOString() }));
+    styleUi.pending = normalizeStyleRules([...styleUi.pending, ...found]).map((rule) => ({ ...rule, on: false }));
+    const when = new Date().toISOString();
+    items.forEach((item) => { if (state.studioEdits?.[item.index]) state.studioEdits[item.index].learnedAt = when; });
+    saveStyle(); saveDraft("estilo-aprendido");
+    styleUi.status = found.length ? `${found.length === 1 ? "1 sugestão nova" : found.length + " sugestões novas"}. Leia, ajuste o texto se quiser e escolha «Adotar» ou «Descartar».` : "A IA não achou padrões repetidos nessas correções (parecem ajustes de conteúdo, não de estilo). Nenhuma regra nova.";
+    finishAiActivity("Estilo analisado", styleUi.status, "success");
+  } catch (error) {
+    styleUi.status = error.message || "Não foi possível aprender com as correções.";
+    finishAiActivity("Estilo não analisado", styleUi.status, "error");
+  } finally {
+    styleUi.busy = false;
+    endAiAction();
+    renderStyle();
+  }
+}
+
+function styleAct(action, id) {
+  if (action === "adopt") {
+    const rule = styleUi.pending.find((item) => item.id === id);
+    if (!rule) return;
+    styleUi.pending = styleUi.pending.filter((item) => item.id !== id);
+    styleUi.rules = normalizeStyleRules([...styleUi.rules, { ...rule, on: true }]);
+  } else if (action === "discard") styleUi.pending = styleUi.pending.filter((item) => item.id !== id);
+  else if (action === "remove") styleUi.rules = styleUi.rules.filter((item) => item.id !== id);
+  else if (action === "relearn") { Object.values(state.studioEdits || {}).forEach((edit) => { delete edit.learnedAt; }); styleUi.pickedInit = false; styleUi.picked = new Set(); saveDraft("estilo"); }
+  saveStyle(); renderStyle();
+}
+function styleAddRule() {
+  const input = $("#style-new");
+  const text = String(input?.value || "").trim();
+  if (text.length < 8) { styleUi.status = "Escreva a regra com pelo menos uma frase curta."; renderStyle(); return; }
+  const before = styleUi.rules.length;
+  styleUi.rules = normalizeStyleRules([...styleUi.rules, { text, on: true, source: "manual", at: new Date().toISOString() }]);
+  styleUi.status = styleUi.rules.length === before ? "Essa regra já existe." : "";
+  saveStyle(); renderStyle();
+}
+function styleDownload() {
+  loadStyle();
+  downloadBlob(new Blob([JSON.stringify({ app: "classauthor-estilo", version: 1, rules: styleUi.rules }, null, 2)], { type: "application/json" }), "meu-estilo-ClassAuthor.json");
+}
+function styleImport(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(String(reader.result || ""));
+      if (data?.app !== "classauthor-estilo" || !Array.isArray(data.rules)) throw new Error("Este arquivo não é de regras de estilo do ClassAuthor.");
+      loadStyle();
+      const before = styleUi.rules.length;
+      styleUi.rules = normalizeStyleRules([...styleUi.rules, ...data.rules]);
+      styleUi.status = `${styleUi.rules.length - before} regra${styleUi.rules.length - before === 1 ? "" : "s"} importada${styleUi.rules.length - before === 1 ? "" : "s"}.`;
+      saveStyle(); renderStyle();
+    } catch (error) { styleUi.status = error.message || "Não consegui importar o arquivo."; renderStyle(); }
+  };
+  reader.readAsText(file);
+}
+
 let practiceSequence = 0;
 let materialSequence = 0;
 const selectOption = (value, option) => value === option ? "selected" : "";
@@ -1357,6 +1509,7 @@ function formInput() {
     materials: collectMaterials(),
     resourcePlan: collectResourcePlan(),
     compositionPlan: collectCompositionPlan(),
+    styleGuide: styleGuideForInput(),
     accessCode: $("#access-code")?.value || "",
     webPracticeEnabled: $("#practice-enabled").checked,
     webPractices,
@@ -3954,6 +4107,32 @@ $("#close-rubrics-modal")?.addEventListener("click", closeRubrics);
 $("#rubrics-close-button")?.addEventListener("click", closeRubrics);
 $("#rubrics-csv-button")?.addEventListener("click", downloadRubricsCsv);
 $("#rubrics-xlsx-button")?.addEventListener("click", downloadRubricsXlsx);
+$("#style-button")?.addEventListener("click", openStyle);
+$("#close-style-modal")?.addEventListener("click", closeStyle);
+$("#style-close-button")?.addEventListener("click", closeStyle);
+$("#style-export-button")?.addEventListener("click", styleDownload);
+$("#style-import-button")?.addEventListener("click", () => $("#style-import-file")?.click());
+$("#style-import-file")?.addEventListener("change", (event) => { const file = event.target.files?.[0]; event.target.value = ""; styleImport(file); });
+$("#style-body")?.addEventListener("click", (event) => {
+  const act = event.target.closest("[data-style-act]");
+  if (act) { styleAct(act.dataset.styleAct, act.dataset.id); return; }
+  if (event.target.closest("#style-learn")) { learnFromCorrections(); return; }
+  if (event.target.closest("#style-add-button")) styleAddRule();
+});
+$("#style-body")?.addEventListener("keydown", (event) => { if (event.key === "Enter" && event.target.id === "style-new") { event.preventDefault(); styleAddRule(); } });
+$("#style-body")?.addEventListener("change", (event) => {
+  const pick = event.target.closest("[data-style-pick]");
+  if (pick) { const index = Number(pick.dataset.stylePick); if (pick.checked) styleUi.picked.add(index); else styleUi.picked.delete(index); renderStyle(); return; }
+  const on = event.target.closest("[data-style-on]");
+  if (on) { const rule = styleUi.rules.find((item) => item.id === on.dataset.styleOn); if (rule) { rule.on = on.checked; saveStyle(); renderStyle(); } }
+});
+$("#style-body")?.addEventListener("input", (event) => {
+  const field = event.target.closest("[data-style-text]");
+  if (!field) return;
+  const [kind, id] = String(field.dataset.styleText).split(/:(.*)/s);
+  const rule = (kind === "p" ? styleUi.pending : styleUi.rules).find((item) => item.id === id);
+  if (rule) { rule.text = field.value.replace(/\s+/g, " ").trim().slice(0, 260); saveStyle(); }
+});
 $("#rubrics-body")?.addEventListener("change", (event) => {
   if (event.target.id === "rb-count") { rubricUi.criteriaCount = Number(event.target.value) || 4; return; }
   const pickKey = event.target.dataset?.rbPick;

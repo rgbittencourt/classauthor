@@ -719,3 +719,10 @@ button.studio-top-link img{width:24px;height:24px;border-radius:7px}
 .rb-grid-wrap{overflow:auto;margin-top:10px}.rb-grid{width:100%;border-collapse:collapse;font-size:12px}.rb-grid th,.rb-grid td{border:1px solid #e4e0d7;padding:6px;vertical-align:top;text-align:left;background:#fff}.rb-grid th{width:24%;font-weight:600}.rb-grid td{min-width:105px}.rb-lv{display:block;margin-bottom:4px;font-weight:600;color:#14213d}
 .rb-copy{margin:2px 4px 2px 0;padding:3px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;font:inherit;font-size:11.5px;cursor:pointer}.rb-copy:hover{border-color:var(--coral)}.rb-copy.rb-copied{background:#e3f1e8;border-color:#7fbf95}
 .rb-opts{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:6px 0 10px;font-size:13px}.rb-opts label{display:flex;gap:6px;align-items:center}.rb-opts select,.rb-opts input{padding:5px 8px;border:1px solid var(--line);border-radius:8px;font:inherit;width:auto}.rb-opts input{width:80px}.rb-hint{font-size:12px;color:var(--muted,#5b6275)}.rb-stmt{display:block;margin:4px 0;font-size:12.5px;color:var(--muted,#5b6275)}
+
+/* meu estilo de escrita */
+.style-rule{display:flex;gap:8px;align-items:flex-start;margin:0 0 8px}.style-rule textarea{flex:1;min-width:0;font:inherit;font-size:13.5px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;resize:vertical;background:#fff}
+.style-rule.is-new{flex-direction:column;align-items:stretch;padding:10px;border:1px dashed #d9a441;border-radius:10px;background:#fffaf0}.style-rule.is-new small{color:var(--muted,#5b6275)}
+.style-on{padding-top:8px}.style-add{display:flex;gap:8px;margin-top:10px}.style-add input{flex:1;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13.5px}
+.style-habits{margin:8px 0 10px;font-size:13px}.style-chip{display:inline-block;margin:2px 4px 2px 0;padding:2px 9px;border-radius:99px;background:#f3e4dc;color:#7a3a22;font-size:12.5px}.style-chip small{opacity:.7}
+.link-button{border:0;background:none;color:var(--accent,#c4553a);text-decoration:underline;cursor:pointer;font:inherit;padding:0}

@@ -26,6 +26,7 @@ import illustrateHandler from "./illustrate-handler.js";
 import productionHandler from "./production-handler.js";
 import rubricHandler from "./rubric.js";
 import captionsHandler from "./captions-handler.js";
+import styleHandler from "./style-handler.js";
 import lessonPlanHandler from "./lesson-plan.js";
 import { withUnit } from "./unit.js";
 import regenerateWeekHandler from "../api/regenerate-week.js";
@@ -85,6 +86,7 @@ app.post("/api/figure", (req, res) => figureHandler(req, res));
 app.post("/api/production", (req, res) => productionHandler(req, res));
 app.post("/api/lesson-plan", (req, res) => lessonPlanHandler(req, res));
 app.post("/api/rubric", (req, res) => rubricHandler(req, res));
+app.post("/api/style", (req, res) => styleHandler(req, res));
 app.options("/api/captions", (req, res) => captionsHandler(req, res));
 app.post("/api/captions", (req, res) => captionsHandler(req, res));
 
