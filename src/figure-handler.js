@@ -20,7 +20,7 @@ export function originAllowed(origin, env = process.env) {
   return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 }
 
-function cors(request, response) {
+export function applyCors(request, response) {
   const origin = request.headers?.origin;
   if (origin && originAllowed(origin)) {
     response.setHeader("Access-Control-Allow-Origin", origin);
@@ -35,7 +35,7 @@ function cors(request, response) {
 
 export default async function figureHandler(request, response, { draw = drawFigureFromPrompt } = {}) {
   response.setHeader("Cache-Control", "no-store");
-  const known = cors(request, response);
+  const known = applyCors(request, response);
   if (request.method === "OPTIONS") return response.status(known ? 204 : 403).end();
   if (request.headers?.origin && !known) return response.status(403).json({ ok: false, error: "Este endereço não tem permissão para pedir figuras ao ClassAuthor.", code: "FIGURE_ORIGIN" });
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });

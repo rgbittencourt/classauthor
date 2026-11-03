@@ -8,6 +8,13 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.10.0 · 03/11/2026 · Legendas do YouTube para o ClassAtelier
+
+- Nova rota `POST /api/captions` (ação `captions` em `api/regenerate-week.js`, sem nova função na Vercel): recebe o endereço ou o código de um vídeo do YouTube e devolve a transcrição em parágrafos, lida das legendas que o YouTube publica (de preferência as feitas por pessoa, em português; depois as automáticas; depois inglês). Informa idioma, se é automática e quantos parágrafos.
+- Sem IA e sem custo. Exige o código de acesso e só responde às origens do ClassAtelier (CORS, como `/api/figure`).
+- Erros explicados: vídeo sem legenda, vídeo indisponível, YouTube bloqueou o pedido, falha de rede.
+- Testes em `tests/youtube-captions.test.mjs` (rede simulada).
+
 ## 1.9.1 · 03/11/2026 · CSV de rubricas no formato exato do plugin do Moodle
 
 ### Corrigido

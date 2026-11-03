@@ -25,6 +25,7 @@ import figureHandler from "./figure-handler.js";
 import illustrateHandler from "./illustrate-handler.js";
 import productionHandler from "./production-handler.js";
 import rubricHandler from "./rubric.js";
+import captionsHandler from "./captions-handler.js";
 import lessonPlanHandler from "./lesson-plan.js";
 import { withUnit } from "./unit.js";
 import regenerateWeekHandler from "../api/regenerate-week.js";
@@ -84,6 +85,8 @@ app.post("/api/figure", (req, res) => figureHandler(req, res));
 app.post("/api/production", (req, res) => productionHandler(req, res));
 app.post("/api/lesson-plan", (req, res) => lessonPlanHandler(req, res));
 app.post("/api/rubric", (req, res) => rubricHandler(req, res));
+app.options("/api/captions", (req, res) => captionsHandler(req, res));
+app.post("/api/captions", (req, res) => captionsHandler(req, res));
 
 app.post("/api/enrich-week", async (req, res) => {
   if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
