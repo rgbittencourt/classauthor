@@ -4,11 +4,11 @@ Aplicação para transformar um briefing de curso em uma trilha semanal de aulas
 
 ## Versão
 
-Versão atual: **1.11.0** (Versionamento Semântico). O histórico está em [`CHANGELOG.md`](CHANGELOG.md); o número aparece no rodapé do aplicativo e em `/api/health`.
+Versão atual: **1.11.1** (Versionamento Semântico). O histórico está em [`CHANGELOG.md`](CHANGELOG.md); o número aparece no rodapé do aplicativo e em `/api/health`.
 
 ## Manual
 
-O **Manual Class** descreve os três aplicativos (ClassAuthor, ClassAtelier e ClassAcervo), cada menu, janela e caminho até o Moodle, com 87 capturas de tela: [`manual/manual-class.html`](manual/manual-class.html) (página) e [`manual/manual-class.pdf`](manual/manual-class.pdf) (impressão).
+O **Manual Class** descreve os três aplicativos (ClassAuthor, ClassAtelier e ClassAcervo), cada menu, janela e caminho até o Moodle, com 115 capturas de tela: [`manual/manual-class.html`](manual/manual-class.html) (página) e [`manual/manual-class.pdf`](manual/manual-class.pdf) (impressão).
 
 ## Identidade visual
 

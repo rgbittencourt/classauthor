@@ -8,6 +8,12 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.11.1 · 03/11/2026 · Manual Class atualizado
+
+- O **Manual Class** (aberto pelo botão **Manual ↗**) ganhou todos os recursos das versões 1.4.0 a 1.11.0: Mapa de alinhamento, Ficha da disciplina, pacote de entrega com LEIA-ME, custo da IA em reais e cotação do dólar, Rubricas de avaliação (cópia para o Moodle, CSV do Rubric Importer, planilha), Meu estilo de escrita e a rota de legendas do YouTube. Também traz as novidades do ClassAtelier (transcrição e legendas, modo apresentação, fóruns para criar no Moodle) e do ClassAcervo (miniaturas, testar links, relatório para o Moodle).
+- Novas capturas de tela (115 no total), rotas e variáveis de servidor novas, limites e problemas comuns atualizados, linha do tempo das versões e sumário com as seções novas.
+- O PDF do manual (`manual/manual-class.pdf`) foi refeito com o conteúdo novo.
+
 ## 1.11.0 · 03/11/2026 · Meu estilo de escrita (aprender com as suas correções)
 
 - Novo botão **Meu estilo de escrita**. O ClassAuthor compara, frase a frase e sem IA, o texto que ele escreveu com a versão que você corrigiu no ClassAtelier e devolveu («Devolver ao ClassAuthor»): frases **reescritas**, **cortadas** e **acrescentadas**, e as **expressões que você costuma tirar** (ex.: «neste contexto»).
