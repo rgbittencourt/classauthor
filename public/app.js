@@ -1,6 +1,7 @@
 import { toStudentLesson, toGeneratorWeek } from "./student-export.js";
 import { parseSavedWeek, planPlacement } from "./week-import.js";
 import { alignmentSheets, bloomLabel, buildAlignmentMap } from "./alignment-map.js";
+import { createFichaDocx, fichaChecks, fichaDefaults, weightsTotal } from "./ficha-disciplina.js";
 import { createMoodleXml, quizQuestions } from "./moodle-xml.js";
 import { createProductionWorkbook, createWorkbookFromSheets, hasProduction, productionMarkdown, productionVideos, formatDuration } from "./production-xlsx.js";
 import { SOURCE_USAGES, deleteSourceDoc, importSourceFile, sourceExcerptsForWeek } from "./source-materials.js";
@@ -130,13 +131,13 @@ function enhanceLayout() {
   const actions = document.createElement("section");
   actions.className = "sidebar-actions";
   actions.innerHTML = '<p class="sidebar-label">AÇÕES DO PROJETO</p>';
-  ["assist-button", "generate-button", "recalculate-button", "alignment-map-button", "teacher-pdf-button", "zip-button"].forEach((id) => {
+  ["assist-button", "generate-button", "recalculate-button", "alignment-map-button", "ficha-button", "teacher-pdf-button", "zip-button"].forEach((id) => {
     const button = $("#" + id);
     if (!button) return;
     // O seletor do fluxo semana a semana fica logo acima do botão de gerar.
     if (id === "generate-button") { const stepToggle = $(".step-mode-toggle"); if (stepToggle) actions.appendChild(stepToggle); }
     button.classList.add("sidebar-action");
-    if (["recalculate-button", "alignment-map-button", "teacher-pdf-button", "zip-button"].includes(id)) button.disabled = true;
+    if (["recalculate-button", "alignment-map-button", "ficha-button", "teacher-pdf-button", "zip-button"].includes(id)) button.disabled = true;
     actions.appendChild(button);
   });
   document.querySelector(".form-actions")?.remove();
@@ -505,6 +506,7 @@ function resetDisciplineForm(preserveSession = true) {
   state.reviewMarks = createReviewMarks();
   state.weekApprovals = {};
   state.studioEdits = {};
+  state.ficha = null;
   state.production = emptyProduction();
   state.flow = emptyFlow(); state.lessonPlans = {};
   state.activeReviewGuidance = null;
@@ -595,6 +597,7 @@ function currentSnapshot() {
       studioEdits: state.studioEdits,
       production: state.production,
       stepFlow: state.flow,
+      ficha: state.ficha || null,
       lessonPlans: state.lessonPlans || {},
       generation: state.generation,
       weeks: state.weeks
@@ -928,6 +931,7 @@ function restoreSnapshot(snapshot) {
   state.studioEdits = snapshot.results?.studioEdits || {};
   state.production = normalizeProductionState(snapshot.results?.production);
   state.flow = normalizeFlow(snapshot.results?.stepFlow);
+  state.ficha = snapshot.results?.ficha && typeof snapshot.results.ficha === "object" ? snapshot.results.ficha : null;
   state.lessonPlans = snapshot.results?.lessonPlans && typeof snapshot.results.lessonPlans === "object" ? snapshot.results.lessonPlans : {};
   state.generation = snapshot.results?.generation || snapshot.generation || null;
   if (["running", "consolidating"].includes(state.generation?.status)) state.generation = { ...state.generation, status: "partial" };
@@ -1826,6 +1830,125 @@ function openLessonPreview(index) {
   document.body.style.overflow = "hidden";
 }
 
+// ---------- Ficha da disciplina (Plano de Ensino) ----------
+const FICHA_MEMORY_KEY = "classauthor:ficha-memory:v1";
+// O que não muda de um curso para outro (curso, professores, rodapé, logotipo) fica lembrado neste navegador.
+function fichaBase() {
+  const ficha = fichaDefaults({ input: state.input || formInput(), weeks: state.weeks, generalPlan: state.generalPlan, author: state.input?.author || $("#author")?.value || "" });
+  try {
+    const memory = JSON.parse(localStorage.getItem(FICHA_MEMORY_KEY) || "null");
+    if (memory) {
+      if (memory.course) ficha.course = String(memory.course);
+      if (Array.isArray(memory.professors) && memory.professors.length) ficha.professors = memory.professors.map((item) => ({ name: String(item.name || ""), email: String(item.email || "") }));
+      if (typeof memory.footer === "string") ficha.footer = memory.footer;
+      if (typeof memory.header === "boolean") ficha.header = memory.header;
+    }
+  } catch { /* sem memória: usa o padrão */ }
+  return ficha;
+}
+function rememberFicha(ficha) {
+  try { localStorage.setItem(FICHA_MEMORY_KEY, JSON.stringify({ course: ficha.course, professors: ficha.professors, footer: ficha.footer, header: ficha.header })); } catch { /* sem armazenamento */ }
+}
+
+function renderFichaForm(ficha) {
+  const field = (name, label, value, { rows = 0, hint = "" } = {}) => `<label class="field ficha-field"><span>${escapeHtml(label)}</span>${rows ? `<textarea data-f="${name}" rows="${rows}" spellcheck="true">${escapeHtml(value)}</textarea>` : `<input data-f="${name}" value="${escapeHtml(value)}" />`}${hint ? `<small>${hint}</small>` : ""}</label>`;
+  const professors = (ficha.professors.length ? ficha.professors : [{ name: "", email: "" }]).map((item) => `<div class="ficha-row ficha-prof"><input data-p="name" value="${escapeHtml(item.name)}" placeholder="Nome do professor" /><input data-p="email" value="${escapeHtml(item.email)}" placeholder="e-mail" /><button type="button" class="ficha-remove" data-remove="prof" title="Remover professor">×</button></div>`).join("");
+  const instruments = ficha.instruments.map((row) => `<tr><td><input data-i="name" value="${escapeHtml(row.name)}" /></td><td><textarea data-i="criteria" rows="2">${escapeHtml(row.criteria)}</textarea></td><td><input data-i="weight" class="ficha-weight" value="${escapeHtml(row.weight)}" placeholder="%" inputmode="decimal" /></td><td><input data-i="schedule" value="${escapeHtml(row.schedule)}" /></td><td><button type="button" class="ficha-remove" data-remove="instrument" title="Remover instrumento">×</button></td></tr>`).join("");
+  const references = ficha.references.map((item) => `<div class="ficha-row ficha-ref"><input type="checkbox" data-r="include" ${item.include ? "checked" : ""} title="Incluir na ficha" /><textarea data-r="citation" rows="2">${escapeHtml(item.citation)}</textarea><span class="ficha-ref-tag ${item.verified ? "ok" : "warn"}">${item.origin === "briefing" ? "sua lista" : item.verified ? "conferida" : "não conferida"}</span><button type="button" class="ficha-remove" data-remove="reference" title="Remover referência">×</button></div>`).join("");
+  $("#ficha-body").innerHTML = `
+    <div class="ficha-checks" id="ficha-checks" aria-live="polite"></div>
+    ${ficha.generatedWeeks < ficha.totalWeeks ? `<p class="am-note">Só ${ficha.generatedWeeks} de ${ficha.totalWeeks} ${escapeHtml(localizeUnitText("semanas", courseUnit()))} foram geradas: o conteúdo programático, a ementa e os instrumentos mostram só elas. Gere as demais e use «Refazer a partir do planejamento».</p>` : ""}
+    <section class="ficha-section"><h3>Identificação</h3><div class="ficha-grid">${field("course", "Curso", ficha.course)}${field("unit", "Unidade curricular", ficha.unit)}${field("hours", "C.H.", ficha.hours)}${field("period", "Ano/semestre", ficha.period)}</div>
+      <div class="ficha-sub"><strong>Professores</strong><div id="ficha-professors">${professors}</div><button type="button" class="button button-secondary ficha-add" id="ficha-add-prof">Adicionar professor</button></div></section>
+    <section class="ficha-section"><h3>1. Ementa</h3>${field("ementa", "Ementa", ficha.ementa, { rows: 4, hint: "Montada com os temas das semanas. Troque pela ementa oficial da unidade curricular, se ela existir." })}</section>
+    <section class="ficha-section"><h3>2. Objetivos</h3>${field("objectives", "Objetivos (um por linha)", ficha.objectives, { rows: 4 })}</section>
+    <section class="ficha-section"><h3>3. Conteúdo programático e carga horária</h3>${field("contents", "Conteúdo (uma linha por item; itens 1.1, 1.2… ficam como subitens)", ficha.contents.map((item) => item.text).join("\n"), { rows: 8, hint: "Um tema por semana, com os títulos das seções como subitens. A C.H. total aparece ao lado, como no modelo." })}</section>
+    <section class="ficha-section"><h3>4. Método de ensino e recursos didáticos</h3>${field("method", "Método", ficha.method, { rows: 10, hint: "Separe os parágrafos com uma linha em branco." })}</section>
+    <section class="ficha-section"><h3>5. Avaliação</h3>${field("evaluation", "Texto da avaliação", ficha.evaluation, { rows: 10, hint: "Texto-padrão do modelo de Plano de Ensino do IFSC (Regimento Didático Pedagógico). Confira se ainda vale e adapte à sua instituição." })}</section>
+    <section class="ficha-section"><h3>6. Instrumentos e critérios de avaliação</h3>${field("instrumentsIntro", "Texto de abertura", ficha.instrumentsIntro, { rows: 2 })}
+      <div class="am-scroll"><table class="am-table ficha-table"><thead><tr><th>Instrumento</th><th>Critérios</th><th>Peso</th><th>Cronograma</th><th></th></tr></thead><tbody id="ficha-instruments">${instruments}</tbody></table></div>
+      <p class="ficha-total" id="ficha-total"></p><button type="button" class="button button-secondary ficha-add" id="ficha-add-instrument">Adicionar instrumento</button>
+      <p class="am-note">Os instrumentos vêm das atividades obrigatórias e dos questionários de cada semana. O app não sabe quais valem nota nem quanto: escolha os que entram, apague os outros e defina os pesos.</p></section>
+    <section class="ficha-section"><h3>Referências</h3><div id="ficha-references">${references || '<p class="am-note">Nenhuma referência encontrada no planejamento.</p>'}</div><button type="button" class="button button-secondary ficha-add" id="ficha-add-reference">Adicionar referência</button>
+      <p class="am-note">Entram marcadas as referências da sua lista e as que foram conferidas. As que a IA sugeriu e ninguém conferiu ficam desmarcadas: confirme que a obra existe antes de marcar. Use ** ** para o negrito do título.</p></section>
+    <section class="ficha-section"><h3>Cabeçalho e rodapé</h3><label class="ficha-check"><input type="checkbox" data-f="header" ${ficha.header ? "checked" : ""} /> Logotipo do IFSC no cabeçalho</label>${field("footer", "Rodapé (uma linha por linha do rodapé)", ficha.footer, { rows: 2 })}</section>`;
+  updateFichaChecks();
+}
+
+function readFichaForm() {
+  const root = $("#ficha-body");
+  const get = (name) => root.querySelector(`[data-f="${name}"]`)?.value ?? "";
+  const base = state.ficha || {};
+  return {
+    ...base,
+    preset: "ifsc",
+    header: Boolean(root.querySelector('[data-f="header"]')?.checked),
+    course: get("course").trim(), unit: get("unit").trim(), hours: get("hours").trim(), period: get("period").trim(),
+    professors: [...root.querySelectorAll(".ficha-prof")].map((row) => ({ name: row.querySelector('[data-p="name"]').value.trim(), email: row.querySelector('[data-p="email"]').value.trim() })).filter((item) => item.name || item.email),
+    ementa: get("ementa").trim(), objectives: get("objectives").trim(),
+    contents: get("contents").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => ({ text: line, level: /^\d+\.\d+/.test(line) ? 1 : 0 })),
+    method: get("method").trim(), evaluation: get("evaluation").trim(), instrumentsIntro: get("instrumentsIntro").trim(),
+    instruments: [...root.querySelectorAll("#ficha-instruments tr")].map((row) => ({ name: row.querySelector('[data-i="name"]').value.trim(), criteria: row.querySelector('[data-i="criteria"]').value.trim(), weight: row.querySelector('[data-i="weight"]').value.trim(), schedule: row.querySelector('[data-i="schedule"]').value.trim() })),
+    references: [...root.querySelectorAll(".ficha-ref")].map((row, index) => ({ ...(base.references?.[index] || {}), citation: row.querySelector('[data-r="citation"]').value.trim(), include: row.querySelector('[data-r="include"]').checked })).filter((item) => item.citation),
+    footer: get("footer").trim()
+  };
+}
+
+function updateFichaChecks() {
+  const ficha = readFichaForm();
+  const checks = fichaChecks(ficha);
+  const total = weightsTotal(ficha);
+  const totalLine = $("#ficha-total");
+  if (totalLine) { totalLine.textContent = ficha.instruments.length ? `Soma dos pesos: ${String(Math.round(total * 100) / 100).replace(".", ",")}%` : ""; totalLine.className = `ficha-total ${Math.abs(total - 100) < 0.01 ? "ok" : "warn"}`; }
+  $("#ficha-checks").innerHTML = checks.length ? `<strong>Antes de entregar:</strong><ul>${checks.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : `<strong>Tudo preenchido.</strong> Confira o texto e baixe o documento.`;
+  $("#ficha-checks").className = `ficha-checks ${checks.length ? "warn" : "ok"}`;
+}
+
+function persistFicha() {
+  state.ficha = readFichaForm();
+  rememberFicha(state.ficha);
+  updateFichaChecks();
+  scheduleSave();
+}
+
+function openFicha() {
+  if (!state.weeks?.some((lesson) => lesson?.lessonPlan)) { showError("Gere pelo menos uma semana para montar a ficha da disciplina."); return; }
+  if (!state.ficha) state.ficha = fichaBase();
+  renderFichaForm(state.ficha);
+  $("#ficha-modal").classList.remove("hidden");
+  $("#ficha-modal").setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+}
+
+function closeFicha() {
+  if (!$("#ficha-modal").classList.contains("hidden")) persistFicha();
+  $("#ficha-modal").classList.add("hidden");
+  $("#ficha-modal").setAttribute("aria-hidden", "true");
+  document.body.style.overflow = "";
+}
+
+function fichaMutate(change) {
+  const ficha = readFichaForm();
+  change(ficha);
+  state.ficha = ficha;
+  renderFichaForm(ficha);
+  scheduleSave();
+}
+
+async function downloadFicha() {
+  try {
+    if (!window.JSZip) throw new Error("O componente de ZIP ainda não carregou. Recarregue a página e tente novamente.");
+    persistFicha();
+    let logo = null;
+    if (state.ficha.header) {
+      try { const response = await fetch("./brand/ifsc-institutional-mark.png"); if (response.ok) logo = new Uint8Array(await response.arrayBuffer()); } catch { /* sem logotipo: o documento sai sem cabeçalho */ }
+    }
+    const ficha = deepLocalizeUnit(state.ficha, courseUnit());
+    const blob = await createFichaDocx(window.JSZip, ficha, { logo, output: "blob" });
+    downloadBlob(blob, `plano-de-ensino-${slugify(state.ficha.unit || state.input?.title || "curso")}.docx`);
+  } catch (error) { showError(error.message); }
+}
+
 // ---------- Mapa de alinhamento ----------
 function alignmentMapData() {
   return buildAlignmentMap({ input: state.input || formInput(), weeks: state.weeks, workload: state.workload });
@@ -2502,6 +2625,8 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
   if (zipButton) zipButton.disabled = !complete;
   const alignmentButton = $("#alignment-map-button");
   if (alignmentButton) alignmentButton.disabled = !data.weeks.some((lesson) => lesson?.lessonPlan);
+  const fichaButton = $("#ficha-button");
+  if (fichaButton) fichaButton.disabled = !data.weeks.some((lesson) => lesson?.lessonPlan);
   updateProductionSheetButton();
   renderProductionUcCard();
   updateMediationExportHint();
@@ -3174,7 +3299,7 @@ async function generate() {
   const button = $("#generate-button");
   if (!beginAiAction(button)) return;
   button.dataset.label = resumeGeneration ? `Continuar da semana ${startIndex + 1}` : "Gerar com IA";
-  ["recalculate-button", "alignment-map-button", "teacher-pdf-button", "zip-button"].forEach((id) => { const action = $("#" + id); if (action) action.disabled = true; });
+  ["recalculate-button", "alignment-map-button", "ficha-button", "teacher-pdf-button", "zip-button"].forEach((id) => { const action = $("#" + id); if (action) action.disabled = true; });
   setBusy(button, true, "Gerando material…");
   setAiActivity(resumeGeneration ? "Retomando geração" : "Preparando geração", resumeGeneration ? `As semanas anteriores foram preservadas. Continuando pela semana ${startIndex + 1} de ${input.weeks}…` : `A IA vai construir ${input.weeks} semana(s), uma por vez, e depois consolidar o curso…`, { progress: resumeGeneration ? Math.round((startIndex / (input.weeks + 1)) * 100) : 0 });
   $("#result-alert").classList.add("hidden");
@@ -3495,6 +3620,26 @@ $("#teacher-pdf-button").addEventListener("click", downloadTeacherPdf);
 $("#recalculate-button").addEventListener("click", recalculateQuality);
 $("#close-lesson-modal").addEventListener("click", closeLessonPreview);
 $("#alignment-map-button")?.addEventListener("click", openAlignmentMap);
+$("#ficha-button")?.addEventListener("click", openFicha);
+$("#close-ficha-modal")?.addEventListener("click", closeFicha);
+$("#ficha-close-button")?.addEventListener("click", closeFicha);
+$("#ficha-docx-button")?.addEventListener("click", downloadFicha);
+$("#ficha-reset-button")?.addEventListener("click", () => { if (!window.confirm("Descartar o que você editou na ficha e montar de novo a partir do planejamento?")) return; state.ficha = fichaBase(); renderFichaForm(state.ficha); scheduleSave(); });
+$("#ficha-body")?.addEventListener("input", persistFicha);
+$("#ficha-body")?.addEventListener("change", persistFicha);
+$("#ficha-body")?.addEventListener("click", (event) => {
+  const target = event.target.closest("button");
+  if (!target) return;
+  if (target.id === "ficha-add-prof") fichaMutate((ficha) => ficha.professors.push({ name: "", email: "" }));
+  else if (target.id === "ficha-add-instrument") fichaMutate((ficha) => ficha.instruments.push({ name: "", criteria: "", weight: "", schedule: "" }));
+  else if (target.id === "ficha-add-reference") fichaMutate((ficha) => ficha.references.push({ citation: "Novo item", origin: "briefing", verified: true, include: true }));
+  else if (target.dataset.remove) {
+    const kind = target.dataset.remove;
+    const group = { prof: ".ficha-prof", instrument: "#ficha-instruments tr", reference: ".ficha-ref" }[kind];
+    const position = [...$("#ficha-body").querySelectorAll(group)].indexOf(target.closest(group));
+    fichaMutate((ficha) => { (kind === "prof" ? ficha.professors : kind === "instrument" ? ficha.instruments : ficha.references).splice(position, 1); });
+  }
+});
 $("#close-alignment-modal")?.addEventListener("click", closeAlignmentMap);
 $("#alignment-close-button")?.addEventListener("click", closeAlignmentMap);
 $("#alignment-xlsx-button")?.addEventListener("click", downloadAlignmentMap);

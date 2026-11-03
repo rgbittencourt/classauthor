@@ -8,6 +8,22 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.5.0 · 03/11/2026 · Ficha da disciplina (Plano de Ensino)
+
+### Novo
+- **Ficha da disciplina** (botão na coluna «Ações do projeto»): monta o **Plano de Ensino no modelo do IFSC** a partir do que o ClassAuthor já planejou e baixa em **Word (.docx)**, com cabeçalho (logotipo do IFSC), as seis seções do modelo (ementa, objetivos, conteúdo programático e carga horária, método de ensino e recursos didáticos, avaliação, instrumentos e critérios) e as referências, mais o rodapé institucional.
+- O que o app preenche sozinho: unidade curricular (título do curso), **C.H.** (semanas × horas por semana), **ano/semestre** (pela data de início), **ementa** (temas das semanas), **objetivos** (os do briefing), **conteúdo programático** (um tema por semana, com os títulos das seções como subitens), **método** (texto do modelo, com o número de encontros de prática e as metodologias ativas usadas) e **instrumentos** (atividades obrigatórias e questionários de cada semana, com o cronograma pelo calendário).
+- O que ele **não inventa** e deixa para você: curso, e-mails dos professores, pesos dos instrumentos e quais valem nota. A ficha avisa o que falta («Antes de entregar») e mostra a soma dos pesos, que deve dar 100%.
+- **Referências**: entram marcadas as da sua lista e as conferidas; as que a IA sugeriu e ninguém conferiu ficam **desmarcadas** (confirme que a obra existe antes de marcar), sem duplicar as repetidas entre semanas. Título em negrito pelos marcadores ** **.
+- **Tudo é editável** na própria janela (professores, textos, tabela de instrumentos, referências). O texto da avaliação (Regimento Didático Pedagógico) é o do modelo do IFSC: confira se continua valendo. A ficha editada fica salva com o projeto (rascunho, backup e pasta do projeto); curso, professores, rodapé e logotipo ficam lembrados neste navegador para a próxima ficha. «Refazer a partir do planejamento» descarta as edições.
+- Respeita «Aula» ou «Semana» nos textos do documento.
+
+### Mudou por dentro
+- Novos arquivos `src/ficha-disciplina.js` (dados e montagem do .docx, sem dependências; cópia idêntica em `public/`) e cópia de `abnt.js` em `public/` (ordenação ABNT das referências). Testes em `tests/ficha-disciplina.test.mjs`.
+
+### Compatibilidade
+- O backup ganhou o campo `results.ficha` (opcional). Backups antigos abrem como antes.
+
 ## 1.4.0 · 03/11/2026 · Mapa de alinhamento do curso
 
 ### Novo
