@@ -223,9 +223,91 @@ export function formatAbntList(entries = [], options = {}) {
 const AUTH = "\\p{Lu}[\\p{Lu}'’ -]*,\\s+(?:(?:\\p{Lu}\\.\\s?)+|[\\p{L}'’-]+(?:\\s+(?:\\p{Lu}\\.|[\\p{L}'’-]+))*)";
 const MANY_AUTHORS = new RegExp(`^(${AUTH})(?:;\\s*${AUTH}){3,}\\.?(?=\\s)`, "u");
 
+// ───── Inferência da estrutura: autor fora do formato e título sem negrito ─────
+// A referência tem uma ordem fixa (autor. título. [edição.] local: editora, ano.), então dá para achar o título, o
+// periódico ou a obra sem a IA. Só mexe quando a estrutura é clara; do contrário deixa como está e a conferência avisa.
+const DOT = "\u0001";
+const protectDots = (text) => text
+  .replace(/(?<!\p{L})(?:et al|ed|v|n|p|pp|vol|org|coord|cap)\./giu, (m) => m.replace(".", DOT))
+  .replace(/(?<!\p{L})(?:jan|fev|mar|abr|jun|jul|ago|set|out|nov|dez)\./giu, (m) => m.replace(".", DOT))
+  .replace(/(?<!\p{L})[Ss]\. ?[lnd]\./gu, (m) => m.replace(/\./g, DOT))
+  .replace(/(\d+)\.(?=\s+ed\b)/gu, `$1${DOT}`)
+  .replace(/(?<!\p{L})\p{Lu}\./gu, (m) => m.replace(".", DOT));
+
+function segments(text) {
+  const prot = protectDots(text);
+  const out = [];
+  let start = 0;
+  const re = /\.(?:\s+|$)/g;
+  let m;
+  while ((m = re.exec(prot))) { out.push({ s: start, e: m.index, t: text.slice(start, m.index) }); start = m.index + m[0].length; }
+  if (start < text.length) out.push({ s: start, e: text.length, t: text.slice(start) });
+  return out;
+}
+
+const AUTH_LOOSE = "\\p{Lu}[\\p{L}'’ -]*,\\s+(?:(?:\\p{Lu}\\.\\s?)+|\\p{Lu}[\\p{L}'’-]*(?:\\s+(?:\\p{Lu}\\.|[\\p{L}'’-]+))*)";
+const NAME_WORD = "\\p{Lu}[\\p{L}'’-]+|\\p{Lu}\\.";
+const NAME = `(?:${NAME_WORD})(?:\\s+(?:${NAME_WORD}|d[aeo]s?|e|van|von|di|del|la|le))*`;
+const PERSON_LEAD = new RegExp(`^(${AUTH}(?:;\\s*${AUTH})*)\\.?(?=\\s|$)`, "u");
+const ENTITY_LEAD = /^([\p{Lu}0-9][\p{Lu}0-9 '’&()/-]{2,}?)\.(?=\s)/u;
+const LOOSE_LEAD = new RegExp(`^(${AUTH_LOOSE}(?:;\\s*${AUTH_LOOSE})*)(?:\\.(?=\\s)|(?<=\\p{Lu}\\.)(?=\\s))`, "u");
+const NAME_LEAD = new RegExp(`^(${NAME}(?:(?:;\\s*|\\s+e\\s+|\\s+&\\s+)${NAME})*)\\.(?=\\s)`, "u");
+const PLACE = /^(?:\d{1,2}\. ed\. )?[^:*]{2,45}:\s+[^,*]{1,100},\s*(?:\d{4}|\[s\. ?d\.\]|s\. ?d\.)/u;
+const PLACE_NO_YEAR = /^(?:\d{1,2}\. ed\. )?[^:*,]{2,45}:\s+[^,*:]{1,100}$/u;
+const SUB_ENTITY = /^(?:Minist|Secretaria|Conselho|Instituto|Universidade|Coordena|Departamento|Funda|Comiss|C[aâ]mara|Senado|Tribunal|Governo|Prefeitura)/iu;
+const LAW = /^((?:Lei Complementar|Lei|Decreto-Lei|Decreto|Portaria|Resolu[cç][aã]o|Parecer|Medida Provisória|Emenda Constitucional|Instru[cç][aã]o Normativa)\s+(?:n\.?\s?[ºo°]?\s*|nº\s*|número\s*)?[\d][\d.\/-]*)/iu;
+
+function leadInfo(text) {
+  const m = PERSON_LEAD.exec(text) || ENTITY_LEAD.exec(text);
+  return m ? { end: m[0].length } : null;
+}
+
+function boldSpan(text, s, e) {
+  const seg = text.slice(s, e);
+  const colon = seg.search(/:\s/);
+  const end = colon > 0 ? s + colon : e;
+  return `${text.slice(0, s)}**${text.slice(s, end)}**${text.slice(end)}`;
+}
+
+function inferBold(text) {
+  if (/\*\*[^*]+\*\*/.test(text)) return text;
+  const lead = leadInfo(text);
+  if (!lead) return text;
+  const offset = lead.end + (text.slice(lead.end).length - text.slice(lead.end).trimStart().length);
+  const segs = segments(text.slice(offset));
+  if (!segs.length) return text;
+  const at = (i) => (segs[i] ? segs[i].t : "");
+  const bold = (i) => boldSpan(text, offset + segs[i].s, offset + segs[i].e);
+  const inAt = segs.findIndex((seg) => /^In:\s/.test(seg.t));
+  if (inAt >= 0) return PLACE.test(at(inAt + 2)) ? bold(inAt + 1) : text;
+  const journal = segs.findIndex((seg, i) => i >= 1 && /^[^,*]+,.*(?:^|[\s,])(?:v|n|p)\.\s*\d/.test(seg.t));
+  if (journal >= 1) { const s0 = offset + segs[journal].s; return boldSpan(text, s0, s0 + segs[journal].t.indexOf(",")); }
+  const law = LAW.exec(at(0));
+  if (law) { const s0 = offset + segs[0].s; return `${text.slice(0, s0)}**${law[1]}**${text.slice(s0 + law[1].length)}`; }
+  if (PLACE.test(at(1)) || (segs.length === 2 && PLACE_NO_YEAR.test(at(1)))) return bold(0);
+  if (SUB_ENTITY.test(at(0)) && PLACE.test(at(2))) return bold(1);
+  if (!PLACE.test(at(1)) && /^(?:\d{4}|\[s\. ?d\.\]|Dispon)/i.test(at(1))) return bold(0);
+  return text;
+}
+
+// Autor escrito fora do formato ("Paulo Freire.", "Silva, Ana.", "Ana Souza e Bia Lima."): só vira SOBRENOME, Nome quando
+// o resto da referência confirma a estrutura (título e local/editora/ano); do contrário o texto fica como está.
+function fixAuthorLead(text) {
+  if (leadInfo(text)) return text;
+  const m = LOOSE_LEAD.exec(text) || NAME_LEAD.exec(text);
+  if (!m) return text;
+  const rest = text.slice(m[0].length).trim();
+  if (!rest) return text;
+  const authors = abntAuthors(m[1].split(/\s*;\s*|\s+e\s+|\s+&\s+/).map(clean).filter(Boolean));
+  if (!authors) return text;
+  const candidate = `${authors}${authors.endsWith(".") ? "" : "."} ${rest}`;
+  return /^\*\*[^*]+\*\*/.test(rest) || inferBold(candidate) !== candidate ? candidate : text;
+}
+
 export function normalizeAbntCitation(value) {
   let text = clean(value);
   if (!text) return "";
+  text = fixAuthorLead(text);
   text = text.replace(/(?<!\*)[*_]et al\.?[*_](?!\*)/gi, "et al.").replace(/<(?:em|i)>\s*et al\.?\s*<\/(?:em|i)>/gi, "et al.");
   text = text.replace(MANY_AUTHORS, (all, first) => `${first} et al.`).replace(/et al\.\s+et al\./g, "et al.");
   text = text.replace(/\*\*([^*:]+?):\s+([^*]+?)\*\*/g, "**$1**: $2");
@@ -235,7 +317,7 @@ export function normalizeAbntCitation(value) {
   text = text.replace(/Dispon[ií]vel em:\s*(https?:\/\/[^\s<>]+?)\.?(?=\s|$)/gi, (all, url) => `Disponível em: <${url}>.`);
   text = text.replace(/(Acesso em:\s*)0?(\d{1,2})\s*(?:de\s+)?([\p{L}]+)\.?\s*(?:de\s+)?(\d{4})/giu, (all, lead, day, month, year) => (abntMonth(month) ? `${lead}${day} ${abntMonth(month)} ${year}` : all));
   if (/\b(?:v|n|p)\.\s*\d/.test(text)) text = text.replace(/,\s*([\p{L}]+)\.?\s+(\d{4})(\.?)$/u, (all, month, year, dot) => (abntMonth(month) ? `, ${abntMonth(month)} ${year}${dot || "."}` : all));
-  return text;
+  return inferBold(text);
 }
 
 // Itens do ClassAtelier são HTML (<strong> no título). Estas duas funções vão e voltam, sem perder o negrito.
@@ -253,4 +335,19 @@ export function sortHtmlReferences(items) {
   return list.map((html, index) => ({ html, index, key: abntSortKey(citationFromHtml(html)) }))
     .sort((a, b) => (a.key && !b.key ? -1 : !a.key && b.key ? 1 : a.key.localeCompare(b.key, "pt-BR") || a.index - b.index))
     .map((entry) => entry.html);
+}
+
+// Item HTML do ClassAtelier já corrigido (negrito do título, autor, data de acesso...). Com link dentro, o texto fica como está.
+// Se nada muda, devolve o próprio HTML (preserva qualquer marcação que a norma não mexe).
+export function fixHtmlReference(item) {
+  const html = typeof item === "string" ? item : String(item?.html ?? item?.citation ?? "");
+  if (!html.trim() || /<a[\s>]/i.test(html)) return html;
+  const plainText = citationFromHtml(html);
+  const next = normalizeAbntCitation(plainText);
+  return next === plainText ? html : citationToHtml(next);
+}
+
+// Lista pronta para a aula: cada item corrigido e todos em ordem alfabética.
+export function prepareHtmlReferences(items) {
+  return sortHtmlReferences((Array.isArray(items) ? items : []).map(fixHtmlReference));
 }

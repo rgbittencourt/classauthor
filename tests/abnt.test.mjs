@@ -191,3 +191,50 @@ test("ABNT: as referências da semana entram corrigidas e em ordem (normalizeLes
     "ZAGO, Rui. **Livro**. 2. ed. Rio: Y, 2018. Disponível em: <https://x.org>. Acesso em: 5 maio 2026."
   ]);
 });
+
+// ───── Inferência: o que a norma resolve sem dúvida já sai corrigido (negrito do título, autor no formato) ─────
+test("ABNT: acha o título e põe o negrito (livro, subtítulo, capítulo, artigo, site, lei, subórgão)", () => {
+  const cases = [
+    ["SILVA, Ana. Gestão escolar. 2. ed. São Paulo: Cortez, 2020.", "SILVA, Ana. **Gestão escolar**. 2. ed. São Paulo: Cortez, 2020."],
+    ["FREIRE, Paulo. Pedagogia da autonomia: saberes necessários à prática educativa. São Paulo: Paz e Terra, 1996.", "FREIRE, Paulo. **Pedagogia da autonomia**: saberes necessários à prática educativa. São Paulo: Paz e Terra, 1996."],
+    ["SILVA, A. B. Gestão. SP: X, 2020.", "SILVA, A. B. **Gestão**. SP: X, 2020."],
+    ["SOUZA, Ana. Avaliação formativa. Educação em Revista, Belo Horizonte, v. 10, n. 2, p. 15-30, mar. 2020.", "SOUZA, Ana. Avaliação formativa. **Educação em Revista**, Belo Horizonte, v. 10, n. 2, p. 15-30, mar. 2020."],
+    ["FREIRE, Paulo. Educação e mudança. In: ALVES, Maria (Org.). Educar hoje. Porto Alegre: Artmed, 2018. p. 10-25.", "FREIRE, Paulo. Educação e mudança. In: ALVES, Maria (Org.). **Educar hoje**. Porto Alegre: Artmed, 2018. p. 10-25."],
+    ["UNESCO. Relatório global. 2022. Disponível em: <https://x.org>. Acesso em: 5 mar. 2026.", "UNESCO. **Relatório global**. 2022. Disponível em: <https://x.org>. Acesso em: 5 mar. 2026."],
+    ["BRASIL. Lei nº 9.394, de 20 de dezembro de 1996. Estabelece as diretrizes e bases da educação nacional. Brasília, 1996.", "BRASIL. **Lei nº 9.394**, de 20 de dezembro de 1996. Estabelece as diretrizes e bases da educação nacional. Brasília, 1996."],
+    ["BRASIL. Ministério da Educação. Base Nacional Comum Curricular. Brasília: MEC, 2018.", "BRASIL. Ministério da Educação. **Base Nacional Comum Curricular**. Brasília: MEC, 2018."]
+  ];
+  for (const [from, to] of cases) {
+    assert.equal(normalizeAbntCitation(from), to);
+    assert.equal(normalizeAbntCitation(to), to, "idempotente: " + to);
+  }
+});
+
+test("ABNT: autor fora do formato vira SOBRENOME, Nome quando o resto confirma a estrutura", () => {
+  assert.equal(normalizeAbntCitation("Paulo Freire. Pedagogia da autonomia. São Paulo: Paz e Terra, 1996."), "FREIRE, Paulo. **Pedagogia da autonomia**. São Paulo: Paz e Terra, 1996.");
+  assert.equal(normalizeAbntCitation("Ana Souza e Bia Lima. Gestão. SP: X, 2020."), "SOUZA, Ana; LIMA, Bia. **Gestão**. SP: X, 2020.");
+  assert.equal(normalizeAbntCitation("Silva, Ana. Gestão. SP: X, 2020."), "SILVA, Ana. **Gestão**. SP: X, 2020.");
+  assert.equal(normalizeAbntCitation("Silva, A. B. Gestão. SP: X, 2020."), "SILVA, A. B. **Gestão**. SP: X, 2020.");
+  assert.equal(normalizeAbntCitation("Ana Souza; Bia Lima; Caio Rocha; Davi Alves. Gestão. SP: X, 2020."), "SOUZA, Ana et al. **Gestão**. SP: X, 2020.");
+  assert.equal(normalizeAbntCitation("Paulo Freire. **Pedagogia**. São Paulo: Paz e Terra, 1996."), "FREIRE, Paulo. **Pedagogia**. São Paulo: Paz e Terra, 1996.");
+  assert.equal(normalizeAbntCitation("Wikipedia. Educação a distância. 2023. Disponível em: https://pt.wikipedia.org/wiki/EaD. Acesso em: 03 Nov. 2026."), "WIKIPEDIA. **Educação a distância**. 2023. Disponível em: <https://pt.wikipedia.org/wiki/EaD>. Acesso em: 3 nov. 2026.");
+});
+
+test("ABNT: sem estrutura clara (obra sem autor, título solto) o texto não é adivinhado e segue para a conferência", () => {
+  for (const text of ["Gestão educacional na era digital. São Paulo: X, 2020.", "Learning Theory. Cambridge: CUP, 2020.", "gestão educacional", "SILVA, Ana. Gestão escolar."]) {
+    assert.equal(normalizeAbntCitation(text), text);
+    assert.ok(abntIssues(normalizeAbntCitation(text)).length >= 1, text);
+  }
+});
+
+test("ABNT: depois da correção automática só sobra o que falta de informação (ano, autor, data de acesso)", () => {
+  const raw = [
+    "SILVA, Ana. Gestão escolar. São Paulo: Cortez, 2020.",
+    "Paulo Freire. Pedagogia da autonomia. São Paulo: Paz e Terra, 1996.",
+    "SOUZA, Ana. Avaliação. Educação em Revista, BH, v. 1, n. 2, p. 3-9, mai. 2020.",
+    "SILVA, Ana. Gestão escolar. São Paulo: Cortez."
+  ];
+  const left = raw.map((text) => abntIssues(normalizeAbntCitation(text)));
+  assert.deepEqual(left.slice(0, 3), [[], [], []]);
+  assert.deepEqual(left[3], ["falta o ano"]);
+});

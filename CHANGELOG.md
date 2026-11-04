@@ -8,6 +8,13 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.15.0 · 04/11/2026 · Referências: o motor acha o título e o autor sozinho
+
+- **Negrito no título sem a IA:** a referência tem ordem fixa (autor. título. edição. local: editora, ano.), então `normalizeAbntCitation` acha o título do livro, a revista do artigo, a obra de um capítulo (depois de «In:»), o título de sites e documentos e o «Lei nº» de leis e normas, e põe o negrito. O subtítulo (depois de «:») fica fora.
+- **Autor fora do formato:** «Paulo Freire.», «Silva, Ana.», «Ana Souza e Bia Lima.» viram «FREIRE, Paulo.», «SILVA, Ana.», «SOUZA, Ana; LIMA, Bia.» quando o resto da referência confirma a estrutura; com 4+ autores vira o primeiro com *et al.*
+- **Sem adivinhar:** obra sem autor, título solto ou texto sem estrutura clara não são alterados e seguem para a conferência. A correção é idempotente (rodar de novo não muda nada).
+- Aplicada a tudo que passa pelo ClassAuthor: referências escritas pelo modelo, lidas do Markdown, enviadas ao ClassAtelier. Novas funções `fixHtmlReference` e `prepareHtmlReferences` (itens HTML do ClassAtelier). Cópias em `public/` atualizadas.
+
 ## 1.14.0 · 04/11/2026 · Referências na ABNT NBR 6023 (motor de formatação)
 
 - **Regras novas para a IA** (`abntRules`): nome de pessoa em «SOBRENOME, Nome» (Filho, Neto, Júnior e Sobrinho acompanham o sobrenome), 1 a 3 autores separados por «; », 4 ou mais só o primeiro com *et al.* (sem itálico), entidade por extenso em maiúsculas, negrito só no título principal, nunca no subtítulo, mês abreviado com 3 letras e ponto (maio por extenso) e os modelos de livro, capítulo, artigo e site com «Disponível em: <URL>. Acesso em: …».
