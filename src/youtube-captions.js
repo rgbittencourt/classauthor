@@ -15,6 +15,7 @@ const CLIENTS = [
 ];
 const UA = CLIENTS[0].ua;
 const BOT = /login|sign in|bot|confirm/i;
+const UNSUPPORTED = /no longer supported|not (?:supported|compatible)|n[aã]o [eé] mais compat|incompat|update/i;
 
 export class CaptionsError extends Error {
   constructor(message, code, status = 502) { super(message); this.code = code; this.status = status; }
@@ -128,10 +129,11 @@ export async function fetchYouTubeTranscript(videoInput, { language = "pt", fetc
     const status = body?.playabilityStatus?.status;
     if (status && status !== "OK") {
       const reason = body.playabilityStatus.reason || "";
-      const bot = BOT.test(reason) || status === "LOGIN_REQUIRED";
-      refusal = new CaptionsError(bot ? "O YouTube bloqueou o pedido automático. Cole a transcrição à mão." : `O vídeo não está disponível${reason ? ` (${reason})` : ""}.`, "CAPTIONS_UNAVAILABLE", bot ? 502 : 404);
-      // Vídeo realmente indisponível (privado, removido): outro cliente não resolve.
-      if (!bot) break;
+      // "App/dispositivo não compatível" e pedido de login são recusas daquele cliente, não do vídeo: tenta o próximo.
+      const clientRefusal = BOT.test(reason) || status === "LOGIN_REQUIRED" || UNSUPPORTED.test(reason);
+      const next = new CaptionsError(clientRefusal ? "O YouTube recusou o pedido automático do servidor. Cole a transcrição à mão." : `O vídeo não está disponível${reason ? ` (${reason})` : ""}.`, "CAPTIONS_UNAVAILABLE", clientRefusal ? 502 : 404);
+      // Recusa do cliente vale mais que "indisponível" de outro cliente.
+      if (clientRefusal || !refusal || refusal.status === 404) refusal = clientRefusal || !refusal ? next : refusal;
       continue;
     }
     player = body;

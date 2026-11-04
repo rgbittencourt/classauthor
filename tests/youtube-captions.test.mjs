@@ -126,9 +126,27 @@ test("fetchYouTubeTranscript tenta outro cliente do YouTube quando o primeiro é
   assert.ok(result.text.length > 0);
 });
 
-test("fetchYouTubeTranscript não insiste quando o vídeo é privado ou removido", async () => {
+test("fetchYouTubeTranscript devolve indisponível quando todos os clientes dizem que o vídeo não existe", async () => {
   let calls = 0;
   const fetchImpl = async () => { calls += 1; return { ok: true, status: 200, json: async () => ({ playabilityStatus: { status: "ERROR", reason: "Video unavailable" } }) }; };
   await assert.rejects(() => fetchYouTubeTranscript("dQw4w9WgXcQ", { fetchImpl }), { code: "CAPTIONS_UNAVAILABLE", status: 404 });
-  assert.equal(calls, 1);
+  assert.equal(calls, 4);
+});
+
+test("fetchYouTubeTranscript segue para o próximo cliente quando o primeiro diz que o app não é compatível", async () => {
+  const clients = [];
+  const fetchImpl = async (url, options = {}) => {
+    if (String(url).includes("youtubei/v1/player")) {
+      const name = JSON.parse(options.body).context.client.clientName;
+      clients.push(name);
+      if (name === "ANDROID" || name === "IOS") return { ok: true, status: 200, json: async () => ({ playabilityStatus: { status: "UNPLAYABLE", reason: "O YouTube não é mais compatível com este aplicativo ou dispositivo." } }) };
+      return { ok: true, status: 200, json: async () => ({ playabilityStatus: { status: "OK" }, captions: { playerCaptionsTracklistRenderer: { captionTracks: tracks } } }) };
+    }
+    return { ok: true, status: 200, text: async () => XML3 };
+  };
+  const result = await fetchYouTubeTranscript("dQw4w9WgXcQ", { fetchImpl });
+  assert.deepEqual(clients, ["ANDROID", "IOS", "ANDROID_VR"]);
+  assert.ok(result.text.length > 0);
+  const allRefuse = async () => ({ ok: true, status: 200, json: async () => ({ playabilityStatus: { status: "UNPLAYABLE", reason: "The YouTube app is no longer supported on this device." } }) });
+  await assert.rejects(() => fetchYouTubeTranscript("dQw4w9WgXcQ", { fetchImpl: allRefuse }), (e) => e.code === "CAPTIONS_UNAVAILABLE" && /recusou o pedido/.test(e.message));
 });

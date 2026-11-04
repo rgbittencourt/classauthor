@@ -8,6 +8,11 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.12.3 · 03/11/2026 · Busca de legendas: recusa de um cliente não encerra a busca
+
+- Na 1.12.2, se o primeiro modo de acesso respondesse "O YouTube não é mais compatível com este aplicativo ou dispositivo", a busca parava ali e dizia que o vídeo não estava disponível, mesmo com o vídeo no ar. Agora essa resposta, assim como o pedido de login, conta como recusa daquele modo e a busca segue para o próximo (Android, iOS, Android VR, player embutido).
+- "Vídeo indisponível" só é mostrado quando todos os modos dizem isso. Se todos recusarem o servidor, a mensagem é "O YouTube recusou o pedido automático do servidor. Cole a transcrição à mão."
+
 ## 1.12.2 · 03/11/2026 · Busca de legendas tenta mais de um caminho
 
 - **Buscar legendas do YouTube** passou a tentar quatro "clientes" do YouTube (Android, iOS, Android VR e player embutido) antes de desistir. O YouTube costuma recusar pedidos que vêm de servidores (como o da Vercel) com a mensagem "bloqueou o pedido automático"; outro cliente às vezes é aceito. Vídeo privado ou removido continua parando na primeira resposta.
