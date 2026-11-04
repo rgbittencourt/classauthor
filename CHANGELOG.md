@@ -8,6 +8,15 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.14.0 · 04/11/2026 · Referências na ABNT NBR 6023 (motor de formatação)
+
+- **Regras novas para a IA** (`abntRules`): nome de pessoa em «SOBRENOME, Nome» (Filho, Neto, Júnior e Sobrinho acompanham o sobrenome), 1 a 3 autores separados por «; », 4 ou mais só o primeiro com *et al.* (sem itálico), entidade por extenso em maiúsculas, negrito só no título principal, nunca no subtítulo, mês abreviado com 3 letras e ponto (maio por extenso) e os modelos de livro, capítulo, artigo e site com «Disponível em: <URL>. Acesso em: …».
+- **Motor de formatação** (`src/abnt.js`): `formatAbnt` monta a referência a partir de campos (autor, título, subtítulo, edição, local, editora, ano; capítulo; revista, volume, número, páginas, mês; URL ou DOI e data de acesso); `formatAbntList` entrega a lista ordenada, com uma linha em branco entre as referências e sem marcadores.
+- **Correção automática do que é inequívoco** (`normalizeAbntCitation`), aplicada às referências que o modelo escreve e às que chegam do Markdown: 4+ autores viram o primeiro com *et al.*, *et al.* sem itálico, negrito fora do subtítulo, «(org.)» vira «(Org.)», «2ª ed.» vira «2. ed.», 1ª edição omitida, URL entre `< >`, data de acesso «5 mar. 2026».
+- **Conferência de forma** (`abntIssues`) ganhou: 4+ autores, *et al.* em itálico, subtítulo em negrito, «(Org.)», edição, URL sem `< >` e data de acesso fora do padrão.
+- O roteiro em Markdown, a tela de leitura e a ficha da disciplina passam a mostrar as referências sem marcadores, à esquerda, com uma linha em branco entre elas. O Markdown antigo, com «- », continua sendo lido.
+- Cópias em `public/` atualizadas (`abnt.js`, `student-export.js`, `ficha-disciplina.js`).
+
 ## 1.13.2 · 04/11/2026 · Manual Class atualizado
 
 - O **Manual Class** descreve o quadro único «Acesso ao ClassAuthor» do ClassAtelier (1.15.1), que serve a busca de legendas, o resumo com IA e as figuras com IA. O servidor em si não mudou.

@@ -65,3 +65,129 @@ test("Citação em bloco sem fonte vira pendência em 'Pontos a conferir'", asyn
   assert.equal(flagged.length, 1);
   assert.match(flagged[0].claim, /Educar é um ato de amor/);
 });
+
+// ───── Motor de formatação (regras R1 a R3, modelos T1 a T4, restrições de apresentação) ─────
+import { formatAbnt, formatAbntList, abntAuthors, abntMonth, normalizeAbntCitation, citationFromHtml, citationToHtml, sortHtmlReferences } from "../src/abnt.js";
+
+test("ABNT R1: nomes de pessoa, 1 a 3 autores com \"; \", 4 ou mais com et al., entidade em maiúsculas", () => {
+  assert.equal(abntAuthors("Florestan Fernandes"), "FERNANDES, Florestan");
+  assert.equal(abntAuthors(["João Silva Filho"]), "SILVA FILHO, João");
+  assert.equal(abntAuthors("FREIRE, Paulo"), "FREIRE, Paulo");
+  assert.equal(abntAuthors(["Ana Souza", "Bia Lima", "Caio Rocha"]), "SOUZA, Ana; LIMA, Bia; ROCHA, Caio");
+  assert.equal(abntAuthors("Ana Souza; Bia Lima; Caio Rocha; Davi Alves"), "SOUZA, Ana et al.");
+  assert.doesNotMatch(abntAuthors("Ana Souza; Bia Lima; Caio Rocha; Davi Alves"), /[*_]et al/);
+  assert.equal(abntAuthors("Universidade Federal de Santa Catarina"), "UNIVERSIDADE FEDERAL DE SANTA CATARINA");
+  assert.equal(abntAuthors("Unesco"), "UNESCO");
+  assert.equal(abntAuthors("Instituto Alfa", { entity: true }), "INSTITUTO ALFA");
+});
+
+test("ABNT R3: mês abreviado com 3 letras e ponto; maio por extenso", () => {
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(abntMonth), ["jan.", "fev.", "mar.", "abr.", "maio", "jun.", "jul.", "ago.", "set.", "out.", "nov.", "dez."]);
+  assert.equal(abntMonth("Março"), "mar.");
+  assert.equal(abntMonth("MAI."), "maio");
+  assert.equal(abntMonth("setembro"), "set.");
+  assert.equal(abntMonth("xyz"), "");
+});
+
+test("ABNT T1: livro no todo; 1ª edição omite a edição; negrito só no título principal", () => {
+  assert.equal(formatAbnt({ tipo: "livro", autor: "Florestan Fernandes", titulo: "A revolução burguesa no Brasil", subtitulo: "ensaio de interpretação sociológica", edicao: "3", local: "Rio de Janeiro", editora: "Zahar", ano: 2005 }),
+    "FERNANDES, Florestan. **A revolução burguesa no Brasil**: ensaio de interpretação sociológica. 3. ed. Rio de Janeiro: Zahar, 2005.");
+  assert.equal(formatAbnt({ autores: "Ana Souza", titulo: "Gestão escolar", edicao: "1ª", local: "São Paulo", editora: "Cortez", ano: 2020 }), "SOUZA, Ana. **Gestão escolar**. São Paulo: Cortez, 2020.");
+  assert.equal(formatAbnt({ autores: "Ana Souza", titulo: "Gestão", local: "SP", editora: "X" }), "SOUZA, Ana. **Gestão**. SP: X, [s. d.].");
+});
+
+test("ABNT T2: capítulo de livro com In:, (Org.) e páginas", () => {
+  assert.equal(formatAbnt({ tipo: "capitulo", autores: ["Paulo Freire"], capitulo: "Educação e mudança", obraAutores: ["Maria Alves"], titulo: "Educar hoje", local: "Porto Alegre", editora: "Artmed", ano: 2018, paginas: "10 a 25" }),
+    "FREIRE, Paulo. Educação e mudança. In: ALVES, Maria (Org.). **Educar hoje**. Porto Alegre: Artmed, 2018. p. 10-25.");
+});
+
+test("ABNT T3: artigo de periódico com v., n., p. e mês abreviado antes do ano", () => {
+  assert.equal(formatAbnt({ tipo: "artigo", autores: "Ana Souza; João da Silva", titulo: "Avaliação formativa", revista: "Educação em Revista", local: "Belo Horizonte", volume: 10, numero: 2, paginas: "15–30", mes: 3, ano: 2020 }),
+    "SOUZA, Ana; SILVA, João da. Avaliação formativa. **Educação em Revista**, Belo Horizonte, v. 10, n. 2, p. 15-30, mar. 2020.");
+  assert.match(formatAbnt({ tipo: "artigo", autores: "Ana Souza", titulo: "T", revista: "R", mes: "maio", ano: 2021 }), /\*\*R\*\*, maio 2021\.$/);
+});
+
+test("ABNT T4 e R3: site com Disponível em e Acesso em; DOI vira URL", () => {
+  assert.equal(formatAbnt({ tipo: "site", autores: "Universidade Federal de Santa Catarina", titulo: "Manual do aluno", subtitulo: "guia", ano: 2023, url: "https://ufsc.br/x", acesso: "2026-03-05" }),
+    "UNIVERSIDADE FEDERAL DE SANTA CATARINA. **Manual do aluno**: guia. 2023. Disponível em: <https://ufsc.br/x>. Acesso em: 5 mar. 2026.");
+  assert.match(formatAbnt({ tipo: "site", autores: "UNESCO", titulo: "Relatório", ano: 2022, doi: "10.1000/xyz", acesso: "5 de maio de 2026" }), /Disponível em: <https:\/\/doi\.org\/10\.1000\/xyz>\. Acesso em: 5 maio 2026\.$/);
+  assert.match(formatAbnt({ tipo: "site", autores: "UNESCO", titulo: "Relatório", ano: 2022, url: "https://x.org" }, { today: "28 out. 2026" }), /Acesso em: 28 out\. 2026\.$/);
+});
+
+test("ABNT: o que o motor gera passa na conferência de forma, sem pendências", () => {
+  const cases = [
+    { autores: "Ana Souza", titulo: "Gestão", subtitulo: "teoria", edicao: 2, local: "SP", editora: "X", ano: 2020 },
+    { tipo: "capitulo", autores: "Paulo Freire", capitulo: "C", obraAutores: "Maria Alves", titulo: "L", local: "SP", editora: "X", ano: 2018, paginas: "1-9" },
+    { tipo: "artigo", autores: "Ana Souza", titulo: "A", revista: "R", volume: 1, numero: 2, paginas: "3-4", mes: 5, ano: 2020 },
+    { tipo: "site", autores: "UNESCO", titulo: "T", ano: 2022, url: "https://x.org" }
+  ];
+  for (const entry of cases) assert.deepEqual(abntIssues(formatAbnt(entry)), [], formatAbnt(entry));
+});
+
+test("ABNT: lista final em ordem alfabética, uma linha em branco entre as referências, sem marcadores", () => {
+  const out = formatAbntList([
+    { autores: "Zeca Zago", titulo: "B", ano: 2000, local: "A", editora: "B" },
+    "ÁVILA, Bruno. **Obra**. Rio: Y, 2019.",
+    { autores: "Ana Alves", titulo: "A", ano: 2001, local: "A", editora: "B" }
+  ]);
+  const blocks = out.split("\n\n");
+  assert.equal(blocks.length, 3);
+  assert.deepEqual(blocks.map((b) => b.split(",")[0]), ["ALVES", "ÁVILA", "ZAGO"]);
+  assert.ok(blocks.every((b) => !b.includes("\n") && !/^[-*•\d]/.test(b)));
+});
+
+test("ABNT: correções seguras de uma referência já escrita (e idempotentes)", () => {
+  const fixes = [
+    ["SILVA, Ana; SOUZA, Bia; LIMA, Caio; ROCHA, Davi. **Título: sub**. 2ª ed. São Paulo: X, 2020.", "SILVA, Ana et al. **Título**: sub. 2. ed. São Paulo: X, 2020."],
+    ["SILVA, A. B.; SOUZA, B.; LIMA, C.; ROCHA, D. *et al.* **T**. 1. ed. SP: X, 2020.", "SILVA, A. B. et al. **T**. SP: X, 2020."],
+    ["FREIRE, Paulo (org.). **T**. SP: X, 2020.", "FREIRE, Paulo (Org.). **T**. SP: X, 2020."],
+    ["SILVA, Ana. **T**. SP: X, 2020. Disponível em: https://x.org. Acesso em: 05 Maio. 2026.", "SILVA, Ana. **T**. SP: X, 2020. Disponível em: <https://x.org>. Acesso em: 5 maio 2026."],
+    ["ALVES, Eva. Artigo. **Rev**, SP, v. 3, n. 1, p. 1-9, Mai. 2020.", "ALVES, Eva. Artigo. **Rev**, SP, v. 3, n. 1, p. 1-9, maio 2020."],
+    ["SILVA, Ana. **T**. 2 ed. SP: X, 2020.", "SILVA, Ana. **T**. 2. ed. SP: X, 2020."]
+  ];
+  for (const [from, to] of fixes) {
+    assert.equal(normalizeAbntCitation(from), to);
+    assert.equal(normalizeAbntCitation(to), to);
+    assert.deepEqual(abntIssues(to), [], to);
+  }
+  const ok = "SILVA, Ana; SOUZA, Bia; LIMA, Caio. **Gestão**: teoria. 2. ed. São Paulo: Cortez, 2020. Disponível em: <https://x.org>. Acesso em: 5 mar. 2026.";
+  assert.equal(normalizeAbntCitation(ok), ok);
+  assert.equal(normalizeAbntCitation("SILVA, Ana. **Título**. Local: Ed., 2020."), "SILVA, Ana. **Título**. Local: Ed., 2020.");
+});
+
+test("ABNT: a conferência aponta o que a norma decide (4+ autores, et al. em itálico, subtítulo em negrito, data de acesso)", () => {
+  const has = (text, pattern) => abntIssues(text).some((m) => pattern.test(m));
+  assert.ok(has("SILVA, Ana; SOUZA, Bia; LIMA, Caio; ROCHA, Davi. **T**. SP: X, 2020.", /et al/));
+  assert.ok(has("SILVA, Ana *et al.* **T**. SP: X, 2020.", /itálico/));
+  assert.ok(has("SILVA, Ana. **T: sub**. SP: X, 2020.", /subtítulo/));
+  assert.ok(has("SILVA, Ana. **T**. SP: X, 2020. Disponível em: <https://x.org>. Acesso em: 5 mai. 2026.", /5 mar\. 2026/));
+  assert.ok(has("SILVA, Ana. **T**. SP: X, 2020. Disponível em: https://x.org. Acesso em: 5 mar. 2026.", /entre < >/));
+  assert.ok(has("SILVA, Ana. **T**. 1. ed. SP: X, 2020.", /1ª edição/));
+});
+
+test("ABNT: itens HTML do ClassAtelier vão e voltam sem perder o negrito e saem ordenados", () => {
+  assert.equal(citationFromHtml("SILVA, Ana. <strong>Gestão &amp; <i>escola</i></strong>. SP: X, 2020."), "SILVA, Ana. **Gestão & escola**. SP: X, 2020.");
+  assert.equal(citationToHtml("SILVA, Ana. **Gestão <1>**. SP: X, 2020."), "SILVA, Ana. <strong>Gestão &lt;1&gt;</strong>. SP: X, 2020.");
+  assert.deepEqual(sortHtmlReferences(["ZAGO, R. <strong>B</strong>. 2000.", "ÁVILA, B. <strong>A</strong>. 2001.", "ALVES, E. <strong>C</strong>. 2002."]).map((h) => h.split(",")[0]), ["ALVES", "ÁVILA", "ZAGO"]);
+});
+
+test("ABNT: o roteiro em Markdown separa as referências por linha em branco, sem marcadores, e relê igual", () => {
+  const plan = { weekNumber: 1, title: "T", references: [{ citation: "ZAGO, Rui. **Livro B**. Rio: Y, 2018." }, { citation: "ALVES, Eva. **Livro A**. Recife: Z, 2017." }] };
+  const md = planToMarkdown(plan);
+  assert.match(md, /ZAGO, Rui\. \*\*Livro B\*\*\. Rio: Y, 2018\.\n\nALVES, Eva\./);
+  assert.doesNotMatch(md.split("## Referências desta semana")[1], /^\s*[-*] /m);
+  const again = parseWeekMarkdown(`# Semana 1 — T\n\n## Referências desta semana\n\n${plan.references.map((r) => r.citation).join("\n\n")}\n`, { weekNumber: 1 }).lessonPlan.references.map((r) => r.citation);
+  assert.deepEqual(again.sort(), ["ALVES, Eva. **Livro A**. Recife: Z, 2017.", "ZAGO, Rui. **Livro B**. Rio: Y, 2018."]);
+});
+
+test("ABNT: as referências da semana entram corrigidas e em ordem (normalizeLessonPlan)", async () => {
+  const { normalizeLessonPlan } = await import("../src/aula-schema.js");
+  const plan = normalizeLessonPlan({ references: [
+    { citation: "ZAGO, Rui. **Livro**. 2ª ed. Rio: Y, 2018. Disponível em: https://x.org. Acesso em: 05 Mai. 2026." },
+    "ALVES, Ana; LIMA, Bia; ROCHA, Caio; SOUZA, Davi. **Obra**. SP: X, 2020."
+  ] }, { title: "Curso", weeks: 1 }, 0);
+  assert.deepEqual(plan.references.map((r) => r.citation), [
+    "ALVES, Ana et al. **Obra**. SP: X, 2020.",
+    "ZAGO, Rui. **Livro**. 2. ed. Rio: Y, 2018. Disponível em: <https://x.org>. Acesso em: 5 maio 2026."
+  ]);
+});

@@ -743,3 +743,7 @@ button.studio-top-link img{width:24px;height:24px;border-radius:7px}
 
 #keys-clear[hidden]{display:none}
 .keys-body p{max-width:none}
+
+/* Referências (ABNT NBR 6023): à esquerda, sem marcadores, espaço simples dentro de cada uma e uma linha em branco entre elas. */
+.reader-refs { text-align: left; }
+.reader-refs p { margin: 0 0 1.2em; line-height: 1.35; text-align: left; }

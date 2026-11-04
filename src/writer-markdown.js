@@ -434,7 +434,7 @@ export function planToMarkdown(plan = {}) {
   const glossary = Array.isArray(plan.glossary) ? plan.glossary : [];
   if (glossary.length) out.push("## Glossário rápido desta semana", glossary.map((item) => `- **${plain(item.term)}**: ${plain(item.definition)}`).join("\n"));
   const references = Array.isArray(plan.references) ? plan.references : [];
-  if (references.length) out.push("## Referências desta semana", references.map((item) => `- ${plainReference(typeof item === "string" ? item : item.citation || item.title || item.href)}`).join("\n"));
+  if (references.length) out.push("## Referências desta semana", references.map((item) => plainReference(typeof item === "string" ? item : item.citation || item.title || item.href)).join("\n\n"));
   const claims = Array.isArray(plan.claimEvidence) ? plan.claimEvidence : [];
   if (claims.length) out.push("## Pontos a conferir", claims.map((item) => `- ${item.sectionNumber ? `[${item.sectionNumber}] ` : ""}${plain(item.claim)}`).join("\n"));
   return `${out.join("\n\n")}\n`;

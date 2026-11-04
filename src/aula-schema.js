@@ -3,7 +3,7 @@ import { activeStyleGuide } from "./style-learning.js";
 import { normalizeSourceExcerpts, sourceUsedSummary } from "./source-material.js";
 import { normalizeApproach, normalizeMethodologyPlan, methodForWeek } from "./methodology.js";
 import { normalizeDidacticArc, buildAlignmentMatrix, buildProgression, pedagogicalReview } from "./pedagogy.js";
-import { sortReferencesAbnt } from "./abnt.js";
+import { sortReferencesAbnt, normalizeAbntCitation } from "./abnt.js";
 import { measureLessonQuality } from "./content-quality.js";
 import { normalizeAcademicProfile } from "./academic.js";
 import { progressionForWeek } from "./curriculum.js";
@@ -385,11 +385,11 @@ function normalizeGlossary(value) {
 }
 
 function normalizeReference(value, index = 0) {
-  if (typeof value === "string") return { id: `ref-${String(index + 1).padStart(2, "0")}`, citation: text(value), type: "fonte-a-conferir", authors: [], year: "", publisher: "", doi: "", href: "", verified: false, verificationStatus: "needs-human-review", usedInSections: [], supportsClaims: [] };
+  if (typeof value === "string") return { id: `ref-${String(index + 1).padStart(2, "0")}`, citation: normalizeAbntCitation(text(value)), type: "fonte-a-conferir", authors: [], year: "", publisher: "", doi: "", href: "", verified: false, verificationStatus: "needs-human-review", usedInSections: [], supportsClaims: [] };
   const item = object(value);
   return {
     id: text(item.id, `ref-${String(index + 1).padStart(2, "0")}`),
-    citation: text(item.citation || item.title || item.reference),
+    citation: normalizeAbntCitation(text(item.citation || item.title || item.reference)),
     type: text(item.type, "fonte-a-conferir"),
     authors: splitLines(item.authors || item.author),
     year: text(item.year),

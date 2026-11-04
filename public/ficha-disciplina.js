@@ -202,7 +202,7 @@ export function fichaDocumentXml(ficha, { logo = null } = {}) {
     ...instrumentRows
   ], { keepRows: true });
 
-  const refs = (ficha.references || []).filter((item) => item.include).map((item) => para(item.citation, { align: "left", size: 20, after: 120 })).join("");
+  const refs = (ficha.references || []).filter((item) => item.include).map((item) => para(item.citation, { align: "left", size: 20, after: 240 })).join("");
 
   const header = ficha.header && logo ? "<w:headerReference w:type=\"default\" r:id=\"rIdHeader\"/>" : "";
   const footer = text(ficha.footer) ? "<w:footerReference w:type=\"default\" r:id=\"rIdFooter\"/>" : "";

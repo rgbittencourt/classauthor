@@ -1,3 +1,4 @@
+import { normalizeAbntCitation } from "./abnt.js";
 const object = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 const text = (value, fallback = "") => String(value ?? "").trim() || fallback;
 
@@ -18,7 +19,7 @@ const referenceMarkup = (value) => escapeHtml(value).replace(/\*\*([^*]+)\*\*/g,
 // antigo ({ html, href }), que está salvo nas semanas geradas antes desta correção.
 export function referenceItemHtml(item) {
   const entry = typeof item === "string" ? { citation: item } : object(item);
-  const body = entry.html != null && text(entry.html) ? text(entry.html) : referenceMarkup(entry.citation || entry.title || entry.href);
+  const body = entry.html != null && text(entry.html) ? text(entry.html) : referenceMarkup(normalizeAbntCitation(entry.citation || entry.title || entry.href));
   const href = text(entry.href);
   const safeHref = /^https?:\/\//i.test(href) ? href.replace(/"/g, "%22") : "";
   const hasLink = safeHref && !body.includes(escapeHtml(href)) && !body.includes(safeHref);
