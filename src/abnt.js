@@ -59,7 +59,7 @@ export function sortReferencesAbnt(references) {
 
 // Conferência de forma: devolve o que falta para a referência parecer ABNT. Não verifica se a obra existe.
 // Entrada pelo título (obra sem autor): o título em negrito e a primeira palavra em maiúsculas.
-const TITLE_ENTRY = /^\*\*(?:(?:O|A|OS|AS|UM|UMA)\s+)?[A-ZÁÉÍÓÚÂÊÔÃÕÇ0-9]{2,}\b/;
+const TITLE_ENTRY = /^\*\*\[?(?:(?:O|A|OS|AS|UM|UMA)\s+)?[A-ZÁÉÍÓÚÂÊÔÃÕÇ0-9]{2,}/;
 
 export function abntIssues(reference) {
   const item = typeof reference === "string" ? { citation: reference } : reference || {};
@@ -68,6 +68,7 @@ export function abntIssues(reference) {
   const issues = [];
   if (!plainText) return issues;
   if (!/^(?:[A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-ZÁÉÍÓÚÂÊÔÃÕÇ'’ -]+[,.]|[A-ZÁÉÍÓÚÂÊÔÃÕÇ]{2,}\b)/.test(plainText) && !TITLE_ENTRY.test(raw)) issues.push("deve começar por SOBRENOME, Nome (ou ENTIDADE em maiúsculas)");
+  if (/\[t[ií]tulo\]/i.test(plainText)) issues.push("falta o título: troque [título] pelo título da obra");
   if (/\[ano\]/.test(plainText)) issues.push("falta o ano: troque [ano] pelo ano de publicação");
   else if (!/\b(1[5-9]\d{2}|20\d{2})\b|\bs\.\s?d\./.test(plainText)) issues.push("falta o ano");
   if (!/\*\*[^*]+\*\*/.test(raw)) issues.push("falta o destaque (negrito) no título");
@@ -372,14 +373,13 @@ function boldIsSound(text) {
   if (spans.length > 1) return false;
   const m = spans[0];
   const inner = m[1];
-  if (/\.\s+\p{Lu}/u.test(inner) || /\.\s*$/.test(inner)) return false;
+  if (/(?<!(?:^|\s)\p{Lu})\.\s+\p{Lu}/u.test(inner) || /\.\s*$/.test(inner)) return false;
   const before = text.slice(0, m.index).trim();
   const tail = text.slice(m.index + m[0].length);
   if (!before) {
     // Entrada pelo título: primeira palavra em maiúsculas e o resto em minúsculas ("GESTÃO educacional"); "GOOGLE Cloud" ou "IBM" é autor.
-    if (!/\s\p{Ll}{2,}/u.test(inner)) return false;
-    const first = segments(tail.replace(/^\.\s*/, ""))[0];
-    return !!first && (PLACE.test(first.t) || PLACE_NO_YEAR.test(first.t));
+    const more = tail.replace(/^[.,\s]*(?:\[ano\]|(?:19|20)\d{2})?[.,\s]*/, "");
+    return TITLE_ENTRY.test(`**${inner}`) && !inner.includes(",") && (/\s\p{Ll}{2,}/u.test(inner) || more === "" || /^Dispon/i.test(more));
   }
   if (segments(before).length <= 1) return true; // logo depois do autor: é o título (com subtítulo, se houver)
   const rest = tail.split(/\.\s/)[0];
@@ -434,6 +434,35 @@ function addMissing(text) {
   return out;
 }
 
+
+// Última rede: referência sempre sai com o título em negrito. Com autor, o título é o trecho logo depois dele; sem autor, a obra
+// entra pelo título (negrito e primeira palavra em maiúsculas). Só não faz nada se não houver texto de título.
+function forceBold(text) {
+  if (/\*\*[^*]+\*\*/.test(text)) return text;
+  const lead = leadInfo(text);
+  const base = lead ? lead.end : 0;
+  const rest = text.slice(base);
+  const offset = base + (rest.length - rest.trimStart().length);
+  const segs = segments(text.slice(offset));
+  const usable = segs.map((seg, i) => ({ seg, i })).filter(({ seg }) => seg.t.trim() && !/^(?:\d{4}$|Dispon|Acesso|https?:)/i.test(seg.t.trim()));
+  if (!usable.length) {
+    // Sem título à vista: o lugar dele fica marcado, em negrito como o título deve ser.
+    if (lead) { const tailText = text.slice(lead.end).trim().replace(/\.$/, ""); return `${text.slice(0, lead.end)} **[título]**${tailText ? `, ${tailText}` : ""}.`; }
+    if (/Dispon[ií]vel em:|https?:\/\//i.test(text)) return `**[TÍTULO]**. ${text.trim()}`;
+    return text;
+  }
+  let pick = usable[0];
+  if (lead && SUB_ENTITY.test(pick.seg.t) && usable[1]) pick = usable[1];
+  const s = offset + pick.seg.s;
+  const e = offset + pick.seg.e;
+  if (lead) return boldSpan(text, s, e);
+  const title = text.slice(s, e).trim();
+  const words = title.split(/\s+/);
+  const n = ARTICLE.test(words[0]) && words.length > 1 ? 2 : 1;
+  const upper = [...words.slice(0, n).map((w) => w.toLocaleUpperCase("pt-BR")), ...words.slice(n)].join(" ");
+  return boldSpan(`${text.slice(0, s)}${upper}${text.slice(e)}`, s, s + upper.length);
+}
+
 // Obra sem autor: "Título. Local: Editora, ano." vira "**TÍTULO** ..." (entrada pelo título). Só quando a estrutura é clara.
 const ARTICLE = /^(?:o|a|os|as|um|uma)$/i;
 function fixTitleEntry(text) {
@@ -460,6 +489,7 @@ export function normalizeAbntCitation(value) {
   text = fixAuthorDate(text);
   // "Local: Editora. 2000" -> "Local: Editora, 2000." (ponto no lugar da vírgula antes do ano; ponto final)
   text = text.replace(/(?<!(?:Acesso em|Disponível em|Dispon.vel em))(:\s+[^,.:*;]{1,60})\.\s+((?:19|20)\d{2})(?=\.?$)/u, "$1, $2").replace(/(\d{4})$/, "$1.");
+  text = text.replace(/^(https?:\/\/\S+?)\.?$/, "Disponível em: $1");
   text = fixQuotesAndDates(text);
   text = fixEntityLead(text);
   text = fixAuthorLead(text);
@@ -474,7 +504,7 @@ export function normalizeAbntCitation(value) {
   text = text.replace(/Dispon[ií]vel em:\s*(https?:\/\/[^\s<>]+?)\.?(?=\s|$)/gi, (all, url) => `Disponível em: <${url}>.`);
   text = text.replace(/(Acesso em:\s*)0?(\d{1,2})\s*(?:de\s+)?([\p{L}]+)\.?\s*(?:de\s+)?(\d{4})/giu, (all, lead, day, month, year) => (abntMonth(month) ? `${lead}${day} ${abntMonth(month)} ${year}` : all));
   if (/\b(?:v|n|p)\.\s*\d/.test(text)) text = text.replace(/,\s*([\p{L}]+)\.?\s+(\d{4})(\.?)$/u, (all, month, year, dot) => (abntMonth(month) ? `, ${abntMonth(month)} ${year}${dot || "."}` : all));
-  return addMissing(inferBold(text));
+  return addMissing(forceBold(inferBold(text)));
 }
 
 // Itens do ClassAtelier são HTML (<strong> no título). Estas duas funções vão e voltam, sem perder o negrito.

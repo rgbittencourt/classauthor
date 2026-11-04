@@ -8,6 +8,11 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.15.5 · 04/11/2026 · Referências: título sempre em negrito
+
+- O **título sai sempre em negrito**: a mensagem «falta o destaque (negrito) no título» deixou de existir. Com autor, o título é o trecho logo depois dele; sem autor, a obra entra pelo título (negrito e primeira palavra em maiúsculas).
+- O que não existe ganha marcador no lugar certo, com a tipografia certa: **«[título]»** em negrito, «[ano]», «Acesso em: [dia mês ano].». Um endereço colado sozinho vira «**[TÍTULO]**, [ano]. Disponível em: <endereço>. Acesso em: [dia mês ano].».
+
 ## 1.15.4 · 04/11/2026 · Referências: sem editora, entidade como autor e o que falta à vista
 
 - **Autor entidade** («Gartner.», «Google Cloud.») vai em MAIÚSCULAS; o negrito volta só ao título mesmo em referências **sem editora** («Autor. Título, ano.»), com **ano colado ao título**, com **aspas** no título (reportagem, o jornal fica em negrito) e com **data por extenso** («2 de fevereiro de 2025» vira «2 fev. 2025»; a data de leis fica por extenso).

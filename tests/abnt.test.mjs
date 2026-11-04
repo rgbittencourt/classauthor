@@ -221,8 +221,21 @@ test("ABNT: autor fora do formato vira SOBRENOME, Nome quando o resto confirma a
 });
 
 test("ABNT: sem estrutura clara (título solto, sem local/editora/ano) o texto não é adivinhado e segue para a conferência", () => {
-  assert.equal(normalizeAbntCitation("gestão educacional"), "gestão educacional");
-  assert.ok(abntIssues("gestão educacional").length >= 1);
+  // a rede final: o título sempre sai em negrito; o que não existe ganha marcador no lugar certo
+  assert.equal(normalizeAbntCitation("gestão educacional"), "**GESTÃO educacional**, [ano].");
+  assert.equal(normalizeAbntCitation("SILVA, Ana."), "SILVA, Ana. **[título]**, [ano].");
+  assert.equal(normalizeAbntCitation("https://exemplo.com/x"), "**[TÍTULO]**, [ano]. Disponível em: <https://exemplo.com/x>. Acesso em: [dia mês ano].");
+});
+
+test("ABNT: depois da correção nunca sobra «falta o destaque (negrito)» e a correção é idempotente", () => {
+  const samples = ["Pedagogia da autonomia", "Paulo Freire", "SILVA, Ana. 2020.", "SILVA, Ana.", "O estado de S. Paulo. 2020.", "https://exemplo.com/x", "Disponível em: https://x.br",
+    "AUTOR XYZ. Algo estranho aqui sem nada, mais coisa e outra 12 ou 13.", "BRASIL. Ministério da Educação. Parâmetros curriculares. 1997.", "Gartner. Citizen Development."];
+  for (const sample of samples) {
+    const out = normalizeAbntCitation(sample);
+    assert.ok(/\*\*[^*]+\*\*/.test(out), sample);
+    assert.ok(!abntIssues(out).some((x) => /destaque|negrito/.test(x)), `${sample} -> ${out} -> ${abntIssues(out)}`);
+    assert.equal(normalizeAbntCitation(out), out, `idempotente: ${sample}`);
+  }
 });
 
 test("ABNT: o que falta e não dá para deduzir aparece na referência, no lugar certo, entre colchetes", () => {
