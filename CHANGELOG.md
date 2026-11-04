@@ -8,6 +8,10 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.13.2 · 04/11/2026 · Manual Class atualizado
+
+- O **Manual Class** descreve o quadro único «Acesso ao ClassAuthor» do ClassAtelier (1.15.1), que serve a busca de legendas, o resumo com IA e as figuras com IA. O servidor em si não mudou.
+
 ## 1.13.1 · 04/11/2026 · Manual Class atualizado
 
 - O **Manual Class** descreve os interruptores do bloco Vídeo (faixa de legenda, resumo e transcrição) do ClassAtelier 1.15.0. O ClassAuthor em si não mudou.
