@@ -5,8 +5,16 @@
 // A rede entra por `fetchImpl`, para os testes não dependerem do YouTube.
 
 const PLAYER_URL = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false";
-const CLIENT = { clientName: "ANDROID", clientVersion: "20.10.38", androidSdkVersion: 34, hl: "pt", gl: "BR" };
-const UA = "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip";
+// O YouTube recusa com frequência pedidos vindos de servidores (IPs de datacenter). Por isso o pedido
+// é tentado com mais de um "cliente" do YouTube, um após o outro, até algum aceitar.
+const CLIENTS = [
+  { id: 3, ua: "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip", client: { clientName: "ANDROID", clientVersion: "20.10.38", androidSdkVersion: 34, hl: "pt", gl: "BR" } },
+  { id: 5, ua: "com.google.ios.youtube/20.10.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)", client: { clientName: "IOS", clientVersion: "20.10.4", deviceMake: "Apple", deviceModel: "iPhone16,2", osName: "iPhone", osVersion: "18.3.2.22D82", hl: "pt", gl: "BR" } },
+  { id: 28, ua: "com.google.android.apps.youtube.vr.oculus/1.62.27 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip", client: { clientName: "ANDROID_VR", clientVersion: "1.62.27", deviceMake: "Oculus", deviceModel: "Quest 3", androidSdkVersion: 32, osName: "Android", osVersion: "12L", hl: "pt", gl: "BR" } },
+  { id: 85, ua: "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version", client: { clientName: "TVHTML5_SIMPLY_EMBEDDED_PLAYER", clientVersion: "2.0", hl: "pt", gl: "BR" }, embed: true }
+];
+const UA = CLIENTS[0].ua;
+const BOT = /login|sign in|bot|confirm/i;
 
 export class CaptionsError extends Error {
   constructor(message, code, status = 502) { super(message); this.code = code; this.status = status; }
@@ -101,25 +109,43 @@ export async function fetchYouTubeTranscript(videoInput, { language = "pt", fetc
     catch (error) { throw new CaptionsError("Não consegui falar com o YouTube agora. Tente de novo em instantes ou cole a transcrição à mão.", "CAPTIONS_NETWORK"); }
     finally { clearTimeout(timer); }
   };
-  const playerResponse = await call(PLAYER_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "User-Agent": UA, "Accept-Language": "pt-BR,pt;q=0.9", "X-YouTube-Client-Name": "3", "X-YouTube-Client-Version": CLIENT.clientVersion },
-    body: JSON.stringify({ context: { client: CLIENT }, videoId, contentCheckOk: true, racyCheckOk: true })
-  });
-  if (!playerResponse.ok) throw new CaptionsError("O YouTube não respondeu ao pedido das legendas (erro " + playerResponse.status + "). Cole a transcrição à mão.", "CAPTIONS_BLOCKED");
-  let player;
-  try { player = await playerResponse.json(); } catch (error) { throw new CaptionsError("O YouTube respondeu em um formato inesperado. Cole a transcrição à mão.", "CAPTIONS_BLOCKED"); }
-  const status = player?.playabilityStatus?.status;
-  if (status && status !== "OK") {
-    const reason = player.playabilityStatus.reason || "";
-    throw new CaptionsError(/login|sign in|bot/i.test(reason) ? "O YouTube bloqueou o pedido automático. Cole a transcrição à mão." : `O vídeo não está disponível${reason ? ` (${reason})` : ""}.`, "CAPTIONS_UNAVAILABLE", /login|sign in|bot/i.test(reason) ? 502 : 404);
+  // Tenta cada cliente até um devolver o vídeo liberado; guarda o motivo da última recusa.
+  let player = null;
+  let refusal = null;
+  let usedUa = UA;
+  for (const option of CLIENTS) {
+    let response;
+    try {
+      response = await call(PLAYER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "User-Agent": option.ua, "Accept-Language": "pt-BR,pt;q=0.9", "X-YouTube-Client-Name": String(option.id), "X-YouTube-Client-Version": option.client.clientVersion },
+        body: JSON.stringify({ context: { client: option.client, ...(option.embed ? { thirdParty: { embedUrl: "https://www.youtube.com/" } } : {}) }, videoId, contentCheckOk: true, racyCheckOk: true })
+      });
+    } catch (error) { refusal = refusal || error; continue; }
+    if (!response.ok) { refusal = new CaptionsError("O YouTube não respondeu ao pedido das legendas (erro " + response.status + "). Cole a transcrição à mão.", "CAPTIONS_BLOCKED"); continue; }
+    let body;
+    try { body = await response.json(); } catch (error) { refusal = new CaptionsError("O YouTube respondeu em um formato inesperado. Cole a transcrição à mão.", "CAPTIONS_BLOCKED"); continue; }
+    const status = body?.playabilityStatus?.status;
+    if (status && status !== "OK") {
+      const reason = body.playabilityStatus.reason || "";
+      const bot = BOT.test(reason) || status === "LOGIN_REQUIRED";
+      refusal = new CaptionsError(bot ? "O YouTube bloqueou o pedido automático. Cole a transcrição à mão." : `O vídeo não está disponível${reason ? ` (${reason})` : ""}.`, "CAPTIONS_UNAVAILABLE", bot ? 502 : 404);
+      // Vídeo realmente indisponível (privado, removido): outro cliente não resolve.
+      if (!bot) break;
+      continue;
+    }
+    player = body;
+    usedUa = option.ua;
+    // Aceito, mas sem faixas: tenta o próximo cliente antes de concluir que o vídeo não tem legenda.
+    if (body?.captions?.playerCaptionsTracklistRenderer?.captionTracks?.length) break;
   }
+  if (!player) throw refusal || new CaptionsError("Não consegui falar com o YouTube agora. Cole a transcrição à mão.", "CAPTIONS_NETWORK");
   const tracks = player?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
   const track = pickTrack(tracks, language);
   if (!track) throw new CaptionsError("Este vídeo não tem legendas publicadas. Ative as legendas automáticas no YouTube Studio (ou cole a transcrição à mão).", "CAPTIONS_NONE", 404);
   const captionUrl = String(track.baseUrl).replace(/&fmt=[^&]*/g, "");
   if (!/^https:\/\/(www\.)?youtube\.com\//.test(captionUrl)) throw new CaptionsError("Endereço de legenda inesperado.", "CAPTIONS_BLOCKED");
-  const captionResponse = await call(captionUrl, { headers: { "User-Agent": UA, "Accept-Language": "pt-BR,pt;q=0.9" } });
+  const captionResponse = await call(captionUrl, { headers: { "User-Agent": usedUa, "Accept-Language": "pt-BR,pt;q=0.9" } });
   if (!captionResponse.ok) throw new CaptionsError("Não consegui baixar a legenda (erro " + captionResponse.status + "). Cole a transcrição à mão.", "CAPTIONS_BLOCKED");
   const cues = parseCaptionXml(await captionResponse.text());
   if (!cues.length) throw new CaptionsError("A legenda veio vazia. Cole a transcrição à mão.", "CAPTIONS_NONE", 404);

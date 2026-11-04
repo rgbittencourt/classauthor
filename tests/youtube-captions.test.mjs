@@ -109,3 +109,26 @@ test("handler: CORS, código de acesso e resposta", async () => {
     assert.equal(m.out.body.code, "CAPTIONS_ID");
   } finally { if (prev === undefined) delete process.env.AULA_ACCESS_CODE; else process.env.AULA_ACCESS_CODE = prev; }
 });
+
+test("fetchYouTubeTranscript tenta outro cliente do YouTube quando o primeiro é bloqueado", async () => {
+  const clients = [];
+  const fetchImpl = async (url, options = {}) => {
+    if (String(url).includes("youtubei/v1/player")) {
+      const name = JSON.parse(options.body).context.client.clientName;
+      clients.push(name);
+      if (name === "ANDROID") return { ok: true, status: 200, json: async () => ({ playabilityStatus: { status: "LOGIN_REQUIRED", reason: "Sign in to confirm you're not a bot" } }) };
+      return { ok: true, status: 200, json: async () => ({ playabilityStatus: { status: "OK" }, captions: { playerCaptionsTracklistRenderer: { captionTracks: tracks } } }) };
+    }
+    return { ok: true, status: 200, text: async () => XML3 };
+  };
+  const result = await fetchYouTubeTranscript("dQw4w9WgXcQ", { fetchImpl });
+  assert.deepEqual(clients, ["ANDROID", "IOS"]);
+  assert.ok(result.text.length > 0);
+});
+
+test("fetchYouTubeTranscript não insiste quando o vídeo é privado ou removido", async () => {
+  let calls = 0;
+  const fetchImpl = async () => { calls += 1; return { ok: true, status: 200, json: async () => ({ playabilityStatus: { status: "ERROR", reason: "Video unavailable" } }) }; };
+  await assert.rejects(() => fetchYouTubeTranscript("dQw4w9WgXcQ", { fetchImpl }), { code: "CAPTIONS_UNAVAILABLE", status: 404 });
+  assert.equal(calls, 1);
+});

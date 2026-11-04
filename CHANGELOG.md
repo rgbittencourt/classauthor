@@ -8,6 +8,11 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.12.2 · 03/11/2026 · Busca de legendas tenta mais de um caminho
+
+- **Buscar legendas do YouTube** passou a tentar quatro "clientes" do YouTube (Android, iOS, Android VR e player embutido) antes de desistir. O YouTube costuma recusar pedidos que vêm de servidores (como o da Vercel) com a mensagem "bloqueou o pedido automático"; outro cliente às vezes é aceito. Vídeo privado ou removido continua parando na primeira resposta.
+- **Limite honesto:** se o YouTube recusar o IP da Vercel em todos os caminhos, a mensagem continua e o fallback é colar a transcrição à mão (YouTube → ⋯ → Mostrar transcrição). A chave de API e o código de acesso não influenciam: legendas não usam chave.
+
 ## 1.12.1 · 03/11/2026 · Manual Class atualizado
 
 - O **Manual Class** descreve o alinhamento do texto do Parágrafo, novo no ClassAtelier 1.12.0. O ClassAuthor em si não mudou.
