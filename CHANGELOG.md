@@ -8,6 +8,10 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.13.1 · 04/11/2026 · Manual Class atualizado
+
+- O **Manual Class** descreve os interruptores do bloco Vídeo (faixa de legenda, resumo e transcrição) do ClassAtelier 1.15.0. O ClassAuthor em si não mudou.
+
 ## 1.13.0 · 04/11/2026 · Resumo do vídeo com IA (para o ClassAtelier)
 
 - Nova rota **`/api/video-summary`** (despachada por `api/regenerate-week.js`, action `videosummary`, sem criar função nova no plano Hobby). Recebe as falas da legenda com tempo, pede à IA um resumo em seções e tópicos e devolve cada tópico com o instante em que o assunto começa. É o que o botão **Gerar resumo com IA** do ClassAtelier 1.14.0 usa.
