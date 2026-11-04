@@ -221,9 +221,37 @@ test("ABNT: autor fora do formato vira SOBRENOME, Nome quando o resto confirma a
 });
 
 test("ABNT: sem estrutura clara (título solto, sem local/editora/ano) o texto não é adivinhado e segue para a conferência", () => {
-  for (const text of ["gestão educacional", "SILVA, Ana. Gestão escolar."]) {
-    assert.equal(normalizeAbntCitation(text), text);
-    assert.ok(abntIssues(normalizeAbntCitation(text)).length >= 1, text);
+  assert.equal(normalizeAbntCitation("gestão educacional"), "gestão educacional");
+  assert.ok(abntIssues("gestão educacional").length >= 1);
+});
+
+test("ABNT: o que falta e não dá para deduzir aparece na referência, no lugar certo, entre colchetes", () => {
+  assert.equal(normalizeAbntCitation("SILVA, Ana. Gestão escolar."), "SILVA, Ana. **Gestão escolar**, [ano].");
+  assert.equal(normalizeAbntCitation("SILVA, Ana. Gestão escolar. São Paulo: Cortez."), "SILVA, Ana. **Gestão escolar**. São Paulo: Cortez, [ano].");
+  assert.equal(normalizeAbntCitation("WIKIPEDIA. Vibe coding. Disponível em: https://en.wikipedia.org/wiki/Vibe_coding."), "WIKIPEDIA. **Vibe coding**, [ano]. Disponível em: <https://en.wikipedia.org/wiki/Vibe_coding>. Acesso em: [dia mês ano].");
+  assert.ok(abntIssues("SILVA, Ana. **Gestão escolar**, [ano].").some((x) => /\[ano\]/.test(x)));
+  assert.ok(abntIssues("A. **B**, 2020. Disponível em: <https://x.br>. Acesso em: [dia mês ano].").some((x) => /\[dia mês ano\]/.test(x)));
+  // não duplica
+  const once = normalizeAbntCitation("SILVA, Ana. Gestão escolar.");
+  assert.equal(normalizeAbntCitation(once), once);
+});
+
+test("ABNT: referências de sites e reportagens (autor entidade, ano colado ao título, aspas, data por extenso)", () => {
+  const cases = {
+    "Gartner. Citizen Development and Low-Code/No-Code platforms.": "GARTNER. **Citizen Development and Low-Code/No-Code platforms**, [ano].",
+    "FORUM, It. Por que o vibe coding está deixando as empresas vulneráveis, 2026.": "FORUM, It. **Por que o vibe coding está deixando as empresas vulneráveis**, 2026.",
+    "**GOOGLE Cloud**. Vibe Coding Explained: Tools and Guides, 2026.": "GOOGLE CLOUD. **Vibe Coding Explained**: Tools and Guides, 2026.",
+    "IBM. Cost of a Data Breach Report 2025.": "IBM. **Cost of a Data Breach Report**, 2025.",
+    "**IMASTERS**. Lovable: a falha, 2026.": "IMASTERS. **Lovable**: a falha, 2026.",
+    "KARPATHY, A. Publicação original sobre vibe coding, X (Twitter), 2 de fevereiro de 2025.": "KARPATHY, A. **Publicação original sobre vibe coding**, X (Twitter), 2 fev. 2025.",
+    'ROOSE, K. "Not a Coder? With A.I., Just Having an Idea Can Be Enough." The New York Times, 27 fev. 2025.': "ROOSE, K. Not a Coder? With A.I., Just Having an Idea Can Be Enough. **The New York Times**, 27 fev. 2025.",
+    "Veracode. GenAI Code Security Report, 2025.": "VERACODE. **GenAI Code Security Report**, 2025.",
+    "BRASIL. **Lei nº 14.533**, de 11 de janeiro de 2023 (institui a Política).": "BRASIL. **Lei nº 14.533**, de 11 de janeiro de 2023 (institui a Política)."
+  };
+  for (const [from, to] of Object.entries(cases)) {
+    const got = normalizeAbntCitation(from);
+    assert.equal(got, to, from);
+    assert.equal(normalizeAbntCitation(got), got, `idempotente: ${from}`);
   }
 });
 
@@ -254,7 +282,7 @@ test("ABNT: depois da correção automática só sobra o que falta de informaç�
   ];
   const left = raw.map((text) => abntIssues(normalizeAbntCitation(text)));
   assert.deepEqual(left.slice(0, 3), [[], [], []]);
-  assert.deepEqual(left[3], ["falta o ano"]);
+  assert.deepEqual(left[3], ["falta o ano: troque [ano] pelo ano de publicação"]);
 });
 
 test("ABNT: erros de propósito (negrito na referência inteira, no autor ou na editora, espaços, caixa, autor-data) são desfeitos", () => {

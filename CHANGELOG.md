@@ -8,6 +8,11 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.15.4 · 04/11/2026 · Referências: sem editora, entidade como autor e o que falta à vista
+
+- **Autor entidade** («Gartner.», «Google Cloud.») vai em MAIÚSCULAS; o negrito volta só ao título mesmo em referências **sem editora** («Autor. Título, ano.»), com **ano colado ao título**, com **aspas** no título (reportagem, o jornal fica em negrito) e com **data por extenso** («2 de fevereiro de 2025» vira «2 fev. 2025»; a data de leis fica por extenso).
+- O que a norma pede e não dá para deduzir **aparece na própria referência, no lugar certo**: «[ano]» e «Acesso em: [dia mês ano].». A conferência lista o que trocar.
+
 ## 1.15.3 · 04/11/2026 · Referências: desfaz negrito fora do título e arruma digitação
 
 - Negrito na **referência inteira**, no autor, na editora ou em vários trechos é desfeito e o negrito volta só ao título.
