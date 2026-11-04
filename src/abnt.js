@@ -71,6 +71,7 @@ export function abntIssues(reference) {
   if (!/\b(1[5-9]\d{2}|20\d{2})\b|\bs\.\s?d\./.test(plainText)) issues.push("falta o ano");
   if (!/\*\*[^*]+\*\*/.test(raw)) issues.push("falta o destaque (negrito) no título");
   if (/\*\*[^*:]+:\s+[^*]+\*\*/.test(raw)) issues.push("o negrito vai só no título principal, não no subtítulo");
+  else if (/\*\*/.test(raw) && !boldIsSound(raw)) issues.push("o negrito vai só no título, não na referência inteira nem no autor ou na editora");
   const leading = plainText.split(/;\s+/);
   let authors = 0;
   while (authors < leading.length && /^\p{Lu}[\p{Lu}'’ -]+,\s/u.test(leading[authors])) authors += 1;
@@ -309,6 +310,66 @@ function fixAuthorLead(text) {
   return /^\*\*[^*]+\*\*/.test(rest) || inferBold(candidate) !== candidate ? candidate : text;
 }
 
+
+// ---- Limpeza de erros de digitação e de formato antes da inferência ----
+const SMALL = /^(?:e|de|da|do|das|dos|di|du|del|la|le|von|van|y)$/i;
+const cap = (word) => (word ? word.charAt(0).toLocaleUpperCase("pt-BR") + word.slice(1).toLocaleLowerCase("pt-BR") : word);
+const nameCase = (value) => value.split(/(\s+)/).map((w, i) => (/^\s+$/.test(w) ? w : i > 0 && SMALL.test(w) ? w.toLowerCase() : cap(w))).join("");
+
+// Espaços e pontuação: "autonomia .São Paulo :Paz e Terra ,1996" -> "autonomia. São Paulo: Paz e Terra, 1996".
+function tidyPunctuation(text) {
+  const keep = [];
+  let out = text.replace(/(?:https?:\/\/|www\.)[^\s<>]+|\b10\.\d{4,}\/\S+/g, (u) => { keep.push(u); return `\u0001${keep.length - 1}\u0001`; });
+  out = out.replace(/\*\*([^*]+)\*\*/g, (all, inner) => `**${inner.trim()}**`);
+  out = out.replace(/\s{2,}/g, " ").replace(/\s+([.,;:])/g, "$1");
+  out = out.replace(/([,;:])(?=\p{L})/gu, "$1 ").replace(/(?<=\p{L})([,;:])(?=\d)/gu, "$1 ").replace(/(?<=\p{Ll}{2})\.(?=\p{Lu})/gu, ". ");
+  return out.replace(/\u0001(\d+)\u0001/g, (all, i) => keep[Number(i)]);
+}
+
+// Caixa: autor em minúsculas ou com o nome em MAIÚSCULAS, referência toda em minúsculas, título todo em maiúsculas.
+function fixCase(text) {
+  let out = text;
+  if (!/\p{Lu}/u.test(out) && /:\s*[^,]+,\s*\d{4}/.test(out)) {
+    out = out.replace(/^([\p{Ll}'’ -]+),\s*([\p{Ll}][\p{Ll}. ]*?)(?=[.;])/u, (all, sur, name) => `${sur.toLocaleUpperCase("pt-BR")}, ${nameCase(name)}`);
+    const parts = out.split(/(?<=\.)\s+/);
+    out = parts.map((part, i) => (/^[^:]+:\s*[^,]+,\s*\d{4}/.test(part) ? part.replace(/:\s*/, ": ").split(/:\s/).map((x) => nameCase(x)).join(": ") : i > 0 || !/^\p{Lu}+,/u.test(part) ? part.charAt(0).toLocaleUpperCase("pt-BR") + part.slice(1) : part)).join(" ");
+  }
+  out = out.replace(/(^|;\s*)(\p{Lu}[\p{Lu}'’ -]+),\s+(\p{Lu}{2}[\p{Lu} ]*)(?=[.;])/gu, (all, lead, sur, name) => `${lead}${sur}, ${nameCase(name)}`);
+  const lead = leadInfo(out);
+  if (lead) {
+    const segs = segments(out.slice(lead.end).trimStart());
+    const off = out.length - out.slice(lead.end).trimStart().length;
+    const first = segs[0];
+    if (first && !SUB_ENTITY.test(first.t) && first.t === first.t.toLocaleUpperCase("pt-BR") && first.t.split(/\s+/).length >= 2 && /\p{L}{3}/u.test(first.t) && !/\*\*/.test(first.t)) {
+      const low = first.t.toLocaleLowerCase("pt-BR");
+      out = `${out.slice(0, off + first.s)}${low.charAt(0).toLocaleUpperCase("pt-BR")}${low.slice(1)}${out.slice(off + first.e)}`;
+    }
+  }
+  return out;
+}
+
+// "FREIRE, Paulo (1996). Título. Local: Editora." -> "FREIRE, Paulo. Título. Local: Editora, 1996."
+function fixAuthorDate(text) {
+  const m = /^([\p{L}'’ -]+,\s*[\p{L}. ]+?)\.?\s*\(((?:19|20)\d{2})\)\.?\s+(.+)$/u.exec(text);
+  if (!m || !/:\s+[^,.:]+\.$/.test(m[3]) || /(?:19|20)\d{2}/.test(m[3])) return text;
+  return `${m[1]}. ${m[3].replace(/\.$/, `, ${m[2]}.`)}`;
+}
+
+// O negrito vai só no título. Se a referência inteira, o autor, a editora ou vários trechos estão em negrito, tira tudo e infere de novo.
+function boldIsSound(text) {
+  const spans = [...text.matchAll(/\*\*([^*]+)\*\*/g)];
+  if (!spans.length) return true;
+  if (spans.length > 1) return false;
+  const m = spans[0];
+  const inner = m[1];
+  if (/\.\s+\p{Lu}/u.test(inner) || /\.\s*$/.test(inner)) return false;
+  const before = text.slice(0, m.index).trim();
+  const tail = text.slice(m.index + m[0].length);
+  if (!before) { const first = segments(tail.replace(/^\.\s*/, ""))[0]; return !!first && (PLACE.test(first.t) || PLACE_NO_YEAR.test(first.t)); }
+  const rest = tail.split(/\.\s/)[0];
+  return !PLACE.test(`${inner}${rest}`);
+}
+
 // Obra sem autor: "Título. Local: Editora, ano." vira "**TÍTULO** ..." (entrada pelo título). Só quando a estrutura é clara.
 const ARTICLE = /^(?:o|a|os|as|um|uma)$/i;
 function fixTitleEntry(text) {
@@ -329,6 +390,10 @@ function fixTitleEntry(text) {
 export function normalizeAbntCitation(value) {
   let text = clean(value);
   if (!text) return "";
+  text = tidyPunctuation(text);
+  if (!boldIsSound(text)) text = text.replace(/\*\*/g, "");
+  text = fixCase(text);
+  text = fixAuthorDate(text);
   // "Local: Editora. 2000" -> "Local: Editora, 2000." (ponto no lugar da vírgula antes do ano; ponto final)
   text = text.replace(/(?<!(?:Acesso em|Disponível em|Dispon.vel em))(:\s+[^,.:*;]{1,60})\.\s+((?:19|20)\d{2})(?=\.?$)/u, "$1, $2").replace(/(\d{4})$/, "$1.");
   text = fixAuthorLead(text);

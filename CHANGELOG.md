@@ -8,6 +8,11 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.15.3 · 04/11/2026 · Referências: desfaz negrito fora do título e arruma digitação
+
+- Negrito na **referência inteira**, no autor, na editora ou em vários trechos é desfeito e o negrito volta só ao título.
+- Arruma **espaços e pontuação** (espaço antes de ponto ou vírgula, falta de espaço depois de «:» ou «.»), **caixa** (tudo em minúsculas, nome do autor em MAIÚSCULAS, título todo em maiúsculas) e a forma **Autor (ano)**, que vira «Local: Editora, ano».
+
 ## 1.15.2 · 04/11/2026 · Referências corrigidas também na ficha e na leitura
 
 - A **Ficha da disciplina** corrige a ABNT das referências ao montar a lista (as suas e as das semanas) e, ao editar uma referência no campo, corrige ao sair dele: negrito no título, autor em SOBRENOME, Nome.

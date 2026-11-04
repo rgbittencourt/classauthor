@@ -256,3 +256,24 @@ test("ABNT: depois da correção automática só sobra o que falta de informaç�
   assert.deepEqual(left.slice(0, 3), [[], [], []]);
   assert.deepEqual(left[3], ["falta o ano"]);
 });
+
+test("ABNT: erros de propósito (negrito na referência inteira, no autor ou na editora, espaços, caixa, autor-data) são desfeitos", () => {
+  const ok = "FREIRE, Paulo. **Pedagogia da autonomia**. São Paulo: Paz e Terra, 1996.";
+  for (const bad of [
+    "**FREIRE, Paulo. Pedagogia da autonomia. São Paulo: Paz e Terra, 1996.**",
+    "**Paulo Freire. Pedagogia da autonomia. São Paulo: Paz e Terra, 1996.**",
+    "FREIRE, Paulo. **Pedagogia da autonomia. São Paulo: Paz e Terra, 1996.**",
+    "**FREIRE, Paulo.** Pedagogia da autonomia. São Paulo: Paz e Terra, 1996.",
+    "FREIRE, Paulo. Pedagogia da autonomia. **São Paulo**: Paz e Terra, 1996.",
+    "FREIRE, Paulo. **Pedagogia** **da autonomia**. São Paulo: Paz e Terra, 1996.",
+    "freire, paulo. pedagogia da autonomia. são paulo: paz e terra, 1996.",
+    "FREIRE, PAULO. PEDAGOGIA DA AUTONOMIA. São Paulo: Paz e Terra, 1996.",
+    "FREIRE,Paulo.Pedagogia da autonomia.São Paulo:Paz e Terra,1996",
+    "FREIRE, Paulo.  Pedagogia da  autonomia .  São Paulo : Paz e Terra , 1996 .",
+    "FREIRE, Paulo (1996). Pedagogia da autonomia. São Paulo: Paz e Terra."
+  ]) {
+    assert.equal(normalizeAbntCitation(bad), ok, bad);
+    assert.deepEqual(abntIssues(normalizeAbntCitation(bad)), [], bad);
+  }
+  assert.ok(abntIssues("**FREIRE, Paulo. Pedagogia da autonomia. São Paulo: Paz e Terra, 1996.**").some((x) => /negrito/.test(x)));
+});
