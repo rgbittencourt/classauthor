@@ -8,6 +8,10 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.12.4 · 04/11/2026 · Manual Class atualizado
+
+- O **Manual Class** descreve a legenda sincronizada do bloco Vídeo (ClassAtelier 1.13.0) e explica a mensagem «O YouTube recusou o pedido automático do servidor». O ClassAuthor em si não mudou.
+
 ## 1.12.3 · 03/11/2026 · Busca de legendas: recusa de um cliente não encerra a busca
 
 - Na 1.12.2, se o primeiro modo de acesso respondesse "O YouTube não é mais compatível com este aplicativo ou dispositivo", a busca parava ali e dizia que o vídeo não estava disponível, mesmo com o vídeo no ar. Agora essa resposta, assim como o pedido de login, conta como recusa daquele modo e a busca segue para o próximo (Android, iOS, Android VR, player embutido).
