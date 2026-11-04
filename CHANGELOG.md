@@ -8,6 +8,10 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.15.1 · 04/11/2026 · Manual com a capa atualizada
+
+- O **Manual Class** mostrava na capa as versões da primeira edição (ClassAuthor 1.3.0, ClassAtelier 1.5.0, ClassAcervo 1.2.0), a data de 30/10/2026 e 105 capturas. A capa agora traz as versões atuais, a data e as 115 capturas de tela. O ClassAuthor em si não mudou.
+
 ## 1.15.0 · 04/11/2026 · Referências: o motor acha o título e o autor sozinho
 
 - **Negrito no título sem a IA:** a referência tem ordem fixa (autor. título. edição. local: editora, ano.), então `normalizeAbntCitation` acha o título do livro, a revista do artigo, a obra de um capítulo (depois de «In:»), o título de sites e documentos e o «Lei nº» de leis e normas, e põe o negrito. O subtítulo (depois de «:») fica fora.
