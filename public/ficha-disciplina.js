@@ -5,7 +5,7 @@
 // A ficha nasce do que o ClassAuthor já planejou (título, carga, objetivos, temas, atividades, práticas,
 // referências) e fica editável: o app não inventa o que não tem (curso, ementa oficial, pesos e e-mails
 // ficam para o professor conferir). Referências só entram marcadas quando foram conferidas.
-import { sortReferencesAbnt } from "./abnt.js";
+import { normalizeAbntCitation, sortReferencesAbnt } from "./abnt.js";
 
 const text = (value) => String(value ?? "").trim();
 const lines = (value) => (Array.isArray(value) ? value : text(value).split(/\r?\n+/)).map((item) => text(item).replace(/^[-•*\d.)\s]+(?=\S)/, "")).filter(Boolean);
@@ -80,7 +80,7 @@ export function fichaDefaults({ input = {}, weeks = [], generalPlan = null, auth
   const seen = new Set();
   const references = [];
   const addReference = (item, origin) => {
-    const citation = text(item.citation);
+    const citation = normalizeAbntCitation(text(item.citation));
     const key = citation.replace(/\*\*/g, "").toLowerCase().replace(/\W+/g, " ").trim();
     if (!key || seen.has(key)) return;
     seen.add(key);

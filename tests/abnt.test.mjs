@@ -67,7 +67,7 @@ test("Citação em bloco sem fonte vira pendência em 'Pontos a conferir'", asyn
 });
 
 // ───── Motor de formatação (regras R1 a R3, modelos T1 a T4, restrições de apresentação) ─────
-import { formatAbnt, formatAbntList, abntAuthors, abntMonth, normalizeAbntCitation, citationFromHtml, citationToHtml, sortHtmlReferences } from "../src/abnt.js";
+import { formatAbnt, formatAbntList, abntAuthors, abntMonth, normalizeAbntCitation, citationFromHtml, citationToHtml, sortHtmlReferences, fixHtmlReference } from "../src/abnt.js";
 
 test("ABNT R1: nomes de pessoa, 1 a 3 autores com \"; \", 4 ou mais com et al., entidade em maiúsculas", () => {
   assert.equal(abntAuthors("Florestan Fernandes"), "FERNANDES, Florestan");
@@ -220,11 +220,29 @@ test("ABNT: autor fora do formato vira SOBRENOME, Nome quando o resto confirma a
   assert.equal(normalizeAbntCitation("Wikipedia. Educação a distância. 2023. Disponível em: https://pt.wikipedia.org/wiki/EaD. Acesso em: 03 Nov. 2026."), "WIKIPEDIA. **Educação a distância**. 2023. Disponível em: <https://pt.wikipedia.org/wiki/EaD>. Acesso em: 3 nov. 2026.");
 });
 
-test("ABNT: sem estrutura clara (obra sem autor, título solto) o texto não é adivinhado e segue para a conferência", () => {
-  for (const text of ["Gestão educacional na era digital. São Paulo: X, 2020.", "Learning Theory. Cambridge: CUP, 2020.", "gestão educacional", "SILVA, Ana. Gestão escolar."]) {
+test("ABNT: sem estrutura clara (título solto, sem local/editora/ano) o texto não é adivinhado e segue para a conferência", () => {
+  for (const text of ["gestão educacional", "SILVA, Ana. Gestão escolar."]) {
     assert.equal(normalizeAbntCitation(text), text);
     assert.ok(abntIssues(normalizeAbntCitation(text)).length >= 1, text);
   }
+});
+
+test("ABNT: obra sem autor com local, editora e ano entra pelo título (negrito e primeira palavra em maiúsculas)", () => {
+  assert.equal(normalizeAbntCitation("Gestão educacional na era digital. São Paulo: X, 2020."), "**GESTÃO educacional na era digital**. São Paulo: X, 2020.");
+  assert.equal(normalizeAbntCitation("O estado de S. Paulo. São Paulo: Abril, 2020."), normalizeAbntCitation("O estado de S. Paulo. São Paulo: Abril, 2020."));
+  assert.deepEqual(abntIssues(normalizeAbntCitation("Gestão educacional na era digital. São Paulo: X, 2020.")), []);
+});
+
+test("ABNT: entidade com órgão e documento online sem editora ganha negrito no título; editora com ponto antes do ano é corrigida", () => {
+  assert.equal(normalizeAbntCitation("BRASIL. Ministério da Educação. Base Nacional Comum Curricular. Brasília, 2018."), "BRASIL. Ministério da Educação. **Base Nacional Comum Curricular**. Brasília, 2018.");
+  assert.equal(normalizeAbntCitation("MORAN, José. Novas tecnologias. Campinas: Papirus. 2000"), "MORAN, José. **Novas tecnologias**. Campinas: Papirus, 2000.");
+  assert.match(normalizeAbntCitation("A. Disponível em: https://x.br. Acesso em: 3 nov. 2026."), /Acesso em: 3 nov\. 2026/);
+});
+
+test("ABNT: item HTML com link é corrigido e o link continua no lugar", () => {
+  const out = fixHtmlReference('BRASIL. Ministério da Educação. Base Nacional Comum Curricular. Brasília, 2018. Disponível em: <a href="https://x.gov.br/bncc">https://x.gov.br/bncc</a>. Acesso em: 3 nov. 2026.');
+  assert.match(out, /<strong>Base Nacional Comum Curricular<\/strong>/);
+  assert.match(out, /&lt;<a href="https:\/\/x\.gov\.br\/bncc">https:\/\/x\.gov\.br\/bncc<\/a>&gt;/);
 });
 
 test("ABNT: depois da correção automática só sobra o que falta de informação (ano, autor, data de acesso)", () => {

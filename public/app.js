@@ -1,4 +1,5 @@
 import { toStudentLesson, toGeneratorWeek } from "./student-export.js";
+import { normalizeAbntCitation, sortReferencesAbnt } from "./abnt.js";
 import { parseSavedWeek, planPlacement } from "./week-import.js";
 import { alignmentSheets, bloomLabel, buildAlignmentMap } from "./alignment-map.js";
 import { createFichaDocx, fichaChecks, fichaDefaults, weightsTotal } from "./ficha-disciplina.js";
@@ -2041,7 +2042,7 @@ function renderLessonPreview(lesson, index) {
   const glossary = (plan.glossary || []).length ? `<section><h3>Glossário</h3><ul>${plan.glossary.map((item) => `<li><strong>${escapeHtml(item.term || "Termo")}</strong>: ${escapeHtml(item.definition || "")}</li>`).join("")}</ul></section>` : "";
   const referenceStatus = { verified: "conferida", "provided-needs-review": "link informado · conferir", "needs-human-review": "conferir antes de publicar", "suggested-no-url": "sem link · conferir" };
   const references = (plan.references || []).length
-    ? `<section class="reader-references"><h3>Referências bibliográficas (${plan.references.length})</h3><p><small>No padrão ABNT NBR 6023, em ordem alfabética. Escritas pelo modelo a partir do que ele conhece: confira cada uma (autor, ano, edição, link, data de acesso) antes de liberar a semana.</small></p><div class="reader-refs">${plan.references.map((item) => { const citation = item.citation || item.title || item.href || "Referência"; const status = referenceStatus[item.verificationStatus] || "conferir antes de publicar"; const link = item.href ? ` <a href="${escapeHtml(item.href)}" target="_blank" rel="noreferrer">abrir</a>` : ""; return `<p>${escapeHtml(citation).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")}${link} <small>· ${escapeHtml(status)}</small></p>`; }).join("")}</div></section>`
+    ? `<section class="reader-references"><h3>Referências bibliográficas (${plan.references.length})</h3><p><small>No padrão ABNT NBR 6023, em ordem alfabética. Escritas pelo modelo a partir do que ele conhece: confira cada uma (autor, ano, edição, link, data de acesso) antes de liberar a semana.</small></p><div class="reader-refs">${sortReferencesAbnt(plan.references.map((item) => ({ ...item, citation: normalizeAbntCitation(item.citation || item.title || item.href || "Referência") }))).map((item) => { const citation = item.citation; const status = referenceStatus[item.verificationStatus] || "conferir antes de publicar"; const link = item.href ? ` <a href="${escapeHtml(item.href)}" target="_blank" rel="noreferrer">abrir</a>` : ""; return `<p>${escapeHtml(citation).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")}${link} <small>· ${escapeHtml(status)}</small></p>`; }).join("")}</div></section>`
     : `<section class="reader-warning"><h3>Referências bibliográficas</h3><p>Esta semana ainda não tem referências. Escolha “Refazer a semana inteira” na prévia para gerá-las.</p></section>`;
   const letters = ["A", "B", "C", "D", "E", "F"];
   const questionMarkup = (q, position) => {
@@ -4195,7 +4196,12 @@ $("#ficha-close-button")?.addEventListener("click", closeFicha);
 $("#ficha-docx-button")?.addEventListener("click", downloadFicha);
 $("#ficha-reset-button")?.addEventListener("click", () => { if (!window.confirm("Descartar o que você editou na ficha e montar de novo a partir do planejamento?")) return; state.ficha = fichaBase(); renderFichaForm(state.ficha); scheduleSave(); });
 $("#ficha-body")?.addEventListener("input", persistFicha);
-$("#ficha-body")?.addEventListener("change", persistFicha);
+$("#ficha-body")?.addEventListener("change", (event) => {
+  // Referência editada na ficha: o que a ABNT decide sem dúvida (negrito no título, autor em SOBRENOME, Nome) é corrigido ao sair do campo.
+  const field = event.target.closest?.('textarea[data-r="citation"]');
+  if (field) { const fixed = normalizeAbntCitation(field.value.trim()); if (fixed && fixed !== field.value.trim()) field.value = fixed; }
+  persistFicha();
+});
 $("#ficha-body")?.addEventListener("click", (event) => {
   const target = event.target.closest("button");
   if (!target) return;

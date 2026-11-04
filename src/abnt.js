@@ -58,13 +58,16 @@ export function sortReferencesAbnt(references) {
 }
 
 // Conferência de forma: devolve o que falta para a referência parecer ABNT. Não verifica se a obra existe.
+// Entrada pelo título (obra sem autor): o título em negrito e a primeira palavra em maiúsculas.
+const TITLE_ENTRY = /^\*\*(?:(?:O|A|OS|AS|UM|UMA)\s+)?[A-ZÁÉÍÓÚÂÊÔÃÕÇ0-9]{2,}\b/;
+
 export function abntIssues(reference) {
   const item = typeof reference === "string" ? { citation: reference } : reference || {};
   const raw = String(item.citation || item.title || "");
   const plainText = strip(raw);
   const issues = [];
   if (!plainText) return issues;
-  if (!/^(?:[A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-ZÁÉÍÓÚÂÊÔÃÕÇ'’ -]+[,.]|[A-ZÁÉÍÓÚÂÊÔÃÕÇ]{2,}\b)/.test(plainText)) issues.push("deve começar por SOBRENOME, Nome (ou ENTIDADE em maiúsculas)");
+  if (!/^(?:[A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-ZÁÉÍÓÚÂÊÔÃÕÇ'’ -]+[,.]|[A-ZÁÉÍÓÚÂÊÔÃÕÇ]{2,}\b)/.test(plainText) && !TITLE_ENTRY.test(raw)) issues.push("deve começar por SOBRENOME, Nome (ou ENTIDADE em maiúsculas)");
   if (!/\b(1[5-9]\d{2}|20\d{2})\b|\bs\.\s?d\./.test(plainText)) issues.push("falta o ano");
   if (!/\*\*[^*]+\*\*/.test(raw)) issues.push("falta o destaque (negrito) no título");
   if (/\*\*[^*:]+:\s+[^*]+\*\*/.test(raw)) issues.push("o negrito vai só no título principal, não no subtítulo");
@@ -254,6 +257,7 @@ const LOOSE_LEAD = new RegExp(`^(${AUTH_LOOSE}(?:;\\s*${AUTH_LOOSE})*)(?:\\.(?=\
 const NAME_LEAD = new RegExp(`^(${NAME}(?:(?:;\\s*|\\s+e\\s+|\\s+&\\s+)${NAME})*)\\.(?=\\s)`, "u");
 const PLACE = /^(?:\d{1,2}\. ed\. )?[^:*]{2,45}:\s+[^,*]{1,100},\s*(?:\d{4}|\[s\. ?d\.\]|s\. ?d\.)/u;
 const PLACE_NO_YEAR = /^(?:\d{1,2}\. ed\. )?[^:*,]{2,45}:\s+[^,*:]{1,100}$/u;
+const PLACE_YEAR = /^[\p{Lu}][^:*,.]{1,40},\s*(?:\d{4}|\[s\. ?d\.\]|s\. ?d\.)/u;
 const SUB_ENTITY = /^(?:Minist|Secretaria|Conselho|Instituto|Universidade|Coordena|Departamento|Funda|Comiss|C[aâ]mara|Senado|Tribunal|Governo|Prefeitura)/iu;
 const LAW = /^((?:Lei Complementar|Lei|Decreto-Lei|Decreto|Portaria|Resolu[cç][aã]o|Parecer|Medida Provisória|Emenda Constitucional|Instru[cç][aã]o Normativa)\s+(?:n\.?\s?[ºo°]?\s*|nº\s*|número\s*)?[\d][\d.\/-]*)/iu;
 
@@ -285,7 +289,8 @@ function inferBold(text) {
   const law = LAW.exec(at(0));
   if (law) { const s0 = offset + segs[0].s; return `${text.slice(0, s0)}**${law[1]}**${text.slice(s0 + law[1].length)}`; }
   if (PLACE.test(at(1)) || (segs.length === 2 && PLACE_NO_YEAR.test(at(1)))) return bold(0);
-  if (SUB_ENTITY.test(at(0)) && PLACE.test(at(2))) return bold(1);
+  if (SUB_ENTITY.test(at(0)) && (PLACE.test(at(2)) || PLACE_YEAR.test(at(2)))) return bold(1);
+  if (PLACE_YEAR.test(at(1))) return bold(0);
   if (!PLACE.test(at(1)) && /^(?:\d{4}|\[s\. ?d\.\]|Dispon)/i.test(at(1))) return bold(0);
   return text;
 }
@@ -304,10 +309,30 @@ function fixAuthorLead(text) {
   return /^\*\*[^*]+\*\*/.test(rest) || inferBold(candidate) !== candidate ? candidate : text;
 }
 
+// Obra sem autor: "Título. Local: Editora, ano." vira "**TÍTULO** ..." (entrada pelo título). Só quando a estrutura é clara.
+const ARTICLE = /^(?:o|a|os|as|um|uma)$/i;
+function fixTitleEntry(text) {
+  if (/\*\*/.test(text) || leadInfo(text)) return text;
+  const segs = segments(text);
+  if (segs.length < 2 || !PLACE.test(segs[1].t) || /^In:/.test(segs[0].t) || /[;]/.test(segs[0].t)) return text;
+  const title = text.slice(segs[0].s, segs[0].e).trim().replace(/\.$/, "");
+  if (!title || /:\s/.test(title) && false) return text;
+  const words = title.split(/\s+/);
+  const n = ARTICLE.test(words[0]) && words.length > 1 ? 2 : 1;
+  const head = words.slice(0, n).map((w) => w.toLocaleUpperCase("pt-BR")).join(" ");
+  const full = [head, ...words.slice(n)].join(" ");
+  const colon = full.search(/:\s/);
+  const bold = colon > 0 ? `**${full.slice(0, colon)}**${full.slice(colon)}` : `**${full}**`;
+  return `${text.slice(0, segs[0].s)}${bold}${text.slice(segs[0].e).replace(/^\s*/, "")[0] === "." ? "" : "."}${text.slice(segs[0].e)}`.replace(/\.\.+/g, ".");
+}
+
 export function normalizeAbntCitation(value) {
   let text = clean(value);
   if (!text) return "";
+  // "Local: Editora. 2000" -> "Local: Editora, 2000." (ponto no lugar da vírgula antes do ano; ponto final)
+  text = text.replace(/(?<!(?:Acesso em|Disponível em|Dispon.vel em))(:\s+[^,.:*;]{1,60})\.\s+((?:19|20)\d{2})(?=\.?$)/u, "$1, $2").replace(/(\d{4})$/, "$1.");
   text = fixAuthorLead(text);
+  text = fixTitleEntry(text);
   text = text.replace(/(?<!\*)[*_]et al\.?[*_](?!\*)/gi, "et al.").replace(/<(?:em|i)>\s*et al\.?\s*<\/(?:em|i)>/gi, "et al.");
   text = text.replace(MANY_AUTHORS, (all, first) => `${first} et al.`).replace(/et al\.\s+et al\./g, "et al.");
   text = text.replace(/\*\*([^*:]+?):\s+([^*]+?)\*\*/g, "**$1**: $2");
@@ -341,10 +366,16 @@ export function sortHtmlReferences(items) {
 // Se nada muda, devolve o próprio HTML (preserva qualquer marcação que a norma não mexe).
 export function fixHtmlReference(item) {
   const html = typeof item === "string" ? item : String(item?.html ?? item?.citation ?? "");
-  if (!html.trim() || /<a[\s>]/i.test(html)) return html;
-  const plainText = citationFromHtml(html);
+  if (!html.trim()) return html;
+  // Link no meio: o texto é corrigido com a URL à mostra e depois cada URL volta para dentro do seu <a>.
+  const anchors = [];
+  const withoutAnchors = html.replace(/<a\s[^>]*>([\s\S]*?)<\/a>/gi, (all, inner) => { const url = citationFromHtml(inner); anchors.push({ all, url }); return url; });
+  const plainText = citationFromHtml(withoutAnchors);
   const next = normalizeAbntCitation(plainText);
-  return next === plainText ? html : citationToHtml(next);
+  if (next === plainText) return html;
+  let out = citationToHtml(next);
+  anchors.forEach(({ all, url }) => { const esc = citationToHtml(url); if (esc && out.includes(esc)) out = out.replace(esc, all); });
+  return out;
 }
 
 // Lista pronta para a aula: cada item corrigido e todos em ordem alfabética.

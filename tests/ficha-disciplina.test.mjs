@@ -98,3 +98,16 @@ test("o índice do pacote lista as pastas e diz a verdade sobre as pendências",
 test("public/delivery-package.js é cópia idêntica de src/", () => {
   assert.equal(read("../public/delivery-package.js"), read("../src/delivery-package.js"));
 });
+
+test("referências da ficha são corrigidas pela ABNT: negrito no título e autor em SOBRENOME, Nome", () => {
+  const ficha = fichaDefaults({
+    input: { ...input, references: "Paulo Freire. Pedagogia da autonomia. São Paulo: Paz e Terra, 1996." },
+    weeks: [lesson(1, "Sistemas")], generalPlan: { webPracticeSchedule: [] }, author: "Fulana"
+  });
+  const freire = ficha.references.find((item) => /Pedagogia da autonomia/.test(item.citation));
+  assert.equal(freire.citation, "FREIRE, Paulo. **Pedagogia da autonomia**. São Paulo: Paz e Terra, 1996.");
+});
+
+test("public/ficha-disciplina.js é cópia idêntica de src/ (referências ABNT)", () => {
+  assert.equal(read("../public/ficha-disciplina.js"), read("../src/ficha-disciplina.js"));
+});

@@ -8,6 +8,12 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.15.2 · 04/11/2026 · Referências corrigidas também na ficha e na leitura
+
+- A **Ficha da disciplina** corrige a ABNT das referências ao montar a lista (as suas e as das semanas) e, ao editar uma referência no campo, corrige ao sair dele: negrito no título, autor em SOBRENOME, Nome.
+- O motor ABNT corrige também **referência com link** (o link continua no lugar), **autor entidade com órgão e documento online sem editora**, **obra sem autor** (entra pelo título: negrito e primeira palavra em maiúsculas) e **editora com ponto antes do ano**.
+- A **leitura da semana** aplica a mesma correção e a ordem alfabética ao mostrar as referências, inclusive nas semanas já salvas antes da correção automática.
+
 ## 1.15.1 · 04/11/2026 · Manual com a capa atualizada
 
 - O **Manual Class** mostrava na capa as versões da primeira edição (ClassAuthor 1.3.0, ClassAtelier 1.5.0, ClassAcervo 1.2.0), a data de 30/10/2026 e 105 capturas. A capa agora traz as versões atuais, a data e as 115 capturas de tela. O ClassAuthor em si não mudou.
