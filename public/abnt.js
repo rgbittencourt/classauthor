@@ -25,20 +25,23 @@ export function abntMonth(value) {
 }
 
 export function abntRules(today = abntToday()) {
-  return `REFERÊNCIAS NO PADRÃO ABNT (NBR 6023:2018) — obrigatório, sem exceção:
+  return `REFERÊNCIAS NO PADRÃO ABNT NBR 6023:2025 (3ª edição, 21/05/2025) — obrigatório, sem exceção:
 NOMES (autor):
 - pessoa física: último sobrenome em MAIÚSCULAS, vírgula e prenome(s): "Florestan Fernandes" vira FERNANDES, Florestan (Filho, Neto, Júnior e Sobrinho acompanham o sobrenome: SILVA FILHO, João);
 - de 1 a 3 autores, todos, separados por ponto e vírgula e espaço ("; "): SOBRENOME, Nome; SOBRENOME, Nome; com 4 ou mais, só o primeiro seguido de et al., sem itálico;
-- entidade ou instituição: nome por extenso em MAIÚSCULAS (UNIVERSIDADE FEDERAL DE SANTA CATARINA).
-DESTAQUE: negrito (** **) só no título principal (da obra, do periódico ou da página), sempre do mesmo jeito; nunca no subtítulo, que vem depois de dois-pontos.
+- entidade ou instituição: nome em MAIÚSCULAS (UNIVERSIDADE FEDERAL DE SANTA CATARINA);
+- obra sem autor: entra pelo título, com a primeira palavra (e o artigo que a antecede) em MAIÚSCULAS e SEM negrito.
+DESTAQUE: negrito (** **) só no título do documento (livro, relatório, página); em artigo de revista ou de jornal e em matéria de portal, o negrito vai no nome do periódico ou do portal, e o título do artigo fica sem destaque; em lei, o negrito cobre a denominação inteira ("Lei nº 14.533, de 11 de janeiro de 2023"). Nunca no subtítulo, que vem depois de dois-pontos. Sempre do mesmo jeito em todas as referências.
 MODELOS:
 - livro: AUTOR. **Título**: subtítulo. 2. ed. Local: Editora, ano. (1ª edição: omita a edição);
 - capítulo: AUTOR DO CAPÍTULO. Título do capítulo. In: AUTOR DA OBRA (Org.). **Título da obra**. Local: Editora, ano. p. 10-25.
 - artigo: AUTOR. Título do artigo. **Nome do periódico**, local, v. 10, n. 2, p. 15-30, mar. 2020.
-- site ou documento digital: AUTOR ou ENTIDADE. **Título da página ou matéria**. ano. Disponível em: <URL>. Acesso em: ${today}.
-- lei, decreto, norma ou relatório de órgão: JURISDIÇÃO ou ÓRGÃO. **Tipo e número**, de data. Ementa. Local: ano.
-DATAS: mês abreviado com 3 letras e ponto (jan., fev., mar., abr., jun., jul., ago., set., out., nov., dez.), exceto maio, que se escreve por extenso.
-FONTE ONLINE termina com "Disponível em: <URL>. Acesso em: ${today}." — somente quando a URL foi informada; nunca invente URL, DOI, páginas, volume ou editora: se faltar um elemento essencial, escreva a referência com o que você sabe com segurança e liste o que conferir em "Pontos a conferir".
+- matéria de portal ou de jornal: AUTOR. Título da matéria. **Nome do portal**, 6 abr. 2023. Disponível em: https://…. Acesso em: ${today}.
+- site ou documento online: AUTOR ou ENTIDADE. **Título**. Local: Editora, ano. Disponível em: https://…. Acesso em: ${today}.
+- lei, decreto, norma: JURISDIÇÃO. **Lei nº 14.533, de 11 de janeiro de 2023**. Ementa. Local: Órgão, ano. Disponível em: https://…. Acesso em: ${today}.
+- local e editora desconhecidos: [S. l.: s. n.], ano. Só o local desconhecido: [S. l.]: Editora, ano. Só a editora: Local: [s. n.], ano.
+DATAS: mês abreviado com 3 letras e ponto (jan., fev., mar., abr., jun., jul., ago., set., out., nov., dez.), exceto maio, que se escreve por extenso. Dia sem zero à esquerda ("5 mar. 2026").
+FONTE ONLINE termina com "Disponível em: URL. Acesso em: ${today}." — a URL SEM os sinais < >, somente quando a URL foi informada; nunca invente URL, DOI, páginas, volume, editora, local ou data: se faltar um elemento essencial, escreva a referência com o que você sabe com segurança, ponha [ano] no lugar do ano que não souber e liste o que conferir em "Pontos a conferir".
 LISTA: uma referência por linha, alinhada à esquerda, sem marcadores nem números, em ordem alfabética pelo primeiro elemento (SOBRENOME do primeiro autor ou ENTIDADE); sem texto antes ou depois da lista.`;
 }
 
@@ -59,7 +62,7 @@ export function sortReferencesAbnt(references) {
 
 // Conferência de forma: devolve o que falta para a referência parecer ABNT. Não verifica se a obra existe.
 // Entrada pelo título (obra sem autor): o título em negrito e a primeira palavra em maiúsculas.
-const TITLE_ENTRY = /^\*\*\[?(?:(?:O|A|OS|AS|UM|UMA)\s+)?[A-ZÁÉÍÓÚÂÊÔÃÕÇ0-9]{2,}/;
+const TITLE_ENTRY = /^\[?(?:(?:O|A|OS|AS|UM|UMA)\s+)?[A-ZÁÉÍÓÚÂÊÔÃÕÇ0-9]{2,}/;
 
 export function abntIssues(reference) {
   const item = typeof reference === "string" ? { citation: reference } : reference || {};
@@ -67,11 +70,11 @@ export function abntIssues(reference) {
   const plainText = strip(raw);
   const issues = [];
   if (!plainText) return issues;
-  if (!/^(?:[A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-ZÁÉÍÓÚÂÊÔÃÕÇ'’ -]+[,.]|[A-ZÁÉÍÓÚÂÊÔÃÕÇ]{2,}\b)/.test(plainText) && !TITLE_ENTRY.test(raw)) issues.push("deve começar por SOBRENOME, Nome (ou ENTIDADE em maiúsculas)");
+  if (!/^(?:[A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-ZÁÉÍÓÚÂÊÔÃÕÇ'’ -]+[,.]|[A-ZÁÉÍÓÚÂÊÔÃÕÇ]{2,}\b)/.test(plainText) && !TITLE_ENTRY.test(plainText)) issues.push("deve começar por SOBRENOME, Nome (ou ENTIDADE em maiúsculas)");
   if (/\[t[ií]tulo\]/i.test(plainText)) issues.push("falta o título: troque [título] pelo título da obra");
   if (/\[ano\]/.test(plainText)) issues.push("falta o ano: troque [ano] pelo ano de publicação");
-  else if (!/\b(1[5-9]\d{2}|20\d{2})\b|\bs\.\s?d\./.test(plainText)) issues.push("falta o ano");
-  if (!/\*\*[^*]+\*\*/.test(raw)) issues.push("falta o destaque (negrito) no título");
+  else if (!/\b(1[5-9]\d{2}|20\d{2})\b/.test(plainText)) issues.push("falta o ano");
+  if (!/\*\*[^*]+\*\*/.test(raw) && leadInfo(plainText)) issues.push("falta o destaque (negrito) no título");
   if (/\*\*[^*:]+:\s+[^*]+\*\*/.test(raw)) issues.push("o negrito vai só no título principal, não no subtítulo");
   else if (/\*\*/.test(raw) && !boldIsSound(raw)) issues.push("o negrito vai só no título, não na referência inteira nem no autor ou na editora");
   const leading = plainText.split(/;\s+/);
@@ -83,8 +86,8 @@ export function abntIssues(reference) {
   if (/(?:^|[.:*]\s+)1\s*[ªº.]?\s*ed\b/i.test(plainText)) issues.push("1ª edição não se indica");
   if (/(?:^|[.:*]\s+)(?:[2-9]|\d{2})\s*[ªº]\s*ed|(?:^|[.:*]\s+)(?:[2-9]|\d{2})\s+ed\b/i.test(plainText)) issues.push('edição se escreve "2. ed."');
   const hasUrl = /https?:\/\//i.test(plainText) || /^https?:\/\//i.test(String(item.href || ""));
-  if (hasUrl && !/Dispon[ií]vel em:/i.test(plainText)) issues.push('fonte online sem "Disponível em: <URL>."');
-  if (/Dispon[ií]vel em:\s*https?:/i.test(plainText)) issues.push("a URL vai entre < >");
+  if (hasUrl && !/Dispon[ií]vel em:/i.test(plainText)) issues.push('fonte online sem "Disponível em: URL."');
+  if (/Dispon[ií]vel em:\s*(?:<|&lt;)|(?:<|&lt;)https?:/i.test(raw)) issues.push("na NBR 6023:2025 o endereço vem sem os sinais < >");
   if (/\[dia mês ano\]/.test(plainText)) issues.push("falta a data de acesso: troque [dia mês ano] pela data em que você abriu o link");
   else if (/Dispon[ií]vel em:/i.test(plainText) && !/Acesso em:/i.test(plainText)) issues.push('falta "Acesso em: data."');
   const access = plainText.match(/Acesso em:\s*(\d{1,2})\s+([\p{L}]+\.?)\s+(\d{4})/u);
@@ -168,14 +171,15 @@ function digital(entry, today) {
   const doi = clean(entry.doi).replace(/^doi:\s*/i, "");
   if (!url && doi) url = /^https?:/i.test(doi) ? doi : `https://doi.org/${doi}`;
   url = url.replace(/^<|>$/g, "").replace(/\.$/, "");
-  return url ? `Disponível em: <${url}>. Acesso em: ${accessDate(entry.acesso, today)}.` : "";
+  return url ? `Disponível em: ${url}. Acesso em: ${accessDate(entry.acesso, today)}.` : "";
 }
 
 function placeAndYear(entry) {
-  const local = clean(entry.local) || "[S. l.]";
-  const editora = clean(entry.editora) || "[s. n.]";
-  const ano = clean(entry.ano) || "[s. d.]";
-  return `${local}: ${editora}, ${ano}.`;
+  const local = clean(entry.local);
+  const editora = clean(entry.editora);
+  const ano = clean(entry.ano) || "[ano]";
+  if (!local && !editora) return `[S. l.: s. n.], ${ano}.`;
+  return `${local || "[S. l.]"}: ${editora || "[s. n.]"}, ${ano}.`;
 }
 
 function guessType(entry) {
@@ -206,10 +210,10 @@ export function formatAbnt(entry = {}, { today } = {}) {
   } else if (type === "artigo") {
     const issue = [clean(entry.local), clean(entry.volume) && `v. ${clean(entry.volume)}`, clean(entry.numero) && `n. ${clean(entry.numero)}`, pages(entry.paginas) && `p. ${pages(entry.paginas)}`].filter(Boolean);
     const month = abntMonth(entry.mes);
-    const when = [month, clean(entry.ano)].filter(Boolean).join(" ") || "[s. d.]";
+    const when = [month, clean(entry.ano)].filter(Boolean).join(" ") || "[ano]";
     out = `${lead(authors)}${withPeriod(clean(entry.titulo))} **${clean(entry.revista)}**, ${issue.concat(when).join(", ")}.`;
   } else if (type === "site") {
-    out = `${lead(authors)}${withPeriod(titleBlock(entry))} ${clean(entry.ano) ? `${withPeriod(clean(entry.ano))} ` : ""}`;
+    out = `${lead(authors)}${withPeriod(titleBlock(entry))} ${placeAndYear(entry)}`;
   } else {
     const ed = edition(entry.edicao);
     out = `${lead(authors)}${withPeriod(titleBlock(entry))} ${ed ? `${ed} ` : ""}${placeAndYear(entry)}`;
@@ -291,7 +295,12 @@ function inferBold(text) {
   const journal = segs.findIndex((seg, i) => i >= 1 && (/^[^,*]+,.*(?:^|[\s,])(?:v|n|p)\.\s*\d/.test(seg.t) || /^[^,*]+,\s*\d{1,2}\s+\p{L}{3,9}\.?\s+(?:19|20)\d{2}$/u.test(seg.t)));
   if (journal >= 1) { const s0 = offset + segs[journal].s; return boldSpan(text, s0, s0 + segs[journal].t.indexOf(",")); }
   const law = LAW.exec(at(0));
-  if (law) { const s0 = offset + segs[0].s; return `${text.slice(0, s0)}**${law[1]}**${text.slice(s0 + law[1].length)}`; }
+  if (law) {
+    const dated = /^,\s+de\s+\d{1,2}(?:º|°)?\s+de\s+\p{L}+\s+de\s+\d{4}/u.exec(at(0).slice(law[1].length));
+    const span = law[1] + (dated ? dated[0] : "");
+    const s0 = offset + segs[0].s;
+    return `${text.slice(0, s0)}**${span}**${text.slice(s0 + span.length)}`;
+  }
   if (PLACE.test(at(1)) || (segs.length === 2 && PLACE_NO_YEAR.test(at(1)))) return bold(0);
   if (SUB_ENTITY.test(at(0)) && (PLACE.test(at(2)) || PLACE_YEAR.test(at(2)))) return bold(1);
   if (PLACE_YEAR.test(at(1))) return bold(0);
@@ -299,9 +308,18 @@ function inferBold(text) {
   if (segs.length === 1 && !/Dispon/i.test(at(0))) {
     const only = at(0);
     const lastComma = /^(.+),\s*(?:19|20)\d{2}$/u.exec(only);
-    if (lastComma) return boldSpan(text, offset + segs[0].s, offset + segs[0].s + lastComma[1].length);
+    if (lastComma) {
+      // Modelo T4 (site, matéria): "AUTOR. **Título**. Ano." (ponto, não vírgula, antes do ano)
+      const year = /((?:19|20)\d{2})$/.exec(only)[1];
+      const next = `${text.slice(0, offset + segs[0].s)}${lastComma[1]}. ${year}${text.slice(offset + segs[0].e)}`;
+      return boldSpan(next, offset + segs[0].s, offset + segs[0].s + lastComma[1].length);
+    }
     const dated = /^([^,]+),\s.*(?:19|20)\d{2}$/u.exec(only);
-    if (dated) return boldSpan(text, offset + segs[0].s, offset + segs[0].s + dated[1].length);
+    if (dated) {
+      const s0 = offset + segs[0].s;
+      const next = `${text.slice(0, s0)}${dated[1]}.${text.slice(s0 + dated[1].length + 1)}`;
+      return boldSpan(next, s0, s0 + dated[1].length);
+    }
     if (!/,/.test(only) && only.split(/\s+/).length >= 2) return bold(0);
   }
   return text;
@@ -376,11 +394,7 @@ function boldIsSound(text) {
   if (/(?<!(?:^|\s)\p{Lu})\.\s+\p{Lu}/u.test(inner) || /\.\s*$/.test(inner)) return false;
   const before = text.slice(0, m.index).trim();
   const tail = text.slice(m.index + m[0].length);
-  if (!before) {
-    // Entrada pelo título: primeira palavra em maiúsculas e o resto em minúsculas ("GESTÃO educacional"); "GOOGLE Cloud" ou "IBM" é autor.
-    const more = tail.replace(/^[.,\s]*(?:\[ano\]|(?:19|20)\d{2})?[.,\s]*/, "");
-    return TITLE_ENTRY.test(`**${inner}`) && !inner.includes(",") && (/\s\p{Ll}{2,}/u.test(inner) || more === "" || /^Dispon/i.test(more));
-  }
+  if (!before) return false; // obra sem autor: a primeira palavra em maiúsculas já é o destaque, sem negrito
   if (segments(before).length <= 1) return true; // logo depois do autor: é o título (com subtítulo, se houver)
   const rest = tail.split(/\.\s/)[0];
   return !PLACE.test(`${inner}${rest}`);
@@ -418,18 +432,18 @@ function fixTitleYear(text) {
   if (segs.length !== 1) return text;
   const m = /^(.+?[^\s,])\s+((?:19|20)\d{2})\.?$/u.exec(segs[0].t);
   if (!m || m[1].split(/\s+/).length < 2 || /Dispon|Acesso/.test(m[1]) || /(?:jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\.?$/i.test(m[1])) return text;
-  return `${text.slice(0, lead.end)} ${m[1]}, ${m[2]}.`;
+  return `${text.slice(0, lead.end)} ${m[1]}. ${m[2]}.`;
 }
 
 // O que a norma exige e não dá para saber (ano, data de acesso) aparece na própria referência, no lugar certo, entre colchetes.
 function addMissing(text) {
-  if (!/\*\*[^*]+\*\*/.test(text)) return text;
+  if (!text.trim() || (!/\*\*[^*]+\*\*/.test(text) && leadInfo(text))) return text;
   const online = /\s(?=Dispon[ií]vel em:)/.exec(text);
   const head = online ? text.slice(0, online.index) : text;
   const tail = online ? text.slice(online.index) : "";
   const scan = text.replace(/https?:\/\/\S+/g, "").replace(/Acesso em:.*$/, "");
   let out = text;
-  if (!/\b(?:1[5-9]\d{2}|20\d{2})\b|\[s\. ?d\.\]|\[ano\]|\bs\. ?d\./.test(scan)) out = `${head.replace(/[\s.]+$/, "")}, [ano].${tail}`;
+  if (!/\b(?:1[5-9]\d{2}|20\d{2})\b|\[s\. ?d\.\]|\[ano\]|\bs\. ?d\./.test(scan)) { const h = head.replace(/[\s.]+$/, ""); out = `${h}${/\*\*$/.test(h) || !leadInfo(text) ? "." : ","} [ano].${tail}`; }
   if (/Dispon[ií]vel em:/.test(out) && !/Acesso em:/.test(out)) out = `${out.replace(/\s+$/, "")} Acesso em: [dia mês ano].`;
   return out;
 }
@@ -444,11 +458,11 @@ function forceBold(text) {
   const rest = text.slice(base);
   const offset = base + (rest.length - rest.trimStart().length);
   const segs = segments(text.slice(offset));
-  const usable = segs.map((seg, i) => ({ seg, i })).filter(({ seg }) => seg.t.trim() && !/^(?:\d{4}$|Dispon|Acesso|https?:)/i.test(seg.t.trim()));
+  const usable = segs.map((seg, i) => ({ seg, i })).filter(({ seg }) => seg.t.trim() && !/^(?:\d{4}$|\[ano\]|Dispon|Acesso|https?:)/i.test(seg.t.trim()));
   if (!usable.length) {
     // Sem título à vista: o lugar dele fica marcado, em negrito como o título deve ser.
     if (lead) { const tailText = text.slice(lead.end).trim().replace(/\.$/, ""); return `${text.slice(0, lead.end)} **[título]**${tailText ? `, ${tailText}` : ""}.`; }
-    if (/Dispon[ií]vel em:|https?:\/\//i.test(text)) return `**[TÍTULO]**. ${text.trim()}`;
+    if (/Dispon[ií]vel em:|https?:\/\//i.test(text)) return `[TÍTULO]. ${text.trim()}`;
     return text;
   }
   let pick = usable[0];
@@ -460,10 +474,10 @@ function forceBold(text) {
   const words = title.split(/\s+/);
   const n = ARTICLE.test(words[0]) && words.length > 1 ? 2 : 1;
   const upper = [...words.slice(0, n).map((w) => w.toLocaleUpperCase("pt-BR")), ...words.slice(n)].join(" ");
-  return boldSpan(`${text.slice(0, s)}${upper}${text.slice(e)}`, s, s + upper.length);
+  return `${text.slice(0, s)}${upper}${text.slice(e)}`; // entrada pelo título: maiúsculas, sem negrito (NBR 6023:2025)
 }
 
-// Obra sem autor: "Título. Local: Editora, ano." vira "**TÍTULO** ..." (entrada pelo título). Só quando a estrutura é clara.
+// Obra sem autor: "Título. Local: Editora, ano." vira "TÍTULO. ..." (entrada pelo título: primeira palavra em maiúsculas, sem negrito, NBR 6023:2025, 6.7).
 const ARTICLE = /^(?:o|a|os|as|um|uma)$/i;
 function fixTitleEntry(text) {
   if (/\*\*/.test(text) || leadInfo(text)) return text;
@@ -475,20 +489,19 @@ function fixTitleEntry(text) {
   const n = ARTICLE.test(words[0]) && words.length > 1 ? 2 : 1;
   const head = words.slice(0, n).map((w) => w.toLocaleUpperCase("pt-BR")).join(" ");
   const full = [head, ...words.slice(n)].join(" ");
-  const colon = full.search(/:\s/);
-  const bold = colon > 0 ? `**${full.slice(0, colon)}**${full.slice(colon)}` : `**${full}**`;
-  return `${text.slice(0, segs[0].s)}${bold}${text.slice(segs[0].e).replace(/^\s*/, "")[0] === "." ? "" : "."}${text.slice(segs[0].e)}`.replace(/\.\.+/g, ".");
+  return `${text.slice(0, segs[0].s)}${full}${text.slice(segs[0].e)}`;
 }
 
 export function normalizeAbntCitation(value) {
   let text = clean(value);
   if (!text) return "";
+  text = text.replace(/<(https?:\/\/[^\s<>]+)>/g, "$1").replace(/\[s\. ?d\.\]/gi, "[ano]");
   text = tidyPunctuation(text);
   if (!boldIsSound(text)) text = text.replace(/\*\*/g, "");
   text = fixCase(text);
   text = fixAuthorDate(text);
   // "Local: Editora. 2000" -> "Local: Editora, 2000." (ponto no lugar da vírgula antes do ano; ponto final)
-  text = text.replace(/(?<!(?:Acesso em|Disponível em|Dispon.vel em))(:\s+[^,.:*;]{1,60})\.\s+((?:19|20)\d{2})(?=\.?$)/u, "$1, $2").replace(/(\d{4})$/, "$1.");
+  text = text.replace(/(?<!(?:Acesso em|Disponível em|Dispon.vel em|\*\*))(:\s+[^,.:*;]{1,60})\.\s+((?:19|20)\d{2})(?=\.?$)/u, "$1, $2").replace(/(\d{4})$/, "$1.");
   text = text.replace(/^(https?:\/\/\S+?)\.?$/, "Disponível em: $1");
   text = fixQuotesAndDates(text);
   text = fixEntityLead(text);
@@ -501,10 +514,13 @@ export function normalizeAbntCitation(value) {
   text = text.replace(/\((?:orgs?|ORGS?|Orgs?|organizador(?:es)?)\.?\)/g, "(Org.)");
   text = text.replace(/(^|[.:*]\s+)(\d{1,2})\s*[ªº.]?\s*ed(?:i[çc][ãa]o)?\.?(?=\s)/gi, "$1$2. ed.");
   text = text.replace(/(^|[.:*]\s+)1\. ed\.\s+/g, "$1");
-  text = text.replace(/Dispon[ií]vel em:\s*(https?:\/\/[^\s<>]+?)\.?(?=\s|$)/gi, (all, url) => `Disponível em: <${url}>.`);
+  text = text.replace(/Dispon[ií]vel em:\s*<?(https?:\/\/[^\s<>]+?)>?\.?(?=\s|$)/gi, (all, url) => `Disponível em: ${url}.`);
   text = text.replace(/(Acesso em:\s*)0?(\d{1,2})\s*(?:de\s+)?([\p{L}]+)\.?\s*(?:de\s+)?(\d{4})/giu, (all, lead, day, month, year) => (abntMonth(month) ? `${lead}${day} ${abntMonth(month)} ${year}` : all));
   if (/\b(?:v|n|p)\.\s*\d/.test(text)) text = text.replace(/,\s*([\p{L}]+)\.?\s+(\d{4})(\.?)$/u, (all, month, year, dot) => (abntMonth(month) ? `, ${abntMonth(month)} ${year}${dot || "."}` : all));
-  return addMissing(forceBold(inferBold(text)));
+  text = forceBold(inferBold(text));
+  // lei, decreto, portaria: o destaque cobre a denominação inteira, com a data ("Lei nº 14.533, de 11 de janeiro de 2023")
+  text = text.replace(/\*\*([^*]*\bn[ºo°.]\s*[\d.]+)\*\*(,\s+de\s+\d{1,2}(?:º|°)?\s+de\s+\p{L}+\s+de\s+\d{4})/gu, "**$1$2**");
+  return addMissing(text);
 }
 
 // Itens do ClassAtelier são HTML (<strong> no título). Estas duas funções vão e voltam, sem perder o negrito.

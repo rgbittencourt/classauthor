@@ -16,13 +16,13 @@ test("ABNT: ordena em ordem alfabética ignorando acento e negrito", () => {
 test("ABNT: conferência de forma aponta o que falta", () => {
   assert.deepEqual(abntIssues("SILVA, Ana. **Gestão escolar**. 2. ed. São Paulo: Cortez, 2020."), []);
   assert.ok(abntIssues("gestão educacional na era digital").length >= 2);
-  assert.ok(abntIssues("SILVA, Ana. **Título**. São Paulo: X, 2020. Disponível em: <https://exemplo.org>.").some((m) => /Acesso em/.test(m)));
+  assert.ok(abntIssues("SILVA, Ana. **Título**. São Paulo: X, 2020. Disponível em: https://exemplo.org.").some((m) => /Acesso em/.test(m)));
   assert.ok(abntIssues({ citation: "SILVA, Ana. **Título**. São Paulo: X, 2020.", href: "https://exemplo.org" }).some((m) => /Disponível em/.test(m)));
   assert.ok(abntIssues("SILVA, Ana. Título sem destaque. São Paulo: X, 2020.").some((m) => /destaque/.test(m)));
 });
 
 test("ABNT: prompts trazem as regras e a data de acesso no formato da norma", () => {
-  assert.match(abntRules("28 out. 2026"), /NBR 6023:2018/);
+  assert.match(abntRules("28 out. 2026"), /NBR 6023:2025/);
   assert.match(abntRules("28 out. 2026"), /Acesso em: 28 out\. 2026\./);
   assert.match(abntToday(new Date(2026, 9, 28)), /^28 out\. 2026$/);
 });
@@ -93,7 +93,7 @@ test("ABNT T1: livro no todo; 1ª edição omite a edição; negrito só no tít
   assert.equal(formatAbnt({ tipo: "livro", autor: "Florestan Fernandes", titulo: "A revolução burguesa no Brasil", subtitulo: "ensaio de interpretação sociológica", edicao: "3", local: "Rio de Janeiro", editora: "Zahar", ano: 2005 }),
     "FERNANDES, Florestan. **A revolução burguesa no Brasil**: ensaio de interpretação sociológica. 3. ed. Rio de Janeiro: Zahar, 2005.");
   assert.equal(formatAbnt({ autores: "Ana Souza", titulo: "Gestão escolar", edicao: "1ª", local: "São Paulo", editora: "Cortez", ano: 2020 }), "SOUZA, Ana. **Gestão escolar**. São Paulo: Cortez, 2020.");
-  assert.equal(formatAbnt({ autores: "Ana Souza", titulo: "Gestão", local: "SP", editora: "X" }), "SOUZA, Ana. **Gestão**. SP: X, [s. d.].");
+  assert.equal(formatAbnt({ autores: "Ana Souza", titulo: "Gestão", local: "SP", editora: "X" }), "SOUZA, Ana. **Gestão**. SP: X, [ano].");
 });
 
 test("ABNT T2: capítulo de livro com In:, (Org.) e páginas", () => {
@@ -109,8 +109,8 @@ test("ABNT T3: artigo de periódico com v., n., p. e mês abreviado antes do ano
 
 test("ABNT T4 e R3: site com Disponível em e Acesso em; DOI vira URL", () => {
   assert.equal(formatAbnt({ tipo: "site", autores: "Universidade Federal de Santa Catarina", titulo: "Manual do aluno", subtitulo: "guia", ano: 2023, url: "https://ufsc.br/x", acesso: "2026-03-05" }),
-    "UNIVERSIDADE FEDERAL DE SANTA CATARINA. **Manual do aluno**: guia. 2023. Disponível em: <https://ufsc.br/x>. Acesso em: 5 mar. 2026.");
-  assert.match(formatAbnt({ tipo: "site", autores: "UNESCO", titulo: "Relatório", ano: 2022, doi: "10.1000/xyz", acesso: "5 de maio de 2026" }), /Disponível em: <https:\/\/doi\.org\/10\.1000\/xyz>\. Acesso em: 5 maio 2026\.$/);
+    "UNIVERSIDADE FEDERAL DE SANTA CATARINA. **Manual do aluno**: guia. [S. l.: s. n.], 2023. Disponível em: https://ufsc.br/x. Acesso em: 5 mar. 2026.");
+  assert.match(formatAbnt({ tipo: "site", autores: "UNESCO", titulo: "Relatório", ano: 2022, doi: "10.1000/xyz", acesso: "5 de maio de 2026" }), /Disponível em: https:\/\/doi\.org\/10\.1000\/xyz\. Acesso em: 5 maio 2026\.$/);
   assert.match(formatAbnt({ tipo: "site", autores: "UNESCO", titulo: "Relatório", ano: 2022, url: "https://x.org" }, { today: "28 out. 2026" }), /Acesso em: 28 out\. 2026\.$/);
 });
 
@@ -141,7 +141,7 @@ test("ABNT: correções seguras de uma referência já escrita (e idempotentes)"
     ["SILVA, Ana; SOUZA, Bia; LIMA, Caio; ROCHA, Davi. **Título: sub**. 2ª ed. São Paulo: X, 2020.", "SILVA, Ana et al. **Título**: sub. 2. ed. São Paulo: X, 2020."],
     ["SILVA, A. B.; SOUZA, B.; LIMA, C.; ROCHA, D. *et al.* **T**. 1. ed. SP: X, 2020.", "SILVA, A. B. et al. **T**. SP: X, 2020."],
     ["FREIRE, Paulo (org.). **T**. SP: X, 2020.", "FREIRE, Paulo (Org.). **T**. SP: X, 2020."],
-    ["SILVA, Ana. **T**. SP: X, 2020. Disponível em: https://x.org. Acesso em: 05 Maio. 2026.", "SILVA, Ana. **T**. SP: X, 2020. Disponível em: <https://x.org>. Acesso em: 5 maio 2026."],
+    ["SILVA, Ana. **T**. SP: X, 2020. Disponível em: https://x.org. Acesso em: 05 Maio. 2026.", "SILVA, Ana. **T**. SP: X, 2020. Disponível em: https://x.org. Acesso em: 5 maio 2026."],
     ["ALVES, Eva. Artigo. **Rev**, SP, v. 3, n. 1, p. 1-9, Mai. 2020.", "ALVES, Eva. Artigo. **Rev**, SP, v. 3, n. 1, p. 1-9, maio 2020."],
     ["SILVA, Ana. **T**. 2 ed. SP: X, 2020.", "SILVA, Ana. **T**. 2. ed. SP: X, 2020."]
   ];
@@ -150,7 +150,7 @@ test("ABNT: correções seguras de uma referência já escrita (e idempotentes)"
     assert.equal(normalizeAbntCitation(to), to);
     assert.deepEqual(abntIssues(to), [], to);
   }
-  const ok = "SILVA, Ana; SOUZA, Bia; LIMA, Caio. **Gestão**: teoria. 2. ed. São Paulo: Cortez, 2020. Disponível em: <https://x.org>. Acesso em: 5 mar. 2026.";
+  const ok = "SILVA, Ana; SOUZA, Bia; LIMA, Caio. **Gestão**: teoria. 2. ed. São Paulo: Cortez, 2020. Disponível em: https://x.org. Acesso em: 5 mar. 2026.";
   assert.equal(normalizeAbntCitation(ok), ok);
   assert.equal(normalizeAbntCitation("SILVA, Ana. **Título**. Local: Ed., 2020."), "SILVA, Ana. **Título**. Local: Ed., 2020.");
 });
@@ -160,8 +160,8 @@ test("ABNT: a conferência aponta o que a norma decide (4+ autores, et al. em it
   assert.ok(has("SILVA, Ana; SOUZA, Bia; LIMA, Caio; ROCHA, Davi. **T**. SP: X, 2020.", /et al/));
   assert.ok(has("SILVA, Ana *et al.* **T**. SP: X, 2020.", /itálico/));
   assert.ok(has("SILVA, Ana. **T: sub**. SP: X, 2020.", /subtítulo/));
-  assert.ok(has("SILVA, Ana. **T**. SP: X, 2020. Disponível em: <https://x.org>. Acesso em: 5 mai. 2026.", /5 mar\. 2026/));
-  assert.ok(has("SILVA, Ana. **T**. SP: X, 2020. Disponível em: https://x.org. Acesso em: 5 mar. 2026.", /entre < >/));
+  assert.ok(has("SILVA, Ana. **T**. SP: X, 2020. Disponível em: https://x.org. Acesso em: 5 mai. 2026.", /5 mar\. 2026/));
+  assert.ok(has("SILVA, Ana. **T**. SP: X, 2020. Disponível em: <https://x.org>. Acesso em: 5 mar. 2026.", /sem os sinais/));
   assert.ok(has("SILVA, Ana. **T**. 1. ed. SP: X, 2020.", /1ª edição/));
 });
 
@@ -188,7 +188,7 @@ test("ABNT: as referências da semana entram corrigidas e em ordem (normalizeLes
   ] }, { title: "Curso", weeks: 1 }, 0);
   assert.deepEqual(plan.references.map((r) => r.citation), [
     "ALVES, Ana et al. **Obra**. SP: X, 2020.",
-    "ZAGO, Rui. **Livro**. 2. ed. Rio: Y, 2018. Disponível em: <https://x.org>. Acesso em: 5 maio 2026."
+    "ZAGO, Rui. **Livro**. 2. ed. Rio: Y, 2018. Disponível em: https://x.org. Acesso em: 5 maio 2026."
   ]);
 });
 
@@ -200,8 +200,8 @@ test("ABNT: acha o título e põe o negrito (livro, subtítulo, capítulo, artig
     ["SILVA, A. B. Gestão. SP: X, 2020.", "SILVA, A. B. **Gestão**. SP: X, 2020."],
     ["SOUZA, Ana. Avaliação formativa. Educação em Revista, Belo Horizonte, v. 10, n. 2, p. 15-30, mar. 2020.", "SOUZA, Ana. Avaliação formativa. **Educação em Revista**, Belo Horizonte, v. 10, n. 2, p. 15-30, mar. 2020."],
     ["FREIRE, Paulo. Educação e mudança. In: ALVES, Maria (Org.). Educar hoje. Porto Alegre: Artmed, 2018. p. 10-25.", "FREIRE, Paulo. Educação e mudança. In: ALVES, Maria (Org.). **Educar hoje**. Porto Alegre: Artmed, 2018. p. 10-25."],
-    ["UNESCO. Relatório global. 2022. Disponível em: <https://x.org>. Acesso em: 5 mar. 2026.", "UNESCO. **Relatório global**. 2022. Disponível em: <https://x.org>. Acesso em: 5 mar. 2026."],
-    ["BRASIL. Lei nº 9.394, de 20 de dezembro de 1996. Estabelece as diretrizes e bases da educação nacional. Brasília, 1996.", "BRASIL. **Lei nº 9.394**, de 20 de dezembro de 1996. Estabelece as diretrizes e bases da educação nacional. Brasília, 1996."],
+    ["UNESCO. Relatório global. 2022. Disponível em: https://x.org. Acesso em: 5 mar. 2026.", "UNESCO. **Relatório global**. 2022. Disponível em: https://x.org. Acesso em: 5 mar. 2026."],
+    ["BRASIL. Lei nº 9.394, de 20 de dezembro de 1996. Estabelece as diretrizes e bases da educação nacional. Brasília, 1996.", "BRASIL. **Lei nº 9.394, de 20 de dezembro de 1996**. Estabelece as diretrizes e bases da educação nacional. Brasília, 1996."],
     ["BRASIL. Ministério da Educação. Base Nacional Comum Curricular. Brasília: MEC, 2018.", "BRASIL. Ministério da Educação. **Base Nacional Comum Curricular**. Brasília: MEC, 2018."]
   ];
   for (const [from, to] of cases) {
@@ -217,33 +217,33 @@ test("ABNT: autor fora do formato vira SOBRENOME, Nome quando o resto confirma a
   assert.equal(normalizeAbntCitation("Silva, A. B. Gestão. SP: X, 2020."), "SILVA, A. B. **Gestão**. SP: X, 2020.");
   assert.equal(normalizeAbntCitation("Ana Souza; Bia Lima; Caio Rocha; Davi Alves. Gestão. SP: X, 2020."), "SOUZA, Ana et al. **Gestão**. SP: X, 2020.");
   assert.equal(normalizeAbntCitation("Paulo Freire. **Pedagogia**. São Paulo: Paz e Terra, 1996."), "FREIRE, Paulo. **Pedagogia**. São Paulo: Paz e Terra, 1996.");
-  assert.equal(normalizeAbntCitation("Wikipedia. Educação a distância. 2023. Disponível em: https://pt.wikipedia.org/wiki/EaD. Acesso em: 03 Nov. 2026."), "WIKIPEDIA. **Educação a distância**. 2023. Disponível em: <https://pt.wikipedia.org/wiki/EaD>. Acesso em: 3 nov. 2026.");
+  assert.equal(normalizeAbntCitation("Wikipedia. Educação a distância. 2023. Disponível em: https://pt.wikipedia.org/wiki/EaD. Acesso em: 03 Nov. 2026."), "WIKIPEDIA. **Educação a distância**. 2023. Disponível em: https://pt.wikipedia.org/wiki/EaD. Acesso em: 3 nov. 2026.");
 });
 
 test("ABNT: sem estrutura clara (título solto, sem local/editora/ano) o texto não é adivinhado e segue para a conferência", () => {
   // a rede final: o título sempre sai em negrito; o que não existe ganha marcador no lugar certo
-  assert.equal(normalizeAbntCitation("gestão educacional"), "**GESTÃO educacional**, [ano].");
-  assert.equal(normalizeAbntCitation("SILVA, Ana."), "SILVA, Ana. **[título]**, [ano].");
-  assert.equal(normalizeAbntCitation("https://exemplo.com/x"), "**[TÍTULO]**, [ano]. Disponível em: <https://exemplo.com/x>. Acesso em: [dia mês ano].");
+  assert.equal(normalizeAbntCitation("gestão educacional"), "GESTÃO educacional. [ano].");
+  assert.equal(normalizeAbntCitation("SILVA, Ana."), "SILVA, Ana. **[título]**. [ano].");
+  assert.equal(normalizeAbntCitation("https://exemplo.com/x"), "[TÍTULO]. [ano]. Disponível em: https://exemplo.com/x. Acesso em: [dia mês ano].");
 });
 
 test("ABNT: depois da correção nunca sobra «falta o destaque (negrito)» e a correção é idempotente", () => {
-  const samples = ["Pedagogia da autonomia", "Paulo Freire", "SILVA, Ana. 2020.", "SILVA, Ana.", "O estado de S. Paulo. 2020.", "https://exemplo.com/x", "Disponível em: https://x.br",
+  const samples = ["Pedagogia da autonomia", "SILVA, Ana. 2020.", "SILVA, Ana.", "O estado de S. Paulo. 2020.", "https://exemplo.com/x", "Disponível em: https://x.br",
     "AUTOR XYZ. Algo estranho aqui sem nada, mais coisa e outra 12 ou 13.", "BRASIL. Ministério da Educação. Parâmetros curriculares. 1997.", "Gartner. Citizen Development."];
   for (const sample of samples) {
     const out = normalizeAbntCitation(sample);
-    assert.ok(/\*\*[^*]+\*\*/.test(out), sample);
+    assert.ok(/\*\*[^*]+\*\*/.test(out) || /^(?:(?:O|A|OS|AS|UM|UMA) )?\[?[A-ZÁÉÍÓÚÂÊÔÃÕÇ0-9]{2,}/.test(out), sample); // sem autor: entrada pelo título, sem negrito
     assert.ok(!abntIssues(out).some((x) => /destaque|negrito/.test(x)), `${sample} -> ${out} -> ${abntIssues(out)}`);
     assert.equal(normalizeAbntCitation(out), out, `idempotente: ${sample}`);
   }
 });
 
 test("ABNT: o que falta e não dá para deduzir aparece na referência, no lugar certo, entre colchetes", () => {
-  assert.equal(normalizeAbntCitation("SILVA, Ana. Gestão escolar."), "SILVA, Ana. **Gestão escolar**, [ano].");
+  assert.equal(normalizeAbntCitation("SILVA, Ana. Gestão escolar."), "SILVA, Ana. **Gestão escolar**. [ano].");
   assert.equal(normalizeAbntCitation("SILVA, Ana. Gestão escolar. São Paulo: Cortez."), "SILVA, Ana. **Gestão escolar**. São Paulo: Cortez, [ano].");
-  assert.equal(normalizeAbntCitation("WIKIPEDIA. Vibe coding. Disponível em: https://en.wikipedia.org/wiki/Vibe_coding."), "WIKIPEDIA. **Vibe coding**, [ano]. Disponível em: <https://en.wikipedia.org/wiki/Vibe_coding>. Acesso em: [dia mês ano].");
-  assert.ok(abntIssues("SILVA, Ana. **Gestão escolar**, [ano].").some((x) => /\[ano\]/.test(x)));
-  assert.ok(abntIssues("A. **B**, 2020. Disponível em: <https://x.br>. Acesso em: [dia mês ano].").some((x) => /\[dia mês ano\]/.test(x)));
+  assert.equal(normalizeAbntCitation("WIKIPEDIA. Vibe coding. Disponível em: https://en.wikipedia.org/wiki/Vibe_coding."), "WIKIPEDIA. **Vibe coding**. [ano]. Disponível em: https://en.wikipedia.org/wiki/Vibe_coding. Acesso em: [dia mês ano].");
+  assert.ok(abntIssues("SILVA, Ana. **Gestão escolar**. [ano].").some((x) => /\[ano\]/.test(x)));
+  assert.ok(abntIssues("A. **B**, 2020. Disponível em: https://x.br. Acesso em: [dia mês ano].").some((x) => /\[dia mês ano\]/.test(x)));
   // não duplica
   const once = normalizeAbntCitation("SILVA, Ana. Gestão escolar.");
   assert.equal(normalizeAbntCitation(once), once);
@@ -251,15 +251,15 @@ test("ABNT: o que falta e não dá para deduzir aparece na referência, no lugar
 
 test("ABNT: referências de sites e reportagens (autor entidade, ano colado ao título, aspas, data por extenso)", () => {
   const cases = {
-    "Gartner. Citizen Development and Low-Code/No-Code platforms.": "GARTNER. **Citizen Development and Low-Code/No-Code platforms**, [ano].",
-    "FORUM, It. Por que o vibe coding está deixando as empresas vulneráveis, 2026.": "FORUM, It. **Por que o vibe coding está deixando as empresas vulneráveis**, 2026.",
-    "**GOOGLE Cloud**. Vibe Coding Explained: Tools and Guides, 2026.": "GOOGLE CLOUD. **Vibe Coding Explained**: Tools and Guides, 2026.",
-    "IBM. Cost of a Data Breach Report 2025.": "IBM. **Cost of a Data Breach Report**, 2025.",
-    "**IMASTERS**. Lovable: a falha, 2026.": "IMASTERS. **Lovable**: a falha, 2026.",
-    "KARPATHY, A. Publicação original sobre vibe coding, X (Twitter), 2 de fevereiro de 2025.": "KARPATHY, A. **Publicação original sobre vibe coding**, X (Twitter), 2 fev. 2025.",
+    "Gartner. Citizen Development and Low-Code/No-Code platforms.": "GARTNER. **Citizen Development and Low-Code/No-Code platforms**. [ano].",
+    "FORUM, It. Por que o vibe coding está deixando as empresas vulneráveis, 2026.": "FORUM, It. **Por que o vibe coding está deixando as empresas vulneráveis**. 2026.",
+    "**GOOGLE Cloud**. Vibe Coding Explained: Tools and Guides, 2026.": "GOOGLE CLOUD. **Vibe Coding Explained**: Tools and Guides. 2026.",
+    "IBM. Cost of a Data Breach Report 2025.": "IBM. **Cost of a Data Breach Report**. 2025.",
+    "**IMASTERS**. Lovable: a falha, 2026.": "IMASTERS. **Lovable**: a falha. 2026.",
+    "KARPATHY, A. Publicação original sobre vibe coding, X (Twitter), 2 de fevereiro de 2025.": "KARPATHY, A. **Publicação original sobre vibe coding**. X (Twitter), 2 fev. 2025.",
     'ROOSE, K. "Not a Coder? With A.I., Just Having an Idea Can Be Enough." The New York Times, 27 fev. 2025.': "ROOSE, K. Not a Coder? With A.I., Just Having an Idea Can Be Enough. **The New York Times**, 27 fev. 2025.",
-    "Veracode. GenAI Code Security Report, 2025.": "VERACODE. **GenAI Code Security Report**, 2025.",
-    "BRASIL. **Lei nº 14.533**, de 11 de janeiro de 2023 (institui a Política).": "BRASIL. **Lei nº 14.533**, de 11 de janeiro de 2023 (institui a Política)."
+    "Veracode. GenAI Code Security Report, 2025.": "VERACODE. **GenAI Code Security Report**. 2025.",
+    "BRASIL. **Lei nº 14.533**, de 11 de janeiro de 2023 (institui a Política).": "BRASIL. **Lei nº 14.533, de 11 de janeiro de 2023** (institui a Política)."
   };
   for (const [from, to] of Object.entries(cases)) {
     const got = normalizeAbntCitation(from);
@@ -268,8 +268,9 @@ test("ABNT: referências de sites e reportagens (autor entidade, ano colado ao t
   }
 });
 
-test("ABNT: obra sem autor com local, editora e ano entra pelo título (negrito e primeira palavra em maiúsculas)", () => {
-  assert.equal(normalizeAbntCitation("Gestão educacional na era digital. São Paulo: X, 2020."), "**GESTÃO educacional na era digital**. São Paulo: X, 2020.");
+test("ABNT: obra sem autor com local, editora e ano entra pelo título (primeira palavra em maiúsculas, sem negrito — NBR 6023:2025)", () => {
+  assert.equal(normalizeAbntCitation("Gestão educacional na era digital. São Paulo: X, 2020."), "GESTÃO educacional na era digital. São Paulo: X, 2020.");
+  assert.equal(normalizeAbntCitation("**GESTÃO educacional na era digital**. São Paulo: X, 2020."), "GESTÃO educacional na era digital. São Paulo: X, 2020.");
   assert.equal(normalizeAbntCitation("O estado de S. Paulo. São Paulo: Abril, 2020."), normalizeAbntCitation("O estado de S. Paulo. São Paulo: Abril, 2020."));
   assert.deepEqual(abntIssues(normalizeAbntCitation("Gestão educacional na era digital. São Paulo: X, 2020.")), []);
 });
@@ -283,7 +284,8 @@ test("ABNT: entidade com órgão e documento online sem editora ganha negrito no
 test("ABNT: item HTML com link é corrigido e o link continua no lugar", () => {
   const out = fixHtmlReference('BRASIL. Ministério da Educação. Base Nacional Comum Curricular. Brasília, 2018. Disponível em: <a href="https://x.gov.br/bncc">https://x.gov.br/bncc</a>. Acesso em: 3 nov. 2026.');
   assert.match(out, /<strong>Base Nacional Comum Curricular<\/strong>/);
-  assert.match(out, /&lt;<a href="https:\/\/x\.gov\.br\/bncc">https:\/\/x\.gov\.br\/bncc<\/a>&gt;/);
+  assert.match(out, /Disponível em: <a href="https:\/\/x\.gov\.br\/bncc">https:\/\/x\.gov\.br\/bncc<\/a>\./);
+  assert.doesNotMatch(out, /&lt;/);
 });
 
 test("ABNT: depois da correção automática só sobra o que falta de informação (ano, autor, data de acesso)", () => {

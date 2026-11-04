@@ -8,6 +8,17 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.15.6 · 04/11/2026 · Referências conforme a ABNT NBR 6023:2025
+
+O motor de referências passou a seguir a **NBR 6023:2025** (3ª edição, de 21/05/2025), que substitui a de 2018:
+
+- O endereço vem **sem os sinais « < > »**: «Disponível em: https://…. Acesso em: 5 mar. 2026.». Se vierem com os sinais, eles são retirados.
+- **Obra sem autor** entra pelo título, com a primeira palavra em maiúsculas e **sem negrito**.
+- **Lei, decreto e portaria**: o negrito cobre a denominação inteira, com a data («**Lei nº 14.533, de 11 de janeiro de 2023**»).
+- **Matéria de portal ou de jornal**: o negrito vai no nome do portal ou do jornal («Not a Coder?… **The New York Times**, 27 fev. 2025.»); publicação em rede social segue «**Título**. X (Twitter), 2 fev. 2025.».
+- Acabou o «[s. d.]»: sem ano aparece «[ano]»; sem local e editora, «[S. l.: s. n.], ano.»; sem só um deles, «[S. l.]: Editora» ou «Local: [s. n.]».
+- O prompt de IA (`abntRules`) traz as mesmas regras.
+
 ## 1.15.5 · 04/11/2026 · Referências: título sempre em negrito
 
 - O **título sai sempre em negrito**: a mensagem «falta o destaque (negrito) no título» deixou de existir. Com autor, o título é o trecho logo depois dele; sem autor, a obra entra pelo título (negrito e primeira palavra em maiúsculas).
