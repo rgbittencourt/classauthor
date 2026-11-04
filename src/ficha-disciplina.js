@@ -5,7 +5,6 @@
 // A ficha nasce do que o ClassAuthor já planejou (título, carga, objetivos, temas, atividades, práticas,
 // referências) e fica editável: o app não inventa o que não tem (curso, ementa oficial, pesos e e-mails
 // ficam para o professor conferir). Referências só entram marcadas quando foram conferidas.
-import { normalizeAbntCitation, sortReferencesAbnt } from "./abnt.js";
 
 const text = (value) => String(value ?? "").trim();
 const lines = (value) => (Array.isArray(value) ? value : text(value).split(/\r?\n+/)).map((item) => text(item).replace(/^[-•*\d.)\s]+(?=\S)/, "")).filter(Boolean);
@@ -80,7 +79,7 @@ export function fichaDefaults({ input = {}, weeks = [], generalPlan = null, auth
   const seen = new Set();
   const references = [];
   const addReference = (item, origin) => {
-    const citation = normalizeAbntCitation(text(item.citation));
+    const citation = text(item.citation); // nada é corrigido sozinho: o botão «Organizar lista» da ficha corrige e ordena
     const key = citation.replace(/\*\*/g, "").toLowerCase().replace(/\W+/g, " ").trim();
     if (!key || seen.has(key)) return;
     seen.add(key);
@@ -88,7 +87,7 @@ export function fichaDefaults({ input = {}, weeks = [], generalPlan = null, auth
   };
   lines(input.references).forEach((citation) => addReference({ citation, verified: true }, "briefing"));
   generated.forEach(({ lesson }) => (Array.isArray(lesson.lessonPlan.references) ? lesson.lessonPlan.references : []).forEach((reference) => addReference(typeof reference === "string" ? { citation: reference } : reference, "semana")));
-  const sortedReferences = sortReferencesAbnt(references);
+  const sortedReferences = references;
 
   return {
     preset: "ifsc",

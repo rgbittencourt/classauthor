@@ -1,5 +1,5 @@
 import { toStudentLesson, toGeneratorWeek } from "./student-export.js";
-import { normalizeAbntCitation, sortReferencesAbnt } from "./abnt.js";
+import { normalizeAbntCitation, sortReferencesAbnt, abntIssues } from "./abnt.js";
 import { parseSavedWeek, planPlacement } from "./week-import.js";
 import { alignmentSheets, bloomLabel, buildAlignmentMap } from "./alignment-map.js";
 import { createFichaDocx, fichaChecks, fichaDefaults, weightsTotal } from "./ficha-disciplina.js";
@@ -2163,7 +2163,7 @@ function renderFichaForm(ficha) {
       <div class="am-scroll"><table class="am-table ficha-table"><thead><tr><th>Instrumento</th><th>Critérios</th><th>Peso</th><th>Cronograma</th><th></th></tr></thead><tbody id="ficha-instruments">${instruments}</tbody></table></div>
       <p class="ficha-total" id="ficha-total"></p><button type="button" class="button button-secondary ficha-add" id="ficha-add-instrument">Adicionar instrumento</button>
       <p class="am-note">Os instrumentos vêm das atividades obrigatórias e dos questionários de cada semana. O app não sabe quais valem nota nem quanto: escolha os que entram, apague os outros e defina os pesos.</p></section>
-    <section class="ficha-section"><h3>Referências</h3><div id="ficha-references">${references || '<p class="am-note">Nenhuma referência encontrada no planejamento.</p>'}</div><button type="button" class="button button-secondary ficha-add" id="ficha-add-reference">Adicionar referência</button>
+    <section class="ficha-section"><h3>Referências</h3><div id="ficha-references">${references || '<p class="am-note">Nenhuma referência encontrada no planejamento.</p>'}</div><button type="button" class="button button-secondary ficha-add" id="ficha-add-reference">Adicionar referência</button> <button type="button" class="button button-secondary ficha-add" id="ficha-organize-references" title="Corrige cada referência pela ABNT NBR 6023:2025 e põe a lista em ordem alfabética">Organizar lista (corrigir e ordenar)</button><p class="am-note" id="ficha-references-note">Nada muda sozinho: a correção (ABNT NBR 6023:2025) e a ordem alfabética só acontecem quando você clica em «Organizar lista».</p>
       <p class="am-note">Entram marcadas as referências da sua lista e as que foram conferidas. As que a IA sugeriu e ninguém conferiu ficam desmarcadas: confirme que a obra existe antes de marcar. Use ** ** para o negrito do título.</p></section>
     <section class="ficha-section"><h3>Cabeçalho e rodapé</h3><label class="ficha-check"><input type="checkbox" data-f="header" ${ficha.header ? "checked" : ""} /> Logotipo do IFSC no cabeçalho</label>${field("footer", "Rodapé (uma linha por linha do rodapé)", ficha.footer, { rows: 2 })}</section>`;
   updateFichaChecks();
@@ -4197,9 +4197,7 @@ $("#ficha-docx-button")?.addEventListener("click", downloadFicha);
 $("#ficha-reset-button")?.addEventListener("click", () => { if (!window.confirm("Descartar o que você editou na ficha e montar de novo a partir do planejamento?")) return; state.ficha = fichaBase(); renderFichaForm(state.ficha); scheduleSave(); });
 $("#ficha-body")?.addEventListener("input", persistFicha);
 $("#ficha-body")?.addEventListener("change", (event) => {
-  // Referência editada na ficha: o que a ABNT decide sem dúvida (negrito no título, autor em SOBRENOME, Nome) é corrigido ao sair do campo.
-  const field = event.target.closest?.('textarea[data-r="citation"]');
-  if (field) { const fixed = normalizeAbntCitation(field.value.trim()); if (fixed && fixed !== field.value.trim()) field.value = fixed; }
+  // Referência editada na ficha: nada é corrigido sozinho; a correção e a ordenação só acontecem no botão «Organizar lista».
   persistFicha();
 });
 $("#ficha-body")?.addEventListener("click", (event) => {
@@ -4207,6 +4205,12 @@ $("#ficha-body")?.addEventListener("click", (event) => {
   if (!target) return;
   if (target.id === "ficha-add-prof") fichaMutate((ficha) => ficha.professors.push({ name: "", email: "" }));
   else if (target.id === "ficha-add-instrument") fichaMutate((ficha) => ficha.instruments.push({ name: "", criteria: "", weight: "", schedule: "" }));
+  else if (target.id === "ficha-organize-references") {
+    fichaMutate((ficha) => { ficha.references = sortReferencesAbnt(ficha.references.map((item) => ({ ...item, citation: normalizeAbntCitation(item.citation || "") }))); });
+    const pending = state.ficha.references.filter((item) => item.include !== false).map((item, index) => ({ index, issues: abntIssues(item.citation) })).filter((item) => item.issues.length);
+    const note = $("#ficha-references-note");
+    if (note) note.textContent = pending.length ? `Lista corrigida e em ordem. A conferir (${pending.length}): ${pending.map((item) => `nº ${item.index + 1}: ${item.issues.join("; ")}`).join(" · ")}` : "Lista corrigida e em ordem alfabética. Nada a conferir quanto à forma; confira se cada obra existe e se autor, ano e link estão certos.";
+  }
   else if (target.id === "ficha-add-reference") fichaMutate((ficha) => ficha.references.push({ citation: "Novo item", origin: "briefing", verified: true, include: true }));
   else if (target.dataset.remove) {
     const kind = target.dataset.remove;

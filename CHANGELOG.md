@@ -8,6 +8,11 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.15.7 · 04/11/2026 · Ficha da disciplina: só o botão corrige as referências
+
+- Na **Ficha da disciplina**, **nada muda sozinho**: as referências deixam de ser corrigidas ao sair do campo e de entrar já ordenadas. A correção (ABNT NBR 6023:2025) e a ordem alfabética só acontecem quando você clica no novo botão **«Organizar lista (corrigir e ordenar)»**, que também mostra, logo abaixo, o que ficou a conferir.
+- As referências que a IA escreve para as semanas continuam chegando já no padrão.
+
 ## 1.15.6 · 04/11/2026 · Referências conforme a ABNT NBR 6023:2025
 
 O motor de referências passou a seguir a **NBR 6023:2025** (3ª edição, de 21/05/2025), que substitui a de 2018:

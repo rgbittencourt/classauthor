@@ -1,6 +1,6 @@
 {
   "name": "classauthor",
-  "version": "1.15.6",
+  "version": "1.15.7",
   "private": true,
   "description": "Planejador e gerador de aulas semanais compatíveis com o ClassAtelier.",
   "type": "module",
