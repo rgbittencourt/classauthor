@@ -17,6 +17,7 @@ import lessonPlanHandler from "../src/lesson-plan.js";
 import rubricHandler from "../src/rubric.js";
 import captionsHandler from "../src/captions-handler.js";
 import styleHandler from "../src/style-handler.js";
+import videoSummaryHandler from "../src/video-summary.js";
 import keysHandler from "../src/keys-handler.js";
 
 async function handler(request, response) {
@@ -31,6 +32,7 @@ async function handler(request, response) {
   if (request.body?.action === "plan") return lessonPlanHandler(request, response);
   if (request.body?.action === "style") return styleHandler(request, response);
   if (request.body?.action === "captions") return captionsHandler(request, response);
+  if (request.body?.action === "videosummary") return videoSummaryHandler(request, response);
   if (request.body?.action === "testkeys") return keysHandler(request, response);
   if (request.body?.action === "rubric") return rubricHandler(request, response);
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });

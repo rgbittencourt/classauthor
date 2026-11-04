@@ -8,6 +8,13 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.13.0 · 04/11/2026 · Resumo do vídeo com IA (para o ClassAtelier)
+
+- Nova rota **`/api/video-summary`** (despachada por `api/regenerate-week.js`, action `videosummary`, sem criar função nova no plano Hobby). Recebe as falas da legenda com tempo, pede à IA um resumo em seções e tópicos e devolve cada tópico com o instante em que o assunto começa. É o que o botão **Gerar resumo com IA** do ClassAtelier 1.14.0 usa.
+- Mesmas regras das outras rotas do ClassAtelier: CORS só para os endereços conhecidos, **código de acesso** ou **chave de IA própria** (nunca a chave do servidor sem o código) e o campo `usage` com o consumo.
+- Vídeo longo é dividido em até 4 partes (cerca de 2 horas de fala), uma chamada por parte, para caber no limite de tokens do pedido. Tempos fora do vídeo são descartados e os tópicos saem em ordem de tempo.
+- 7 testes novos (`tests/video-summary.test.mjs`); a suíte tem 256 testes.
+
 ## 1.12.4 · 04/11/2026 · Manual Class atualizado
 
 - O **Manual Class** descreve a legenda sincronizada do bloco Vídeo (ClassAtelier 1.13.0) e explica a mensagem «O YouTube recusou o pedido automático do servidor». O ClassAuthor em si não mudou.
