@@ -8,6 +8,11 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.15.8 · 04/11/2026 · Referências: autor-entidade em minúsculas
+
+- Uma referência como «gartner. Citizen Development…» (entidade em minúsculas) passa a sair «GARTNER. **Citizen Development…**. [ano].»: o autor vai para MAIÚSCULAS e o título seguinte fica em negrito, sem a mensagem «falta o destaque» e sem precisar de uma segunda correção.
+- O Manual Class teve as capturas de tela refeitas.
+
 ## 1.15.7 · 04/11/2026 · Ficha da disciplina: só o botão corrige as referências
 
 - Na **Ficha da disciplina**, **nada muda sozinho**: as referências deixam de ser corrigidas ao sair do campo e de entrar já ordenadas. A correção (ABNT NBR 6023:2025) e a ordem alfabética só acontecem quando você clica no novo botão **«Organizar lista (corrigir e ordenar)»**, que também mostra, logo abaixo, o que ficou a conferir.

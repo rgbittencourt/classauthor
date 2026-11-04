@@ -465,6 +465,14 @@ function forceBold(text) {
     if (/Dispon[ií]vel em:|https?:\/\//i.test(text)) return `[TÍTULO]. ${text.trim()}`;
     return text;
   }
+  // «gartner. Citizen Development…»: uma palavra solta seguida de outro trecho com inicial maiúscula é autor-entidade (vai em MAIÚSCULAS); o título é o trecho seguinte.
+  if (!lead && usable.length >= 2) {
+    const a = usable[0].seg, b = usable[1].seg;
+    if (/^[\p{L}][\p{L}\d&'-]*$/u.test(a.t.trim()) && !ARTICLE.test(a.t.trim()) && /^\p{Lu}/u.test(b.t.trim())) {
+      const up = `${text.slice(0, offset + a.s)}${a.t.toLocaleUpperCase("pt-BR")}${text.slice(offset + a.e)}`;
+      if (up.length === text.length) return boldSpan(up, offset + b.s, offset + b.e);
+    }
+  }
   let pick = usable[0];
   if (lead && SUB_ENTITY.test(pick.seg.t) && usable[1]) pick = usable[1];
   const s = offset + pick.seg.s;

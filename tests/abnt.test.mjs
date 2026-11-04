@@ -320,3 +320,10 @@ test("ABNT: erros de propósito (negrito na referência inteira, no autor ou na 
   }
   assert.ok(abntIssues("**FREIRE, Paulo. Pedagogia da autonomia. São Paulo: Paz e Terra, 1996.**").some((x) => /negrito/.test(x)));
 });
+
+test("ABNT: autor-entidade em minúsculas («gartner.») vira MAIÚSCULAS e o título seguinte sai em negrito, sem sobrar «falta o destaque»", () => {
+  const out = normalizeAbntCitation("gartner. Citizen Development and Low-Code/No-Code platforms.");
+  assert.equal(out, "GARTNER. **Citizen Development and Low-Code/No-Code platforms**. [ano].");
+  assert.equal(normalizeAbntCitation(out), out);
+  assert.ok(!abntIssues(out).some((x) => /destaque/.test(x)));
+});
