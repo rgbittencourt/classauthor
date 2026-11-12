@@ -8,6 +8,12 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.19.0 · 12/11/2026 · Plano do deck inteiro antes dos slides
+
+- `/api/slides` ganha `mode: "outline"`: lê a aula inteira (seções, texto e figuras) e planeja exatamente a quantidade pedida de slides de conteúdo, cada um com seção, tipo, título e ideia, sem repetir conceito e sem duplicar os slides fixos (capa, pergunta, roteiro, objetivos, síntese, pergunta que fica).
+- `mode: "section"` aceita `outline` (os itens do plano daquela parte) e `deck` (os títulos do deck inteiro), e segue o plano item a item.
+- Regras de escrita revistas: fatos, números, autores e citações continuam só os do texto, mas analogias, exemplos próximos da turma e contas resolvidas passam a ser permitidos; títulos que afirmam algo e cartões com conteúdo concreto.
+
 ## 1.18.0 · 12/11/2026 · Slides na quantidade pedida, notas completas e respostas
 
 - `/api/slides` com `mode: "section"` aceita **`count`**: a IA gera exatamente essa quantidade de slides para o trecho (até 10 por chamada; o ClassAtelier divide seções grandes em partes, com `part`), e **`avoid`**, a lista do que já existe, para completar sem repetir.

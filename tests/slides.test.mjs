@@ -97,3 +97,24 @@ test("slideAnswer devolve a resposta detalhada e o frame traz a resposta da perg
   const f = normalizeFrame({ question: "Por quê?", questionAnswer: "Porque sim, e eis o raciocínio." });
   assert.match(f.questionAnswer, /raciocínio/);
 });
+
+test("o plano do deck distribui a quantidade pedida entre as seções", async () => {
+  const { slidesOutline } = await import("../src/slides.js");
+  let seen = null;
+  const ask = async (messages) => { seen = messages; return { slides: [{ sec: 1, type: "statement", title: "Radar mede tempo", idea: "eco" }, { sec: 2, type: "nada", title: "Bandas", idea: "P a Ka" }, { sec: 9, type: "formula", title: "R = c·t/2", idea: "conta" }, { sec: 2, type: "cards", title: "" }] }; };
+  const r = await slidesOutline({ lessonTitle: "Radar", count: 3, sections: [{ title: "Eco", text: "texto ".repeat(50) }, { title: "Bandas", text: "bandas ".repeat(50), images: [{ id: "img1", caption: "Espectro" }] }] }, { ask });
+  assert.match(seen[1].content, /EXATAMENTE 3 slides/);
+  assert.match(seen[1].content, /\[img1\] Espectro/);
+  assert.deepEqual(r.outline.map((o) => [o.sec, o.type]), [[1, "statement"], [2, "cards"], [2, "formula"]]);
+});
+
+test("a seção segue o plano recebido e vê o deck inteiro", async () => {
+  const { slidesForSection } = await import("../src/slides.js");
+  let seen = null;
+  const ask = async (messages) => { seen = messages; return { slides: [{ type: "statement", text: "A", notes: "n" }, { type: "statement", text: "B", notes: "n" }, { type: "statement", text: "C", notes: "n" }] }; };
+  const r = await slidesForSection({ text: "x ".repeat(60), count: 7, outline: [{ type: "formula", title: "R = c·t/2", idea: "conta do eco de 5 ms" }, { type: "reflect", title: "Apito em Torres" }], deck: ["Radar mede tempo", "Bandas"] }, { ask });
+  assert.match(seen[1].content, /EXATAMENTE 2 slide/);
+  assert.match(seen[1].content, /PLANO A SEGUIR[\s\S]*\[formula\] R = c·t\/2 — conta do eco de 5 ms/);
+  assert.match(seen[1].content, /deck inteiro[\s\S]*- Bandas/);
+  assert.equal(r.slides.length, 2);
+});

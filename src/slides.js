@@ -27,12 +27,25 @@ const RULES = `Regras:
 - Uma ideia por slide. Pouco texto na tela, frases curtas, nada de parágrafo longo: o detalhe vai para notes.
 - Títulos com até 60 caracteres; textos de cartão e itens com até 120 caracteres.
 - Alterne os tipos; prefira cards, compare, steps, formula, bignumber, table e timeline a list. Evite dois slides seguidos do mesmo tipo quando houver alternativa.
-- Fidelidade total: use só o que está no texto. Não invente números, datas, autores, citações nem exemplos. Se o texto marca algo como "a conferir", mantenha a ressalva.
+- Fidelidade aos fatos: números, datas, autores, fontes e citações só como estão no texto; se o texto marca algo como "a conferir", mantenha a ressalva. Para ensinar bem, você PODE criar analogias do cotidiano, exemplos próximos da turma e contas resolvidas com os valores do texto, desde que cientificamente corretos e ligados ao conteúdo.
+- Escreva como um bom professor projetaria: título que afirma algo (não só um rótulo), frase de impacto com uma ideia forte, cartões com conteúdo concreto e específico (nada de frase genérica), contas resolvidas passo a passo.
 - Toda pergunta "Para refletir" (ou pergunta à turma) vira um slide reflect; nas notes desse slide escreva a RESPOSTA bem explicada e detalhada (1 a 3 parágrafos), com o raciocínio passo a passo.
 - Avisos e erros comuns ("Atenção", "Dica") viram alert. Contas e exemplos numéricos viram formula ou bignumber, com a conta completa nas notes.
 - notes (OBRIGATÓRIO em todo slide): o roteiro completo e detalhado do que o professor diz, de 90 a 220 palavras, em português do Brasil e tom de sala de aula: explica o conceito do slide com as palavras e os exemplos do texto, retoma números e contas passo a passo, antecipa a dúvida mais comum e fecha com a transição para o próximo slide. Nunca deixe notes vazia ou genérica.
 - Se o slide traz QUALQUER pergunta (reflect, statement terminado em "?", pergunta em cards ou list), as notes terminam com "RESPOSTA:" seguida da resposta completa, bem explicada e detalhada (de 120 a 300 palavras), com o raciocínio passo a passo, as contas quando houver, os erros típicos e a ligação com o conteúdo.
 - Cumpra exatamente a quantidade de slides pedida: se o trecho for curto, aprofunde (exemplo numérico, comparação, erro comum, pergunta para refletir) usando só o que está no texto; se for longo, condense.`;
+
+const OUTLINE_SYSTEM = `Você é designer instrucional e de apresentações. Lê a aula inteira e planeja o deck de slides de conteúdo, em português do Brasil, antes de qualquer slide ser escrito.
+Regras:
+- Responda só com JSON válido, sem markdown.
+- Planeje EXATAMENTE a quantidade pedida de slides, na ordem da aula; cada slide indica a seção de onde sai (sec, número da seção). Toda seção recebe pelo menos 1 slide; seções de glossário, resumo ou revisão recebem no máximo 1 (o deck já tem síntese).
+- Não planeje capa, pergunta da aula, roteiro, objetivos, síntese final nem "pergunta que fica": esses slides já existem. Não repita a pergunta central da aula num slide.
+- Nenhum conceito aparece duas vezes no deck. Cada slide avança a aula.
+- Em cada seção, monte um arco: gancho ou exemplo concreto → conceito → fórmula ou conta resolvida (se houver) → erro comum ou atenção → pergunta para refletir quando o texto trouxer uma. Use os exemplos e lugares que estão no texto.
+- Varie os tipos; nunca 3 slides seguidos do mesmo tipo. Use reflect para toda pergunta "Para refletir" do texto. Use image para as figuras listadas (imageId), cada uma no máximo uma vez.
+- type: um de statement, cards, list, formula, compare, steps, timeline, table, bignumber, reflect, alert, quote, image.
+- title: o título do slide (até 60 caracteres), que afirma algo. idea: o que o slide mostra, com os dados, o exemplo ou a conta que deve usar (até 220 caracteres).
+Formato: {"slides":[{"sec":1,"type":"…","title":"…","idea":"…","imageId":"img1"?}]}`;
 
 const SECTION_SYSTEM = `Você é designer instrucional e de apresentações. Converte uma seção de uma aula em slides profissionais para projetar em sala, em português do Brasil.
 ${RULES}
@@ -100,12 +113,14 @@ export function normalizeFrame(raw) {
   };
 }
 
-function sectionMessages({ lessonTitle, sectionTitle, sectionIndex, sectionCount, part, text, images, count, avoid }) {
+function sectionMessages({ lessonTitle, sectionTitle, sectionIndex, sectionCount, part, text, images, count, avoid, outline = [], deck = [] }) {
   const figs = images.length ? images.map((im) => `[${im.id}] ${clip(im.caption || im.alt || "figura", 160)}`).join("\n") : "(nenhuma)";
   const avoidText = avoid.length ? `\nJá existem slides sobre (não repita, traga outros aspectos do texto):\n${avoid.map((t) => "- " + t).join("\n")}\n` : "";
+  const planText = outline.length ? `\nPLANO A SEGUIR (um slide por item, nesta ordem, com o tipo indicado; troque o tipo só se o conteúdo não couber nele):\n${outline.map((o, i) => `${i + 1}. [${o.type}] ${o.title}${o.idea ? " — " + o.idea : ""}${o.imageId ? " (figura " + o.imageId + ")" : ""}`).join("\n")}\n` : "";
+  const deckText = deck.length ? `\nO deck inteiro (para não repetir o que outros slides já cobrem):\n${deck.map((t) => "- " + t).join("\n")}\n` : "";
   return [
     { role: "system", content: SECTION_SYSTEM },
-    { role: "user", content: `Aula: "${clip(lessonTitle, 160)}".\nSeção ${sectionIndex} de ${sectionCount}: "${clip(sectionTitle, 120)}"${part ? ` (${clip(part, 40)})` : ""}.\nGere EXATAMENTE ${count} slide(s) para este trecho, nem mais nem menos (não repita o título da seção como slide isolado), cada um com notes completas.${avoidText}\nFiguras disponíveis no trecho:\n${figs}\n\nTexto do trecho:\n${String(text).slice(0, 14000)}` }
+    { role: "user", content: `Aula: "${clip(lessonTitle, 160)}".\nSeção ${sectionIndex} de ${sectionCount}: "${clip(sectionTitle, 120)}"${part ? ` (${clip(part, 40)})` : ""}.\nGere EXATAMENTE ${count} slide(s) para este trecho, nem mais nem menos (não repita o título da seção como slide isolado), cada um com notes completas.${planText}${deckText}${avoidText}\nFiguras disponíveis no trecho:\n${figs}\n\nTexto do trecho:\n${String(text).slice(0, 14000)}` }
   ];
 }
 
@@ -117,12 +132,46 @@ export async function slidesForSection(body = {}, { ask = callJson } = {}) {
   const legacy = Number.parseInt(body.max, 10) || Number.parseInt(body.min, 10) || 4;
   const count = Math.max(1, Math.min(10, Number.parseInt(body.count, 10) || legacy));
   const avoid = arr(body.avoid).map((t) => clip(t, 80)).filter(Boolean).slice(0, 30);
-  const messages = sectionMessages({ lessonTitle: body.lessonTitle, sectionTitle: body.sectionTitle, sectionIndex: Number(body.sectionIndex) || 1, sectionCount: Number(body.sectionCount) || 1, part: body.part, text, images, count, avoid });
-  const raw = await ask(messages, { temperature: 0.4, maxTokens: Math.min(16000, 2000 + count * 1300), label: "slides-section", ignoreRequestBudget: true, cacheSystem: true });
+  const outline = arr(body.outline).map(normalizeOutlineItem).filter(Boolean).slice(0, 10);
+  const deck = arr(body.deck).map((t) => clip(t, 80)).filter(Boolean).slice(0, 160);
+  const n = outline.length ? Math.min(10, outline.length) : count;
+  const messages = sectionMessages({ lessonTitle: body.lessonTitle, sectionTitle: body.sectionTitle, sectionIndex: Number(body.sectionIndex) || 1, sectionCount: Number(body.sectionCount) || 1, part: body.part, text, images, count: n, avoid, outline, deck });
+  const raw = await ask(messages, { temperature: 0.4, maxTokens: Math.min(16000, 2000 + n * 1300), label: "slides-section", ignoreRequestBudget: true, cacheSystem: true });
   const ids = images.map((im) => im.id);
-  const slides = arr(raw && raw.slides).map((s) => normalizeSlide(s, ids)).filter(Boolean).slice(0, count);
+  const slides = arr(raw && raw.slides).map((s) => normalizeSlide(s, ids)).filter(Boolean).slice(0, n);
   if (!slides.length) { const error = new Error("A IA não devolveu slides válidos para esta seção."); error.code = "SLIDES_INVALID"; error.retryable = true; throw error; }
   return { slides };
+}
+
+function normalizeOutlineItem(o) {
+  if (!o || typeof o !== "object") return null;
+  const type = SLIDE_TYPES.includes(o.type) ? o.type : "cards";
+  const title = clip(o.title, 90);
+  if (!title) return null;
+  return { type, title, idea: clip(o.idea, 260), ...(o.imageId ? { imageId: String(o.imageId).slice(0, 20) } : {}) };
+}
+
+// Plano do deck inteiro: a IA lê a aula toda e distribui a quantidade pedida entre as seções,
+// sem repetir conceito. Cada item diz a seção (sec, a partir de 1), o tipo, o título e a ideia.
+export async function slidesOutline(body = {}, { ask = callJson } = {}) {
+  const sections = arr(body.sections).map((s) => ({ title: clip(s && s.title, 120), text: String((s && s.text) || ""), images: arr(s && s.images).map((im) => ({ id: String(im && im.id || "").slice(0, 20), caption: clip(im && (im.caption || im.alt), 140) })).filter((im) => im.id).slice(0, 12) })).filter((s) => s.title || s.text).slice(0, 40);
+  if (!sections.length) { const error = new Error("A aula não tem seções para planejar os slides."); error.code = "SLIDES_TEXT_MISSING"; throw error; }
+  const count = Math.max(sections.length, Math.min(150, Number.parseInt(body.count, 10) || 20));
+  const budget = 60000; const total = sections.reduce((a, s) => a + s.text.length, 0) || 1;
+  const parts = sections.map((s, i) => {
+    const room = Math.max(1500, Math.floor(budget * s.text.length / total));
+    const figs = s.images.length ? `\nFiguras: ${s.images.map((im) => `[${im.id}] ${im.caption || "figura"}`).join("; ")}` : "";
+    return `### Seção ${i + 1}: ${s.title}${figs}\n${s.text.slice(0, room)}`;
+  });
+  const messages = [
+    { role: "system", content: OUTLINE_SYSTEM },
+    { role: "user", content: `Aula: "${clip(body.lessonTitle, 160)}". Planeje EXATAMENTE ${count} slides de conteúdo para estas ${sections.length} seções.\n\n${parts.join("\n\n")}` }
+  ];
+  const raw = await ask(messages, { temperature: 0.3, maxTokens: Math.min(20000, 2500 + count * 160), label: "slides-outline", ignoreRequestBudget: true });
+  const n = sections.length;
+  const slides = arr(raw && raw.slides).map((o) => { const item = normalizeOutlineItem(o); if (!item) return null; const sec = Math.min(n, Math.max(1, Number.parseInt(o.sec, 10) || 1)); return { sec, ...item }; }).filter(Boolean).slice(0, count);
+  if (slides.length < Math.ceil(count * 0.6)) { const error = new Error("A IA não devolveu o plano dos slides."); error.code = "SLIDES_INVALID"; error.retryable = true; throw error; }
+  return { outline: slides };
 }
 
 export async function slidesFrame(body = {}, { ask = callJson } = {}) {
