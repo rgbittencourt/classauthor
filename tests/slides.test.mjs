@@ -118,3 +118,19 @@ test("a seção segue o plano recebido e vê o deck inteiro", async () => {
   assert.match(seen[1].content, /deck inteiro[\s\S]*- Bandas/);
   assert.equal(r.slides.length, 2);
 });
+
+test("os tipos visuais (calc, cycle, scale, chart) passam pela validação", async () => {
+  const { normalizeSlide } = await import("../src/slides.js");
+  assert.deepEqual(normalizeSlide({ type: "calc", title: "Eco de 5 ms", given: [{ sym: "t", text: "5 ms" }], steps: ["R = c·t/2", "R = 7,5×10⁵ m"], result: "750 km" }).result, "750 km");
+  assert.equal(normalizeSlide({ type: "calc", steps: [], result: "1" }), null);
+  assert.equal(normalizeSlide({ type: "cycle", steps: [{ title: "Emite" }, { title: "Escuta" }] }), null);
+  assert.equal(normalizeSlide({ type: "scale", marks: [{ label: "P" }, { label: "L" }, { label: "C", value: "5 cm" }] }).marks[2].value, "5 cm");
+  assert.deepEqual(normalizeSlide({ type: "chart", unit: "cm", items: [{ label: "L", value: "20" }, { label: "C", value: "5,6" }, { label: "?", value: "x" }] }).items, [{ label: "L", value: 20 }, { label: "C", value: 5.6 }]);
+});
+
+test("o plano recebe as equações de cada seção", async () => {
+  const { slidesOutline } = await import("../src/slides.js");
+  let seen = null;
+  await slidesOutline({ count: 1, sections: [{ title: "Eco", text: "t ".repeat(40), equations: ["R = \\frac{c t}{2}"] }] }, { ask: async (m) => { seen = m; return { slides: [{ sec: 1, type: "formula", title: "R = c·t/2" }] }; } });
+  assert.match(seen[1].content, /Equações \(todas precisam aparecer[^\n]*\$\$R = \\frac\{c t\}\{2\}\$\$/);
+});

@@ -8,6 +8,12 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.20.0 · 12/11/2026 · Slides mais visuais e com todas as equações
+
+- Quatro tipos novos no catálogo de `/api/slides`: `calc` (conta resolvida: dados, linhas da conta e resultado), `cycle` (etapas em ciclo), `scale` (régua ou espectro com marcas) e `chart` (barras com números que estão no texto).
+- O plano (`mode: "outline"`) recebe as equações de cada seção (`equations`, em LaTeX) e exige um slide de fórmula para cada uma, mais a conta resolvida quando o texto traz valores; pelo menos metade do deck deve ser visual.
+- As seções convertem toda equação do texto para símbolos Unicode no slide de fórmula.
+
 ## 1.19.0 · 12/11/2026 · Plano do deck inteiro antes dos slides
 
 - `/api/slides` ganha `mode: "outline"`: lê a aula inteira (seções, texto e figuras) e planeja exatamente a quantidade pedida de slides de conteúdo, cada um com seção, tipo, título e ideia, sem repetir conceito e sem duplicar os slides fixos (capa, pergunta, roteiro, objetivos, síntese, pergunta que fica).

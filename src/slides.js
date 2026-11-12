@@ -4,16 +4,20 @@ import { callJson } from "./ai-client.js";
 // fechado de tipos; o desenho (paleta, tipografia, grade) é todo do ClassAtelier.
 // Dois modos: "frame" (pergunta da aula, objetivos e síntese) e "section" (slides de uma seção).
 
-export const SLIDE_TYPES = ["statement", "cards", "list", "formula", "compare", "steps", "timeline", "table", "bignumber", "reflect", "alert", "quote", "image"];
+export const SLIDE_TYPES = ["statement", "cards", "list", "formula", "calc", "compare", "steps", "cycle", "timeline", "scale", "chart", "table", "bignumber", "reflect", "alert", "quote", "image"];
 
 const CATALOG = `Catálogo (use só estes tipos e campos):
 statement {type, eyebrow?, text, sub?} — frase ou pergunta de impacto, uma só ideia.
 cards {type, title, items:[{title, text}]} — 2 a 4 cartões paralelos.
 list {type, title, items:[string]} — 3 a 5 itens curtos (use pouco).
 formula {type, title, formula, legend:[{sym, text}], note?} — fórmula em texto simples com símbolos Unicode (ex.: R = c·t/2, λ = c/f, 3×10⁸ m/s); até 4 itens na legenda.
+calc {type, title, given:[{sym, text}], steps:[string], result, unit?} — exemplo resolvido: dados (até 4), 2 a 4 linhas da conta em texto simples com Unicode (ex.: "R = c·t/2", "R = (3×10⁸ × 5×10⁻³)/2", "R = 7,5×10⁵ m") e o resultado curto (ex.: "750 km").
 compare {type, title, left:{label, title, text}, right:{label, title, text}} — dois lados contrastados.
 steps {type, title, steps:[{title, text}]} — 3 ou 4 etapas de um processo ou sequência.
+cycle {type, title, steps:[{title, text}]} — 3 a 5 etapas que se repetem em ciclo (desenhadas em círculo).
 timeline {type, title, events:[{date, title, text}]} — 2 a 4 marcos datados.
+scale {type, title, from, to, marks:[{label, value?, text?}], note?} — régua ou espectro com 3 a 8 marcas em ordem (ex.: bandas P a Ka, escala em dB, faixas do espectro); from e to são os rótulos das pontas (ex.: "ondas longas", "ondas curtas").
+chart {type, title, unit, items:[{label, value}], note?} — gráfico de barras com 2 a 8 valores numéricos QUE ESTÃO NO TEXTO (value é número).
 table {type, title, headers:[string], rows:[[string]]} — até 6 linhas e 4 colunas.
 bignumber {type, title, value, label, text?} — um número ou resultado de destaque (value curto, ex.: "750 km").
 reflect {type, question, sub?} — pergunta para a turma pensar.
@@ -30,7 +34,8 @@ const RULES = `Regras:
 - Fidelidade aos fatos: números, datas, autores, fontes e citações só como estão no texto; se o texto marca algo como "a conferir", mantenha a ressalva. Para ensinar bem, você PODE criar analogias do cotidiano, exemplos próximos da turma e contas resolvidas com os valores do texto, desde que cientificamente corretos e ligados ao conteúdo.
 - Escreva como um bom professor projetaria: título que afirma algo (não só um rótulo), frase de impacto com uma ideia forte, cartões com conteúdo concreto e específico (nada de frase genérica), contas resolvidas passo a passo.
 - Toda pergunta "Para refletir" (ou pergunta à turma) vira um slide reflect; nas notes desse slide escreva a RESPOSTA bem explicada e detalhada (1 a 3 parágrafos), com o raciocínio passo a passo.
-- Avisos e erros comuns ("Atenção", "Dica") viram alert. Contas e exemplos numéricos viram formula ou bignumber, com a conta completa nas notes.
+- Avisos e erros comuns ("Atenção", "Dica") viram alert. Toda equação do texto (em LaTeX entre $$…$$ ou escrita) aparece num slide formula, convertida para texto simples com símbolos Unicode (x², 10⁻³, λ, σ⁰, θ, Δ, ·, ×, √). Exemplos numéricos viram calc (conta resolvida passo a passo), com a explicação completa nas notes.
+- Use recursos visuais sempre que o conteúdo permitir: calc para contas, scale para escalas, faixas e espectros, chart para comparar valores do texto, cycle para processos que se repetem, steps para sequências, timeline para história, compare para contrastes, table para dados tabulares.
 - notes (OBRIGATÓRIO em todo slide): o roteiro completo e detalhado do que o professor diz, de 90 a 220 palavras, em português do Brasil e tom de sala de aula: explica o conceito do slide com as palavras e os exemplos do texto, retoma números e contas passo a passo, antecipa a dúvida mais comum e fecha com a transição para o próximo slide. Nunca deixe notes vazia ou genérica.
 - Se o slide traz QUALQUER pergunta (reflect, statement terminado em "?", pergunta em cards ou list), as notes terminam com "RESPOSTA:" seguida da resposta completa, bem explicada e detalhada (de 120 a 300 palavras), com o raciocínio passo a passo, as contas quando houver, os erros típicos e a ligação com o conteúdo.
 - Cumpra exatamente a quantidade de slides pedida: se o trecho for curto, aprofunde (exemplo numérico, comparação, erro comum, pergunta para refletir) usando só o que está no texto; se for longo, condense.`;
@@ -43,7 +48,9 @@ Regras:
 - Nenhum conceito aparece duas vezes no deck. Cada slide avança a aula.
 - Em cada seção, monte um arco: gancho ou exemplo concreto → conceito → fórmula ou conta resolvida (se houver) → erro comum ou atenção → pergunta para refletir quando o texto trouxer uma. Use os exemplos e lugares que estão no texto.
 - Varie os tipos; nunca 3 slides seguidos do mesmo tipo. Use reflect para toda pergunta "Para refletir" do texto. Use image para as figuras listadas (imageId), cada uma no máximo uma vez.
-- type: um de statement, cards, list, formula, compare, steps, timeline, table, bignumber, reflect, alert, quote, image.
+- Toda equação listada em "Equações" (e toda fórmula escrita no texto) ganha seu slide formula; quando o texto traz valores para ela, planeje também um calc com a conta resolvida.
+- Use os recursos visuais: calc (conta resolvida), scale (régua/espectro/faixas, como bandas ou dB), chart (barras com números do texto), cycle (processo cíclico), steps, timeline, compare, table, bignumber. Num deck bom, pelo menos metade dos slides é visual (não só texto em cartões).
+- type: um de statement, cards, list, formula, calc, compare, steps, cycle, timeline, scale, chart, table, bignumber, reflect, alert, quote, image.
 - title: o título do slide (até 60 caracteres), que afirma algo. idea: o que o slide mostra, com os dados, o exemplo ou a conta que deve usar (até 220 caracteres).
 Formato: {"slides":[{"sec":1,"type":"…","title":"…","idea":"…","imageId":"img1"?}]}`;
 
@@ -94,6 +101,10 @@ export function normalizeSlide(raw, imageIds = []) {
       return headers.length >= 2 && rows.length ? { ...base, title: clip(raw.title, 70), headers, rows: rows.map((r) => headers.map((_, i) => r[i] || "")) } : null;
     }
     case "bignumber": { const value = clip(raw.value, 24); return value ? { ...base, title: clip(raw.title, 70), value, label: clip(raw.label, 80), text: clip(raw.text, 200) } : null; }
+    case "calc": { const steps = arr(raw.steps).map((x) => clip(typeof x === "string" ? x : x && (x.text || x.title), 90)).filter(Boolean).slice(0, 5); const result = clip(raw.result, 30); return steps.length && result ? { ...base, title: clip(raw.title, 70), given: arr(raw.given).map((x) => ({ sym: clip(x && x.sym, 14), text: clip(x && x.text, 80) })).filter((x) => x.sym || x.text).slice(0, 4), steps, result, unit: clip(raw.unit, 20) } : null; }
+    case "cycle": { const steps = arr(raw.steps).map(pair).filter((x) => x.title).slice(0, 5); return steps.length >= 3 ? { ...base, title: clip(raw.title, 70), steps } : null; }
+    case "scale": { const marks = arr(raw.marks).map((x) => ({ label: clip(x && x.label, 18), value: clip(x && x.value, 24), text: clip(x && x.text, 60) })).filter((x) => x.label).slice(0, 8); return marks.length >= 3 ? { ...base, title: clip(raw.title, 70), from: clip(raw.from, 40), to: clip(raw.to, 40), marks, note: clip(raw.note, 200) } : null; }
+    case "chart": { const items = arr(raw.items).map((x) => ({ label: clip(x && x.label, 24), value: Number(String(x && x.value).replace(",", ".")) })).filter((x) => x.label && Number.isFinite(x.value)).slice(0, 8); return items.length >= 2 ? { ...base, title: clip(raw.title, 70), unit: clip(raw.unit, 20), items, note: clip(raw.note, 200) } : null; }
     case "reflect": { const question = clip(raw.question || raw.text, 220); return question ? { ...base, question, sub: clip(raw.sub, 160) } : null; }
     case "alert": { const text = clip(raw.text, 260); return text ? { ...base, title: clip(raw.title, 70) || "Atenção", text } : null; }
     case "quote": { const text = clip(raw.text, 260); return text ? { ...base, text, author: clip(raw.author, 80) } : null; }
@@ -154,14 +165,15 @@ function normalizeOutlineItem(o) {
 // Plano do deck inteiro: a IA lê a aula toda e distribui a quantidade pedida entre as seções,
 // sem repetir conceito. Cada item diz a seção (sec, a partir de 1), o tipo, o título e a ideia.
 export async function slidesOutline(body = {}, { ask = callJson } = {}) {
-  const sections = arr(body.sections).map((s) => ({ title: clip(s && s.title, 120), text: String((s && s.text) || ""), images: arr(s && s.images).map((im) => ({ id: String(im && im.id || "").slice(0, 20), caption: clip(im && (im.caption || im.alt), 140) })).filter((im) => im.id).slice(0, 12) })).filter((s) => s.title || s.text).slice(0, 40);
+  const sections = arr(body.sections).map((s) => ({ title: clip(s && s.title, 120), text: String((s && s.text) || ""), equations: arr(s && s.equations).map((e) => String(e || "").slice(0, 200)).filter(Boolean).slice(0, 20), images: arr(s && s.images).map((im) => ({ id: String(im && im.id || "").slice(0, 20), caption: clip(im && (im.caption || im.alt), 140) })).filter((im) => im.id).slice(0, 12) })).filter((s) => s.title || s.text).slice(0, 40);
   if (!sections.length) { const error = new Error("A aula não tem seções para planejar os slides."); error.code = "SLIDES_TEXT_MISSING"; throw error; }
   const count = Math.max(sections.length, Math.min(150, Number.parseInt(body.count, 10) || 20));
   const budget = 60000; const total = sections.reduce((a, s) => a + s.text.length, 0) || 1;
   const parts = sections.map((s, i) => {
     const room = Math.max(1500, Math.floor(budget * s.text.length / total));
     const figs = s.images.length ? `\nFiguras: ${s.images.map((im) => `[${im.id}] ${im.caption || "figura"}`).join("; ")}` : "";
-    return `### Seção ${i + 1}: ${s.title}${figs}\n${s.text.slice(0, room)}`;
+    const eqs = s.equations.length ? `\nEquações (todas precisam aparecer em slides formula): ${s.equations.map((e) => "$$" + e + "$$").join("  ")}` : "";
+    return `### Seção ${i + 1}: ${s.title}${figs}${eqs}\n${s.text.slice(0, room)}`;
   });
   const messages = [
     { role: "system", content: OUTLINE_SYSTEM },
