@@ -8,6 +8,11 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.21.0 · 12/11/2026 · Diagramas nos slides
+
+- Novo tipo `diagram` em `/api/slides`, com sete figuras montadas a partir de peças prontas (`kind`): `echo` (sinal que vai até o alvo e volta), `wave` (comparação de comprimentos de onda), `curve` (gráfico qualitativo), `reflection` (superfície lisa × rugosa), `geometry` (nadir e visada oblíqua), `layers` (camadas atravessadas por um feixe) e `bragg` (ressonância de Bragg). A IA escolhe o kind e os rótulos; o desenho é do ClassAtelier.
+- O plano do deck passa a pedir um diagrama sempre que a ideia for física ou espacial.
+
 ## 1.20.0 · 12/11/2026 · Slides mais visuais e com todas as equações
 
 - Quatro tipos novos no catálogo de `/api/slides`: `calc` (conta resolvida: dados, linhas da conta e resultado), `cycle` (etapas em ciclo), `scale` (régua ou espectro com marcas) e `chart` (barras com números que estão no texto).

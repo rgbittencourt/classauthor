@@ -134,3 +134,13 @@ test("o plano recebe as equações de cada seção", async () => {
   await slidesOutline({ count: 1, sections: [{ title: "Eco", text: "t ".repeat(40), equations: ["R = \\frac{c t}{2}"] }] }, { ask: async (m) => { seen = m; return { slides: [{ sec: 1, type: "formula", title: "R = c·t/2" }] }; } });
   assert.match(seen[1].content, /Equações \(todas precisam aparecer[^\n]*\$\$R = \\frac\{c t\}\{2\}\$\$/);
 });
+
+test("o diagrama aceita só os kinds conhecidos e completa os rótulos", async () => {
+  const { normalizeSlide } = await import("../src/slides.js");
+  assert.equal(normalizeSlide({ type: "diagram", kind: "foguete" }), null);
+  const e = normalizeSlide({ type: "diagram", kind: "echo", title: "O eco", measure: "R = c·t/2" });
+  assert.equal(e.source, "Radar"); assert.equal(e.measure, "R = c·t/2");
+  assert.equal(normalizeSlide({ type: "diagram", kind: "wave", waves: [{ label: "L", cycles: 99 }] }).waves[0].cycles, 16);
+  assert.equal(normalizeSlide({ type: "diagram", kind: "reflection" }).right.rough, true);
+  assert.equal(normalizeSlide({ type: "diagram", kind: "layers", layers: [{ label: "Nuvem" }] }), null);
+});

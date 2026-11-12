@@ -4,7 +4,8 @@ import { callJson } from "./ai-client.js";
 // fechado de tipos; o desenho (paleta, tipografia, grade) é todo do ClassAtelier.
 // Dois modos: "frame" (pergunta da aula, objetivos e síntese) e "section" (slides de uma seção).
 
-export const SLIDE_TYPES = ["statement", "cards", "list", "formula", "calc", "compare", "steps", "cycle", "timeline", "scale", "chart", "table", "bignumber", "reflect", "alert", "quote", "image"];
+export const SLIDE_TYPES = ["statement", "cards", "list", "formula", "calc", "compare", "steps", "cycle", "timeline", "scale", "chart", "diagram", "table", "bignumber", "reflect", "alert", "quote", "image"];
+export const DIAGRAM_KINDS = ["echo", "wave", "curve", "reflection", "geometry", "layers", "bragg"];
 
 const CATALOG = `Catálogo (use só estes tipos e campos):
 statement {type, eyebrow?, text, sub?} — frase ou pergunta de impacto, uma só ideia.
@@ -18,6 +19,14 @@ cycle {type, title, steps:[{title, text}]} — 3 a 5 etapas que se repetem em ci
 timeline {type, title, events:[{date, title, text}]} — 2 a 4 marcos datados.
 scale {type, title, from, to, marks:[{label, value?, text?}], note?} — régua ou espectro com 3 a 8 marcas em ordem (ex.: bandas P a Ka, escala em dB, faixas do espectro); from e to são os rótulos das pontas (ex.: "ondas longas", "ondas curtas").
 chart {type, title, unit, items:[{label, value}], note?} — gráfico de barras com 2 a 8 valores numéricos QUE ESTÃO NO TEXTO (value é número).
+diagram {type, title, kind, caption?, ...campos do kind} — figura desenhada a partir de peças prontas; escolha o kind que representa a ideia:
+  echo {source, target, out, back, measure?} — algo emite um sinal que vai até um alvo e volta (eco, pulso, sonar, radar); measure é a relação medida (ex.: "R = c·t/2").
+  wave {waves:[{label, cycles}], measure?} — 1 a 3 ondas para comparar comprimentos de onda; cycles de 2 a 14 (mais ciclos = onda mais curta); measure rotula um comprimento (ex.: "λ").
+  curve {x, y, series:[{label, shape}], marks?:[{at, label}]} — gráfico qualitativo; shape: decreasing, increasing, peak, valley, flat, steep (queda forte e depois lenta); at de 0 a 1 marca uma posição no eixo x.
+  reflection {left:{label, rough}, right:{label, rough}, source?} — superfície lisa × rugosa: reflexão especular (vai embora) e espalhamento difuso (parte volta ao sensor); rough é true ou false.
+  geometry {platform, angle, nadir?, oblique?} — geometria de visada: plataforma no alto, linha do nadir, feixe oblíquo e o ângulo.
+  layers {layers:[{label, text?}], ray?} — 2 a 5 camadas empilhadas (de cima para baixo) atravessadas por um feixe.
+  bragg {lambdaRadar, lambdaB, angle} — ondas do mar com espaçamento λ_B e o feixe do radar em ângulo, em fase (ressonância de Bragg).
 table {type, title, headers:[string], rows:[[string]]} — até 6 linhas e 4 colunas.
 bignumber {type, title, value, label, text?} — um número ou resultado de destaque (value curto, ex.: "750 km").
 reflect {type, question, sub?} — pergunta para a turma pensar.
@@ -35,7 +44,7 @@ const RULES = `Regras:
 - Escreva como um bom professor projetaria: título que afirma algo (não só um rótulo), frase de impacto com uma ideia forte, cartões com conteúdo concreto e específico (nada de frase genérica), contas resolvidas passo a passo.
 - Toda pergunta "Para refletir" (ou pergunta à turma) vira um slide reflect; nas notes desse slide escreva a RESPOSTA bem explicada e detalhada (1 a 3 parágrafos), com o raciocínio passo a passo.
 - Avisos e erros comuns ("Atenção", "Dica") viram alert. Toda equação do texto (em LaTeX entre $$…$$ ou escrita) aparece num slide formula, convertida para texto simples com símbolos Unicode (x², 10⁻³, λ, σ⁰, θ, Δ, ·, ×, √). Exemplos numéricos viram calc (conta resolvida passo a passo), com a explicação completa nas notes.
-- Use recursos visuais sempre que o conteúdo permitir: calc para contas, scale para escalas, faixas e espectros, chart para comparar valores do texto, cycle para processos que se repetem, steps para sequências, timeline para história, compare para contrastes, table para dados tabulares.
+- Use recursos visuais sempre que o conteúdo permitir: diagram para ideias físicas ou espaciais (eco, ondas, curvas, reflexão, geometria de visada, camadas, Bragg), calc para contas, scale para escalas, faixas e espectros, chart para comparar valores do texto, cycle para processos que se repetem, steps para sequências, timeline para história, compare para contrastes, table para dados tabulares.
 - notes (OBRIGATÓRIO em todo slide): o roteiro completo e detalhado do que o professor diz, de 90 a 220 palavras, em português do Brasil e tom de sala de aula: explica o conceito do slide com as palavras e os exemplos do texto, retoma números e contas passo a passo, antecipa a dúvida mais comum e fecha com a transição para o próximo slide. Nunca deixe notes vazia ou genérica.
 - Se o slide traz QUALQUER pergunta (reflect, statement terminado em "?", pergunta em cards ou list), as notes terminam com "RESPOSTA:" seguida da resposta completa, bem explicada e detalhada (de 120 a 300 palavras), com o raciocínio passo a passo, as contas quando houver, os erros típicos e a ligação com o conteúdo.
 - Cumpra exatamente a quantidade de slides pedida: se o trecho for curto, aprofunde (exemplo numérico, comparação, erro comum, pergunta para refletir) usando só o que está no texto; se for longo, condense.`;
@@ -49,8 +58,9 @@ Regras:
 - Em cada seção, monte um arco: gancho ou exemplo concreto → conceito → fórmula ou conta resolvida (se houver) → erro comum ou atenção → pergunta para refletir quando o texto trouxer uma. Use os exemplos e lugares que estão no texto.
 - Varie os tipos; nunca 3 slides seguidos do mesmo tipo. Use reflect para toda pergunta "Para refletir" do texto. Use image para as figuras listadas (imageId), cada uma no máximo uma vez.
 - Toda equação listada em "Equações" (e toda fórmula escrita no texto) ganha seu slide formula; quando o texto traz valores para ela, planeje também um calc com a conta resolvida.
-- Use os recursos visuais: calc (conta resolvida), scale (régua/espectro/faixas, como bandas ou dB), chart (barras com números do texto), cycle (processo cíclico), steps, timeline, compare, table, bignumber. Num deck bom, pelo menos metade dos slides é visual (não só texto em cartões).
-- type: um de statement, cards, list, formula, calc, compare, steps, cycle, timeline, scale, chart, table, bignumber, reflect, alert, quote, image.
+- Planeje um diagram sempre que a ideia for física ou espacial e couber num dos kinds (echo, wave, curve, reflection, geometry, layers, bragg): pulso que vai e volta, comparação de comprimentos de onda, curva qualitativa, superfície lisa × rugosa, geometria de visada, camadas atravessadas por um feixe, ressonância de Bragg. Diga o kind na idea.
+- Use os recursos visuais: diagram, calc (conta resolvida), scale (régua/espectro/faixas, como bandas ou dB), chart (barras com números do texto), cycle (processo cíclico), steps, timeline, compare, table, bignumber. Num deck bom, pelo menos metade dos slides é visual (não só texto em cartões).
+- type: um de statement, cards, list, formula, calc, compare, steps, cycle, timeline, scale, chart, diagram, table, bignumber, reflect, alert, quote, image.
 - title: o título do slide (até 60 caracteres), que afirma algo. idea: o que o slide mostra, com os dados, o exemplo ou a conta que deve usar (até 220 caracteres).
 Formato: {"slides":[{"sec":1,"type":"…","title":"…","idea":"…","imageId":"img1"?}]}`;
 
@@ -105,6 +115,19 @@ export function normalizeSlide(raw, imageIds = []) {
     case "cycle": { const steps = arr(raw.steps).map(pair).filter((x) => x.title).slice(0, 5); return steps.length >= 3 ? { ...base, title: clip(raw.title, 70), steps } : null; }
     case "scale": { const marks = arr(raw.marks).map((x) => ({ label: clip(x && x.label, 18), value: clip(x && x.value, 24), text: clip(x && x.text, 60) })).filter((x) => x.label).slice(0, 8); return marks.length >= 3 ? { ...base, title: clip(raw.title, 70), from: clip(raw.from, 40), to: clip(raw.to, 40), marks, note: clip(raw.note, 200) } : null; }
     case "chart": { const items = arr(raw.items).map((x) => ({ label: clip(x && x.label, 24), value: Number(String(x && x.value).replace(",", ".")) })).filter((x) => x.label && Number.isFinite(x.value)).slice(0, 8); return items.length >= 2 ? { ...base, title: clip(raw.title, 70), unit: clip(raw.unit, 20), items, note: clip(raw.note, 200) } : null; }
+    case "diagram": {
+      const kind = DIAGRAM_KINDS.includes(raw.kind) ? raw.kind : "";
+      const t = (v, n = 40) => clip(v, n);
+      const d = { ...base, title: clip(raw.title, 70), kind, caption: clip(raw.caption, 160) };
+      if (kind === "echo") return { ...d, source: t(raw.source, 24) || "Radar", target: t(raw.target, 24) || "Alvo", out: t(raw.out), back: t(raw.back), measure: t(raw.measure, 40) };
+      if (kind === "wave") { const waves = arr(raw.waves).map((w) => ({ label: t(w && w.label, 28), cycles: Math.max(1, Math.min(16, Number(w && w.cycles) || 4)) })).filter((w) => w.label).slice(0, 3); return waves.length ? { ...d, waves, measure: t(raw.measure, 16) } : null; }
+      if (kind === "curve") { const shapes = ["decreasing", "increasing", "peak", "valley", "flat", "steep"]; const series = arr(raw.series).map((x) => ({ label: t(x && x.label, 30), shape: shapes.includes(x && x.shape) ? x.shape : "decreasing" })).slice(0, 3); return series.length ? { ...d, x: t(raw.x, 40), y: t(raw.y, 40), series, marks: arr(raw.marks).map((m) => ({ at: Math.max(0, Math.min(1, Number(m && m.at) || 0)), label: t(m && m.label, 30) })).filter((m) => m.label).slice(0, 3) } : null; }
+      if (kind === "reflection") { const side = (x, r) => ({ label: t(x && x.label, 30), rough: x && typeof x.rough === "boolean" ? x.rough : r }); return { ...d, left: side(raw.left, false), right: side(raw.right, true), source: t(raw.source, 20) || "Radar" }; }
+      if (kind === "geometry") return { ...d, platform: t(raw.platform, 24) || "Satélite", angle: t(raw.angle, 10) || "θ", nadir: t(raw.nadir, 30), oblique: t(raw.oblique, 30) };
+      if (kind === "layers") { const layers = arr(raw.layers).map((l) => ({ label: t(l && l.label, 30), text: t(l && l.text, 70) })).filter((l) => l.label).slice(0, 5); return layers.length >= 2 ? { ...d, layers, ray: t(raw.ray, 30) } : null; }
+      if (kind === "bragg") return { ...d, lambdaRadar: t(raw.lambdaRadar, 20) || "λ radar", lambdaB: t(raw.lambdaB, 20) || "λ_B", angle: t(raw.angle, 10) || "θ" };
+      return null;
+    }
     case "reflect": { const question = clip(raw.question || raw.text, 220); return question ? { ...base, question, sub: clip(raw.sub, 160) } : null; }
     case "alert": { const text = clip(raw.text, 260); return text ? { ...base, title: clip(raw.title, 70) || "Atenção", text } : null; }
     case "quote": { const text = clip(raw.text, 260); return text ? { ...base, text, author: clip(raw.author, 80) } : null; }
