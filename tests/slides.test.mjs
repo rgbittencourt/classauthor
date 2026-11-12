@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeSlide, normalizeFrame, slidesForSection, slidesFrame } from "../src/slides.js";
+import { normalizeSlide, normalizeFrame, slidesForSection, slidesFrame, slideAnswer } from "../src/slides.js";
 import slidesHandler from "../src/slides-handler.js";
 
 const fakeResponse = () => {
@@ -34,10 +34,13 @@ test("tabela completa as células que faltam", () => {
 test("slidesForSection devolve slides normalizados e passa o pedido para a IA", async () => {
   let seen = null;
   const ask = async (messages) => { seen = messages; return { slides: [{ type: "reflect", question: "Por quê?", notes: "Resposta detalhada." }, { type: "nada" }] }; };
-  const r = await slidesForSection({ lessonTitle: "Radar", sectionTitle: "Eco", text: "O radar mede o tempo de ida e volta do pulso de micro-ondas e calcula a distância.", min: 2, max: 4 }, { ask });
+  const r = await slidesForSection({ lessonTitle: "Radar", sectionTitle: "Eco", text: "O radar mede o tempo de ida e volta do pulso de micro-ondas e calcula a distância.", count: 6, avoid: ["Eco e distância"], part: "parte 2 de 3" }, { ask });
   assert.equal(r.slides.length, 1);
   assert.equal(r.slides[0].type, "reflect");
-  assert.match(seen[1].content, /Gere de 2 a 4 slides/);
+  assert.match(seen[1].content, /EXATAMENTE 6 slide/);
+  assert.match(seen[1].content, /não repita[\s\S]*Eco e distância/);
+  assert.match(seen[1].content, /parte 2 de 3/);
+  assert.match(seen[0].content, /RESPOSTA:/);
 });
 
 test("slidesForSection recusa seção sem texto", async () => {
@@ -50,7 +53,14 @@ test("slidesFrame normaliza pergunta, objetivos e síntese", async () => {
   assert.equal(f.question, "Como enxergar sem luz?");
   assert.equal(f.objectives.length, 1);
   assert.equal(f.synthesis.length, 1);
-  assert.deepEqual(normalizeFrame(null), { question: "", objectives: [], synthesis: [] });
+  assert.deepEqual(normalizeFrame(null), { question: "", questionAnswer: "", objectives: [], synthesis: [], closing: { title: "", question: "", hints: [], answer: "" } });
+});
+
+test("a moldura traz a pergunta que fica, com caminhos e orientação de resposta", () => {
+  const f = normalizeFrame({ closing: { title: "σ⁰ como medida indireta", question: "Como separar vento de óleo num mesmo σ⁰?", hints: ["Outros ângulos", "", "Outras fontes"], answer: "Cada causa deixa uma assinatura diferente." } });
+  assert.equal(f.closing.question, "Como separar vento de óleo num mesmo σ⁰?");
+  assert.deepEqual(f.closing.hints, ["Outros ângulos", "Outras fontes"]);
+  assert.match(f.closing.answer, /assinatura/);
 });
 
 test("o handler responde ao pré-voo do ClassAtelier e recusa origem estranha", async () => {
@@ -72,4 +82,18 @@ test("o handler gera os slides de uma seção", async () => {
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.ok, true);
   assert.equal(res.body.slides[0].type, "statement");
+});
+
+test("slidesForSection corta o excesso na quantidade pedida", async () => {
+  const many = Array.from({ length: 9 }, (_, i) => ({ type: "statement", text: "Ideia " + i }));
+  const r = await slidesForSection({ text: "Texto suficiente para gerar slides sobre o radar e o eco do mar.", count: 4 }, { ask: async () => ({ slides: many }) });
+  assert.equal(r.slides.length, 4);
+});
+
+test("slideAnswer devolve a resposta detalhada e o frame traz a resposta da pergunta central", async () => {
+  const a = await slideAnswer({ question: "Qual a profundidade?", context: "eco 0,04 s" }, { ask: async () => ({ answer: "Com a velocidade do som na água, cerca de 1.500 m/s, d = v·t/2 = 30 m." }) });
+  assert.match(a.answer, /30 m/);
+  await assert.rejects(() => slideAnswer({ question: "" }, { ask: async () => ({}) }), /pergunta/);
+  const f = normalizeFrame({ question: "Por quê?", questionAnswer: "Porque sim, e eis o raciocínio." });
+  assert.match(f.questionAnswer, /raciocínio/);
 });

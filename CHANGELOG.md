@@ -8,6 +8,14 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.18.0 · 12/11/2026 · Slides na quantidade pedida, notas completas e respostas
+
+- `/api/slides` com `mode: "section"` aceita **`count`**: a IA gera exatamente essa quantidade de slides para o trecho (até 10 por chamada; o ClassAtelier divide seções grandes em partes, com `part`), e **`avoid`**, a lista do que já existe, para completar sem repetir.
+- Notas do apresentador obrigatórias e detalhadas em todo slide (de 90 a 220 palavras). Todo slide com pergunta ou reflexão termina as notas com **«RESPOSTA:»** e a resposta completa.
+- Novo `mode: "answer"`: devolve a resposta detalhada de uma pergunta, com um trecho da aula como apoio. O ClassAtelier usa quando um slide com pergunta vier sem resposta.
+- A moldura (`mode: "frame"`) traz também a resposta da pergunta da aula (`questionAnswer`) e **a pergunta que fica** (`closing`: conceito, pergunta aberta, caminhos para pensar e orientação de resposta ao professor).
+- Pedidos antigos (`min`/`max`) continuam funcionando.
+
 ## 1.17.0 · 12/11/2026 · Slides para o ClassAtelier
 
 - Nova rota **`/api/slides`** (com CORS, como `/api/figure`), usada pelo botão **Slides** do ClassAtelier. Com `mode: "frame"`, devolve a pergunta central da aula, os objetivos e a síntese; com `mode: "section"`, devolve os slides de uma seção. A IA escolhe só o conteúdo, dentro de um catálogo fechado de tipos (frase de impacto, cartões, comparação, etapas, fórmula, número de destaque, tabela, linha do tempo, pergunta para refletir, atenção, citação e figura da aula), com notas do apresentador; as perguntas «Para refletir» levam a resposta detalhada nas notas. O desenho dos slides é todo do ClassAtelier.
