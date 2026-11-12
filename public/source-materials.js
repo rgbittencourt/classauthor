@@ -46,6 +46,11 @@ const reqPromise = (request) => new Promise((resolve, reject) => { request.onsuc
 
 export async function saveSourceDoc(doc) { return tx("readwrite", (store) => reqPromise(store.put(doc))); }
 export async function loadSourceDoc(id) { if (!id) return null; try { return await tx("readonly", (store) => reqPromise(store.get(id))); } catch { return null; } }
+// O texto extraído deste material está neste navegador? (só confere a chave, sem ler o documento todo)
+export async function hasSourceDoc(id) {
+  if (!id) return false;
+  try { return Boolean(await tx("readonly", (store) => reqPromise(store.getKey(id)))); } catch { return false; }
+}
 export async function deleteSourceDoc(id) { if (!id) return; try { await tx("readwrite", (store) => reqPromise(store.delete(id))); } catch { /* nada a apagar */ } }
 
 const cleanText = (value) => String(value || "").replace(/\u0000/g, "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").replace(/[ \t]{2,}/g, " ").trim();

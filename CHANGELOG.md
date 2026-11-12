@@ -8,6 +8,22 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.16.0 · 12/11/2026 · Materiais de apoio que não se perdem e imagens sugeridas com destino certo
+
+**Materiais de apoio (apostilas e livros anexados)**
+
+- Ao abrir o projeto, reconectar a pasta ou restaurar um backup, o ClassAuthor confere se o texto de cada arquivo anexado está neste navegador. Se não estiver, ele **relê o arquivo da subpasta `fontes/`** da pasta do projeto e extrai o texto de novo, sem você reanexar nada.
+- Se não der (pasta não conectada, sem permissão ou arquivo ausente em `fontes/`), o cartão do material mostra um **aviso visível**: «Texto não encontrado neste navegador…», com o que fazer.
+- Ao anexar um arquivo, o cartão agora diz se a **cópia foi gravada em `fontes/`** ou por que não foi (sem pasta, sem permissão, erro). Antes a falha era silenciosa.
+- Ao clicar em «Gerar com IA», se algum material marcado para uso não tem texto neste navegador, o app avisa que a IA vai gerar **sem** o conteúdo dele e pede confirmação.
+
+**Imagens sugeridas (foto, Napkin, diagrama)**
+
+- Nova subpasta **`imagens/`** na pasta do projeto, para as cópias dos originais das imagens criadas fora (ChatGPT, Napkin…). Projetos antigos ganham a subpasta ao serem abertos.
+- Em cada semana, a prévia traz o painel **«Imagens sugeridas desta semana»**: lista o que ainda falta inserir, com botão para copiar o pedido (ChatGPT) ou o texto (Napkin) e caixa para marcar o que você inseriu de outro jeito. O cartão da semana mostra «📷 N imagem(ns) sugerida(s) a inserir».
+- A semana enviada ao ClassAtelier leva essa lista; quando ela volta editada, as figuras já inseridas saem da lista sozinhas.
+- Nova função no ClassAuthor: `figure-suggestions.js` (lista, estado e nome do arquivo), com testes. 288 testes passando.
+
 ## 1.15.8 · 04/11/2026 · Referências: autor-entidade em minúsculas
 
 - Uma referência como «gartner. Citizen Development…» (entidade em minúsculas) passa a sair «GARTNER. **Citizen Development…**. [ano].»: o autor vai para MAIÚSCULAS e o título seguinte fica em negrito, sem a mensagem «falta o destaque» e sem precisar de uma segunda correção.

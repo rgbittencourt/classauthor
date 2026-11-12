@@ -9,16 +9,17 @@ import { addUsage, costOf, emptyUsage, estimateGeneration, formatBRL, formatInt,
 import { createMoodleXml, quizQuestions } from "./moodle-xml.js";
 import { activeStyleGuide, blocksText, diffSentences, habitsFrom, normalizeStyleRules, STYLE_RULE_LIMIT } from "./style-learning.js";
 import { createProductionWorkbook, createWorkbookFromSheets, hasProduction, productionMarkdown, productionVideos, formatDuration } from "./production-xlsx.js";
-import { SOURCE_USAGES, deleteSourceDoc, importSourceFile, sourceExcerptsForWeek } from "./source-materials.js";
+import { FIGURE_KIND_LABEL, figureStatusList } from "./figure-suggestions.js";
+import { SOURCE_USAGES, deleteSourceDoc, hasSourceDoc, importSourceFile, sourceExcerptsForWeek } from "./source-materials.js";
 import { deepLocalizeUnit, localizeUnitText } from "./unit-text.js";
 import { ownKeys, installKeyFetch, openKeysModal } from "./own-keys.js";
-import { DRAFT_FILE, chooseProjectFolder, folderPermission, folderSupported, forgetProjectFolder, loadProjectFolder, openExistingProjectFolder, projectFolder, saveToProjectFolder, SUBFOLDERS } from "./project-folder.js";
+import { DRAFT_FILE, chooseProjectFolder, folderPermission, folderSupported, forgetProjectFolder, loadProjectFolder, openExistingProjectFolder, projectFolder, readFromProjectFolder, saveToProjectFolder, SUBFOLDERS } from "./project-folder.js";
 import { applyAdjustment, applyRewrite, approveWeek, bridgesBefore, canGenerateNext, dismissIssue, emptyFlow, normalizeFlow, recordGenerated, weekFlowStatus } from "./step-flow.js";
 
 const $ = (selector) => document.querySelector(selector);
 const isGitHubPages = window.location.hostname.endsWith(".github.io");
 const createReviewMarks = () => ({ resources: {}, checks: {}, academic: {}, quality: {} });
-const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null, reviewMarks: createReviewMarks(), weekApprovals: {}, studioEdits: {}, activeReviewGuidance: null, generation: null, flow: emptyFlow(), production: emptyProduction() };
+const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null, reviewMarks: createReviewMarks(), weekApprovals: {}, studioEdits: {}, figureDone: {}, activeReviewGuidance: null, generation: null, flow: emptyFlow(), production: emptyProduction() };
 state.cost = emptyUsage();
 state.rubrics = [];
 
@@ -382,6 +383,8 @@ async function downloadBlob(blob, filename) {
 // e um histórico (backup/historico/) a cada 20 minutos, no máximo. Assim o planejamento abre
 // em outro navegador ou computador com "Abrir pasta de projeto".
 let folderState = "none";
+let sourceRefreshing = null;
+let sourceRefreshAgain = false;
 let lastHistoryAt = 0;
 async function renderProjectFolder() {
   const box = $("#project-folder-bar");
@@ -406,6 +409,7 @@ async function renderProjectFolder() {
   $("#project-folder-reconnect").classList.toggle("hidden", !folder || folderState === "granted");
   $("#project-folder-forget").classList.toggle("hidden", !folder);
   box.classList.toggle("is-connected", folderState === "granted");
+  refreshMaterialSources();
 }
 async function writeDraftToFolder(snapshot) {
   if (!projectFolder() || folderState !== "granted" || !snapshot) return;
@@ -639,6 +643,7 @@ function resetDisciplineForm(preserveSession = true) {
   state.reviewMarks = createReviewMarks();
   state.weekApprovals = {};
   state.studioEdits = {};
+  state.figureDone = {};
   state.ficha = null;
   state.cost = emptyUsage();
   state.rubrics = [];
@@ -732,6 +737,7 @@ function currentSnapshot() {
       reviewMarks: state.reviewMarks,
       weekApprovals: state.weekApprovals,
       studioEdits: state.studioEdits,
+      figureDone: state.figureDone,
       production: state.production,
       stepFlow: state.flow,
       ficha: state.ficha || null,
@@ -1068,6 +1074,7 @@ function restoreSnapshot(snapshot) {
   state.reviewMarks = snapshot.results?.reviewMarks || snapshot.reviewMarks || createReviewMarks();
   state.weekApprovals = snapshot.results?.weekApprovals || snapshot.weekApprovals || {};
   state.studioEdits = snapshot.results?.studioEdits || {};
+  state.figureDone = snapshot.results?.figureDone && typeof snapshot.results.figureDone === "object" ? snapshot.results.figureDone : {};
   state.production = normalizeProductionState(snapshot.results?.production);
   state.flow = normalizeFlow(snapshot.results?.stepFlow);
   state.ficha = snapshot.results?.ficha && typeof snapshot.results.ficha === "object" ? snapshot.results.ficha : null;
@@ -1098,6 +1105,7 @@ function restoreSnapshot(snapshot) {
   }
   showAssistantMessage("Planejamento recuperado. Confira o briefing e continue de onde parou.");
   stabilizeWorkspaceLayout();
+  setTimeout(() => { refreshMaterialSources(); }, 0);
 }
 
 function downloadBackup() {
@@ -1365,17 +1373,90 @@ function practiceCard(data = {}) {
   </article>`;
 }
 
+const SOURCE_MISSING_HELP = {
+  "no-folder": "Conecte a pasta do projeto (“Abrir pasta existente”) para o ClassAuthor reler o arquivo de fontes/, ou anexe o arquivo de novo.",
+  "no-permission": "A pasta do projeto precisa de permissão: clique em “Reconectar pasta” e o texto é extraído de novo de fontes/.",
+  "not-in-fontes": "O arquivo não está na subpasta fontes/ da pasta do projeto. Anexe o arquivo de novo.",
+  unreadable: "Não consegui ler a cópia de fontes/. Anexe o arquivo de novo."
+};
+function materialCopyNote(file) {
+  const copy = file.folderCopy;
+  if (copy === "ok") return `<br><small class="material-source-copy">✓ Cópia guardada em fontes/ da pasta do projeto.</small>`;
+  if (copy === "no-folder") return `<br><small class="material-source-warning">⚠ Sem pasta de projeto conectada: a cópia NÃO foi gravada em fontes/. O texto fica só neste navegador; em outro navegador, ou depois de limpar os dados do site, será preciso anexar o arquivo de novo. Conecte a pasta e anexe o arquivo outra vez para guardar a cópia.</small>`;
+  if (copy === "no-permission") return `<br><small class="material-source-warning">⚠ A pasta do projeto está sem permissão de escrita: a cópia NÃO foi gravada em fontes/. Clique em “Reconectar pasta” e anexe o arquivo de novo.</small>`;
+  if (copy === "error") return `<br><small class="material-source-warning">⚠ Não consegui gravar a cópia em fontes/${file.copyError ? ` (${escapeHtml(file.copyError)})` : ""}. O texto fica só neste navegador.</small>`;
+  return "";
+}
 // Conteúdo do material (PDF/DOCX): o texto fica neste navegador; só trechos de cada semana vão para a IA.
-function materialSourceStatus(file) {
+// extra.missing: o texto extraído não está neste navegador; extra.restored: foi extraído de novo de fontes/.
+function materialSourceStatus(file, extra = {}) {
   if (!file) return `<span class="material-source-empty">Nenhum arquivo anexado. Anexe a apostila, o livro ou o roteiro de laboratório para a IA usar o conteúdo dele.</span>`;
   const unit = file.unit === "parte" ? "partes" : "páginas";
-  return `<strong>📎 ${escapeHtml(file.name || "arquivo")}</strong> · ${Number(file.pageCount) || 0} ${unit} com texto extraído${file.warning ? `<br><span class="material-source-warning">⚠ ${escapeHtml(file.warning)}</span>` : ""} <button type="button" class="link-button material-source-remove">Remover arquivo</button>`;
+  const remove = ` <button type="button" class="link-button material-source-remove">Remover arquivo</button>`;
+  if (extra.missing) {
+    return `<strong>📎 ${escapeHtml(file.name || "arquivo")}</strong><br><span class="material-source-warning">⚠ Texto não encontrado neste navegador: a IA NÃO vai usar o conteúdo deste material até você reanexar o arquivo. ${escapeHtml(SOURCE_MISSING_HELP[extra.missing] || SOURCE_MISSING_HELP["no-folder"])}${extra.detail ? ` (${escapeHtml(extra.detail)})` : ""}</span>${materialCopyNote(file)}${remove}`;
+  }
+  return `<strong>📎 ${escapeHtml(file.name || "arquivo")}</strong> · ${Number(file.pageCount) || 0} ${unit} com texto extraído${extra.restored ? `<br><small class="material-source-copy">✓ O navegador não tinha mais o texto: ele foi extraído de novo a partir de fontes/.</small>` : ""}${file.warning ? `<br><span class="material-source-warning">⚠ ${escapeHtml(file.warning)}</span>` : ""}${materialCopyNote(file)}${remove}`;
+}
+
+// Confere cada material com arquivo: o texto está neste navegador? Se não, tenta reler fontes/ da pasta do projeto.
+function refreshMaterialSources() {
+  // Pedido que chega no meio de uma conferência (por exemplo, ao restaurar o planejamento) pede uma nova volta ao final.
+  if (sourceRefreshing) { sourceRefreshAgain = true; return sourceRefreshing; }
+  sourceRefreshing = (async () => {
+    try {
+     do {
+      sourceRefreshAgain = false;
+      for (const card of document.querySelectorAll("#materials-list .material-card")) {
+        let file = null;
+        try { file = card.dataset.source ? JSON.parse(card.dataset.source) : null; } catch { file = null; }
+        if (!file?.id) continue;
+        const status = card.querySelector(".material-source-status");
+        if (!status) continue;
+        if (await hasSourceDoc(file.id)) { if (status.dataset.state === "missing") { status.innerHTML = materialSourceStatus(file); } status.dataset.state = ""; continue; }
+        const read = await readFromProjectFolder(file.name, { interactive: false });
+        if (read.status === "ok") {
+          try {
+            status.textContent = "O texto não estava neste navegador. Lendo de fontes/…";
+            const fresh = await importSourceFile(read.file, file.id.replace(/^src-/, ""), (done, total) => { status.textContent = `Lendo de fontes/… página ${done} de ${total}`; });
+            const merged = { ...file, ...fresh, folderCopy: "ok" };
+            card.dataset.source = JSON.stringify(merged);
+            status.innerHTML = materialSourceStatus(merged, { restored: true });
+            status.dataset.state = "";
+            scheduleSave();
+            continue;
+          } catch (error) {
+            status.dataset.state = "missing";
+            status.innerHTML = materialSourceStatus(file, { missing: "unreadable", detail: error.message || "" });
+            continue;
+          }
+        }
+        status.dataset.state = "missing";
+        status.innerHTML = materialSourceStatus(file, { missing: read.status === "missing" ? "not-in-fontes" : read.status });
+      }
+     } while (sourceRefreshAgain);
+    } catch (error) { console.warn("Conferência dos materiais adiada:", error); }
+  })();
+  const run = sourceRefreshing;
+  run.finally(() => { if (sourceRefreshing === run) { sourceRefreshing = null; sourceRefreshAgain = false; } });
+  return run;
+}
+
+// Antes de gerar: materiais marcados para uso, mas sem o texto neste navegador, geram SEM o conteúdo deles.
+async function confirmMissingSources(input) {
+  await refreshMaterialSources();
+  const lacking = [];
+  for (const material of input.materials || []) {
+    if (material.sourceFile?.id && material.sourceUsage && !(await hasSourceDoc(material.sourceFile.id))) lacking.push(material.title || material.sourceFile.name || "material");
+  }
+  if (!lacking.length) return true;
+  return window.confirm(`O texto de ${lacking.length} material(is) com arquivo não está neste navegador:\n\n• ${lacking.slice(0, 6).join("\n• ")}\n\nSe continuar, a IA gera SEM usar o conteúdo ${lacking.length > 1 ? "deles" : "dele"}. Para usar, volte aos Materiais de apoio e reanexe o arquivo (ou conecte a pasta do projeto, para relê-lo de fontes/).\n\nOK = gerar mesmo assim. Cancelar = voltar e corrigir.`);
 }
 
 function materialSourceBox(data = {}) {
   const usage = data.sourceUsage || "";
   return `<div class="material-source-box">
-      <div class="material-source-head"><strong>Usar o conteúdo deste material na geração</strong><small>O arquivo é lido no seu navegador e fica guardado nele; para cada semana, só os trechos ligados ao tema vão para a IA, com a página.</small></div>
+      <div class="material-source-head"><strong>Usar o conteúdo deste material na geração</strong><small>O arquivo é lido no seu navegador e o texto fica guardado nele; uma cópia do arquivo vai para a subpasta fontes/ da pasta do projeto, e é de lá que o ClassAuthor relê o texto se o navegador o perder. Para cada semana, só os trechos ligados ao tema vão para a IA, com a página.</small></div>
       <div class="field-grid two">
         <label class="field"><span>Arquivo (PDF ou DOCX)</span><input class="material-file" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" /></label>
         <label class="field"><span>Como a IA deve usar</span><select class="material-usage">${SOURCE_USAGES.map((option) => `<option value="${option.id}" ${option.id === usage ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}</select></label>
@@ -2077,10 +2158,11 @@ function renderLessonPreview(lesson, index) {
     + (guide.weekSummary && guide.studentFAQ?.length ? "" : `<section class="reader-warning"><h3>Explicações para o professor</h3><p>Esta semana ainda não tem o resumo, as perguntas prováveis dos alunos, os equívocos comuns e os sinais de alerta que entram no Material de Mediação. O texto da semana não é alterado.</p><button type="button" class="secondary" id="retry-explain-button">Completar explicações do Material de Mediação</button></section>`);
   $("#lesson-modal-eyebrow").textContent = `PRÉVIA · SEMANA ${String(index + 1).padStart(2, "0")}`;
   $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${index + 1}`;
-  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${pendingFigures}${approvedPlanMarkup}${sourceUsed}${sectionsMarkup}${methodology}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}${productionMarkup(index, weekReleased(index) || manuallyApproved || ["ready", "complete"].includes(automaticStatus))}`;
+  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${pendingFigures}${figureListMarkup(index)}${approvedPlanMarkup}${sourceUsed}${sectionsMarkup}${methodology}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}${productionMarkup(index, weekReleased(index) || manuallyApproved || ["ready", "complete"].includes(automaticStatus))}`;
   renderFlowPanel(index);
   $("#retry-derivatives-button")?.addEventListener("click", () => retryDerivatives(index));
   $("#retry-figures-button")?.addEventListener("click", () => retryFigures(index));
+  wireFigureList(index);
   $("#methodology-guide-button")?.addEventListener("click", async (event) => { await retryDerivatives(index, { parts: ["methodology"], button: event.currentTarget }); openLessonPreview(index); });
   document.querySelectorAll("#lesson-reader .copy-suggestion").forEach((button) => button.addEventListener("click", async () => {
     const value = button.previousElementSibling?.value || "";
@@ -2527,6 +2609,66 @@ function methodologyPreviewMarkup(plan, guide, index, lesson) {
     ${(mg.pitfalls || []).length ? `<h4>Erros comuns</h4>${list(mg.pitfalls)}` : ""}
     ${mg.adaptations ? `<h4>Adaptações</h4>${list([mg.adaptations.ead ? `100% a distância: ${mg.adaptations.ead}` : "", mg.adaptations.synchronous ? `Encontro ao vivo / prática: ${mg.adaptations.synchronous}` : "", mg.adaptations.largeClass ? `Turma grande: ${mg.adaptations.largeClass}` : ""].filter(Boolean))}` : ""}
     <button type="button" class="secondary" id="methodology-guide-button">Gerar o guia de novo</button></details></section>`;
+}
+
+// ── Imagens sugeridas desta semana: o que falta criar fora (ChatGPT, Napkin) e inserir no ClassAtelier ──
+function weekFigureList(index) {
+  const week = state.weeks?.[index];
+  if (!week) return [];
+  return figureStatusList(week, { blocks: state.studioEdits?.[index]?.project?.blocks || null, done: state.figureDone, weekNumber: index + 1 });
+}
+
+function figureCopyText(figure, index) {
+  const plan = state.weeks?.[index]?.lessonPlan || {};
+  if (figure.kind === "napkin") return figure.napkinText || [figure.description, figure.caption].filter(Boolean).map((part) => String(part).replace(/[.\s]+$/, "")).join(". ") + ".";
+  if (figure.kind === "foto" && figure.prompt) return figure.prompt;
+  return externalDiagramPrompt(figure, { lesson: plan.theme || "", section: figure.sectionTitle || "" });
+}
+
+function figureListMarkup(index) {
+  const list = weekFigureList(index);
+  if (!list.length) return "";
+  const open = list.filter((figure) => !figure.inserted).length;
+  const rows = list.map((figure) => {
+    const label = FIGURE_KIND_LABEL[figure.kind] || "Imagem";
+    const state2 = figure.how === "editor" ? "inserida no ClassAtelier ✓" : figure.how === "manual" ? "marcada por você como inserida ✓" : "ainda não inserida";
+    const copyLabel = figure.kind === "napkin" ? "Copiar texto para o Napkin" : "Copiar pedido para o gerador de imagens";
+    return `<li class="figure-todo${figure.inserted ? " is-done" : ""}" data-figure-id="${escapeHtml(figure.id)}"><label><input type="checkbox" class="figure-done" data-figure-id="${escapeHtml(figure.id)}" ${figure.inserted ? "checked" : ""} ${figure.how === "editor" ? "disabled" : ""} /> <strong>${escapeHtml(label)}</strong> · ${escapeHtml(`seção ${figure.sectionNumber}${figure.sectionTitle ? ` — ${figure.sectionTitle}` : ""}`)}</label><p>${escapeHtml(figure.description || figure.caption || "(sem descrição)")}</p><small>${escapeHtml(state2)}${figure.inserted ? "" : ` · arquivo de cópia: <code>imagens/S${index + 1}-fig-${String(figure.id).replace(/^.*-f/, "")}-${figure.kind}.…</code>`}</small> <button type="button" class="secondary figure-copy" data-figure-id="${escapeHtml(figure.id)}">${copyLabel}</button></li>`;
+  }).join("");
+  return `<section class="reader-figure-todo" id="figure-todo-panel"><details ${open ? "open" : ""}><summary><strong>Imagens sugeridas desta semana</strong> · ${open ? `${open} de ${list.length} ainda a inserir` : `as ${list.length} já foram inseridas`}</summary><p><small>Crie cada imagem fora (ChatGPT, Napkin…) e, no ClassAtelier, use “Inserir imagem no cursor” e escolha a figura nesta lista: o ClassAtelier guarda uma cópia do original em <code>imagens/</code> da pasta do projeto e, quando a semana voltar para cá, ela sai da lista. Inseriu de outro jeito? Marque a caixa.</small></p><ul class="figure-todo-list">${rows}</ul></details></section>`;
+}
+
+function wireFigureList(index) {
+  const panel = $("#figure-todo-panel");
+  if (!panel) return;
+  panel.querySelectorAll(".figure-done").forEach((box) => box.addEventListener("change", () => {
+    state.figureDone = state.figureDone || {};
+    if (box.checked) state.figureDone[box.dataset.figureId] = true; else delete state.figureDone[box.dataset.figureId];
+    panel.outerHTML = figureListMarkup(index);
+    wireFigureList(index);
+    refreshFigureBadge(index);
+    saveDraft("imagens sugeridas");
+  }));
+  panel.querySelectorAll(".figure-copy").forEach((button) => button.addEventListener("click", async () => {
+    const figure = weekFigureList(index).find((item) => item.id === button.dataset.figureId);
+    if (!figure) return;
+    const value = figureCopyText(figure, index);
+    try { await navigator.clipboard.writeText(value); } catch { /* sem permissão de área de transferência */ }
+    const label = button.textContent; button.textContent = "Copiado!"; setTimeout(() => { button.textContent = label; }, 1500);
+  }));
+}
+
+function figureBadgeText(index) {
+  const open = weekFigureList(index).filter((figure) => !figure.inserted).length;
+  return open ? `📷 ${open} imagem(ns) sugerida(s) a inserir (foto, Napkin ou diagrama)` : "";
+}
+
+function refreshFigureBadge(index) {
+  const card = $("#week-grid")?.querySelectorAll(".week-card")[index];
+  if (!card) return;
+  card.querySelector(".week-images-pending")?.remove();
+  const text = figureBadgeText(index);
+  if (text) card.querySelector(".week-actions")?.insertAdjacentHTML("beforebegin", `<small class="week-images-pending">${escapeHtml(text)}</small>`);
 }
 
 // Imagem sugerida (foto para gerar fora, ou visual para o Napkin): o professor cria e insere no ClassAtelier.
@@ -3128,7 +3270,7 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
     const qualityLabel = manuallyApproved ? "conferida e liberada por você" : ({ ready: "conteúdo pronto", complete: "conteúdo completo", blocked: "bloqueada: pendência crítica", review: "revisão recomendada", "needs-review": "revisão recomendada", insufficient: "conteúdo insuficiente" }[automaticStatus] || "qualidade não medida");
     const approvalButton = automaticStatus !== "ready" && automaticStatus !== "complete" ? `<button class="week-approve ${manuallyApproved ? "is-approved" : ""}" data-index="${index}" type="button">${manuallyApproved ? "Desfazer liberação" : "Liberar após conferência"}</button>` : "";
     const statusDetail = reasons.length ? `<small class="week-status-detail">${escapeHtml(manuallyApproved ? `Diagnóstico automático: ${reasons.join(" · ")}` : reasons.join(" · "))}</small>` : "";
-    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div>${methodologyForWeekLabel(index, lesson) ? `<span class="week-method">${escapeHtml(methodologyForWeekLabel(index, lesson))}</span>` : ""}${flowBadge(index)}<h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div>${compositionSummary ? `<small class="week-composition-summary"><strong>Composição materializada:</strong> ${escapeHtml(compositionSummary)}</small>` : ""}${resourceCoverage ? `<small class="week-resource-coverage"><strong>Cobertura:</strong> ${escapeHtml(resourceCoverage)}</small>` : pendingResources ? `<small class="week-resource-coverage is-pending"><strong>Cobertura:</strong> ${escapeHtml(pendingResources)}</small>` : ""}${pendingGeneration ? `<small class="week-generation-pending">${escapeHtml(pendingGeneration)}</small>` : ""}<span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(automaticStatus)}">${escapeHtml(qualityLabel)}</span>${statusDetail}<div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-download" data-index="${index}" type="button" title="Arquivo para abrir no ClassAtelier (sem o quiz)">JSON ClassAtelier <span>↓</span></button><button class="button button-secondary week-download-full" data-index="${index}" type="button" title="Semana completa do ClassAuthor, com quiz, feedbacks e guia do professor">JSON ClassAuthor <span>↓</span></button><button class="button button-secondary week-download-quiz" data-index="${index}" type="button" ${quizQuestions(lesson).length ? "" : "disabled"} title="Quiz da semana em Moodle XML, com feedback em todas as alternativas">Quiz XML <span>↓</span></button><button class="button button-secondary week-open-studio" data-index="${index}" type="button" title="Abre o ClassAtelier em outra aba já com esta semana carregada">Abrir esta semana no <strong class="wordmark"><b>Class</b><i>Atelier</i></strong> <span>↗</span></button>${approvalButton}</div>${studioEditMarkup(index)}</article>`;
+    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div>${methodologyForWeekLabel(index, lesson) ? `<span class="week-method">${escapeHtml(methodologyForWeekLabel(index, lesson))}</span>` : ""}${flowBadge(index)}<h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div>${compositionSummary ? `<small class="week-composition-summary"><strong>Composição materializada:</strong> ${escapeHtml(compositionSummary)}</small>` : ""}${resourceCoverage ? `<small class="week-resource-coverage"><strong>Cobertura:</strong> ${escapeHtml(resourceCoverage)}</small>` : pendingResources ? `<small class="week-resource-coverage is-pending"><strong>Cobertura:</strong> ${escapeHtml(pendingResources)}</small>` : ""}${pendingGeneration ? `<small class="week-generation-pending">${escapeHtml(pendingGeneration)}</small>` : ""}${figureBadgeText(index) ? `<small class="week-images-pending">${escapeHtml(figureBadgeText(index))}</small>` : ""}<span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(automaticStatus)}">${escapeHtml(qualityLabel)}</span>${statusDetail}<div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-download" data-index="${index}" type="button" title="Arquivo para abrir no ClassAtelier (sem o quiz)">JSON ClassAtelier <span>↓</span></button><button class="button button-secondary week-download-full" data-index="${index}" type="button" title="Semana completa do ClassAuthor, com quiz, feedbacks e guia do professor">JSON ClassAuthor <span>↓</span></button><button class="button button-secondary week-download-quiz" data-index="${index}" type="button" ${quizQuestions(lesson).length ? "" : "disabled"} title="Quiz da semana em Moodle XML, com feedback em todas as alternativas">Quiz XML <span>↓</span></button><button class="button button-secondary week-open-studio" data-index="${index}" type="button" title="Abre o ClassAtelier em outra aba já com esta semana carregada">Abrir esta semana no <strong class="wordmark"><b>Class</b><i>Atelier</i></strong> <span>↗</span></button>${approvalButton}</div>${studioEditMarkup(index)}</article>`;
   }).join("");
   $("#week-grid").innerHTML = cards;
   const weeksTitle = $("#weeks-sector-title");
@@ -3259,6 +3401,7 @@ window.addEventListener("message", (event) => {
   state.studioEdits = state.studioEdits || {};
   state.studioEdits[index] = { project: { meta: lesson.meta || {}, blocks: lesson.blocks }, text: String(text || ""), fileName: fileName || "", at: new Date().toISOString() };
   refreshStudioEditNote(index);
+  refreshFigureBadge(index);
   saveDraft("semana devolvida pelo ClassAtelier");
   if (projectFolder() && folderState === "granted") {
     const name = localizeUnitText(fileName || weekFileName(state.weeks[index], index, "ClassAtelier.json"), courseUnit());
@@ -3268,12 +3411,21 @@ window.addEventListener("message", (event) => {
   reply({ type: "classauthor:received", week: index + 1, title: state.weeks[index]?.meta?.title || "" });
 });
 
+// A semana que vai para o ClassAtelier leva o número da semana e a lista de imagens sugeridas ainda não inseridas
+// (pedido e texto do Napkin), para o editor ligar cada imagem inserida à figura e guardar a cópia em imagens/.
+function studioPayloadFor(index) {
+  const base = studentProjectFor(index);
+  const suggestions = weekFigureList(index).filter((figure) => !figure.inserted).map(({ id, kind, description, caption, prompt, napkinText, sectionNumber, sectionTitle }) => ({ id, kind, description, caption, prompt: kind === "diagrama" ? figureCopyText({ id, kind, description, caption, prompt, napkinText, sectionTitle }, index) : prompt, napkinText, sectionNumber, sectionTitle }));
+  return { ...base, meta: { ...(base.meta || {}), weekNumber: index + 1, figureSuggestions: suggestions } };
+}
+
 function openInStudio(index) {
   const lesson = Number.isInteger(index) ? state.weeks[index] : null;
   const win = window.open(STUDIO_URL, "classatelier-editor");
   if (!win) { showStudioToast("O navegador bloqueou a nova aba. Libere pop-ups para este site e tente de novo."); return; }
   if (!lesson) return;
-  const payload = studentProjectFor(index);
+  // O ClassAtelier recebe a lista de imagens sugeridas (pedido, texto do Napkin) para ligar cada imagem inserida à figura.
+  const payload = studioPayloadFor(index);
   const fileName = weekFileName(lesson, index, "ClassAtelier.json");
   let settled = false;
   const finish = () => { settled = true; window.removeEventListener("message", onMessage); clearTimeout(fallbackTimer); };
@@ -3747,6 +3899,7 @@ async function generate() {
     return;
   }
   if (!isGitHubPages && !(await confirmGenerationCost({ input, startIndex }))) return;
+  if (!(await confirmMissingSources(input))) return;
   if (!resumeGeneration) {
     state.flow = emptyFlow(); state.lessonPlans = {};
     state.weeks = []; refreshStudioWeekSelect();
@@ -4240,8 +4393,14 @@ $("#materials-list")?.addEventListener("change", async (event) => {
   try {
     const original = input.files[0];
     const file = await importSourceFile(original, card.dataset.id, (done, total) => { status.textContent = `Lendo o arquivo… página ${done} de ${total}`; });
-    if (projectFolder()) saveToProjectFolder(original, original.name, { interactive: true, subfolder: "fontes" }).catch(() => {});
+    // Cópia em fontes/: com aviso visível quando não puder ser gravada (antes a falha era silenciosa).
+    if (!projectFolder()) file.folderCopy = "no-folder";
+    else {
+      try { file.folderCopy = (await saveToProjectFolder(original, original.name, { interactive: true, subfolder: "fontes" })) ? "ok" : "no-permission"; }
+      catch (copyError) { file.folderCopy = "error"; file.copyError = String(copyError?.message || copyError).slice(0, 120); }
+    }
     card.dataset.source = JSON.stringify(file);
+    card.querySelector(".material-source-status").dataset.state = "";
     status.innerHTML = materialSourceStatus(file);
     const usage = card.querySelector(".material-usage");
     if (usage && !usage.value) usage.value = "base";

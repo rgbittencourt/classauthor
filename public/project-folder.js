@@ -17,7 +17,8 @@ export const SUBFOLDERS = Object.freeze([
   ["producao", "Produção audiovisual: planilha e roteiros de vídeo"],
   ["coordenacao", "Para a coordenação: Plano de Ensino (ficha da disciplina), Mapa de alinhamento e o índice do pacote"],
   ["pacotes", "Pacotes completos (ZIP)"],
-  ["fontes", "Cópias das apostilas e livros anexados como fonte (PDF, DOCX)"],
+  ["fontes", "Cópias das apostilas e livros anexados como fonte (PDF, DOCX); o ClassAuthor relê daqui se o navegador perder o texto"],
+  ["imagens", "Imagens das aulas: cópias dos originais criados fora (ChatGPT, Napkin etc.) e inseridos no ClassAtelier"],
   ["textos", "Textos editados e outros arquivos"]
 ]);
 
@@ -101,7 +102,20 @@ export function subfolderFor(filename = "") {
   if (/\.docx$|webpratica|pratica|laboratorio/.test(name)) return "praticas";
   if (/\.xlsx$|roteiros-de-video|producao/.test(name)) return "producao";
   if (/\.zip$/.test(name)) return "pacotes";
+  if (/\.(png|jpe?g|webp|gif|svg)$/.test(name)) return "imagens";
   return "textos";
+}
+
+// Lê um arquivo de uma subpasta (por padrão fontes/). status: ok | no-folder | no-permission | missing.
+export async function readFromProjectFolder(filename, { interactive = false, subfolder = "fontes" } = {}) {
+  if (!current?.handle) return { status: "no-folder" };
+  if ((await folderPermission(interactive)) !== "granted") return { status: "no-permission" };
+  try {
+    let dir = current.handle;
+    for (const part of subfolder.split("/")) dir = await dir.getDirectoryHandle(part);
+    const file = await (await dir.getFileHandle(filename)).getFile();
+    return { status: "ok", file };
+  } catch { return { status: "missing" }; }
 }
 
 // Grava o arquivo na subpasta certa. Devolve o caminho relativo, ou null se não houver pasta/permissão.
