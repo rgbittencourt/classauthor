@@ -19,6 +19,7 @@ import captionsHandler from "../src/captions-handler.js";
 import styleHandler from "../src/style-handler.js";
 import videoSummaryHandler from "../src/video-summary.js";
 import keysHandler from "../src/keys-handler.js";
+import slidesHandler from "../src/slides-handler.js";
 
 async function handler(request, response) {
   // /api/bridge e /api/derivatives são encaminhados para esta função (limite de 12 funções do plano Hobby).
@@ -26,6 +27,8 @@ async function handler(request, response) {
   if (request.body?.action === "derivatives") return derivativesHandler(request, response);
   // /api/figure (figura avulsa pedida pelo ClassAtelier, com CORS) também chega aqui, inclusive o OPTIONS.
   if (request.method === "OPTIONS" || request.body?.action === "figure") return figureHandler(request, response);
+  // /api/slides (slides pedidos pelo ClassAtelier, com CORS; o OPTIONS cai no figureHandler acima, que tem o mesmo CORS).
+  if (request.body?.action === "slides") return slidesHandler(request, response);
   if (request.body?.action === "illustrate") return illustrateHandler(request, response);
   if (request.body?.action === "production") return productionHandler(request, response);
   if (request.body?.action === "edit") return weekEditHandler(request, response);

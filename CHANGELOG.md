@@ -8,6 +8,11 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.17.0 · 12/11/2026 · Slides para o ClassAtelier
+
+- Nova rota **`/api/slides`** (com CORS, como `/api/figure`), usada pelo botão **Slides** do ClassAtelier. Com `mode: "frame"`, devolve a pergunta central da aula, os objetivos e a síntese; com `mode: "section"`, devolve os slides de uma seção. A IA escolhe só o conteúdo, dentro de um catálogo fechado de tipos (frase de impacto, cartões, comparação, etapas, fórmula, número de destaque, tabela, linha do tempo, pergunta para refletir, atenção, citação e figura da aula), com notas do apresentador; as perguntas «Para refletir» levam a resposta detalhada nas notas. O desenho dos slides é todo do ClassAtelier.
+- Aceita o código de acesso ou a chave de IA própria, como as figuras. Nada muda no restante do ClassAuthor.
+
 ## 1.16.0 · 12/11/2026 · Materiais de apoio que não se perdem e imagens sugeridas com destino certo
 
 **Materiais de apoio (apostilas e livros anexados)**

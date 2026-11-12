@@ -20,6 +20,10 @@
       "dest": "/api/regenerate-week"
     },
     {
+      "src": "/api/slides",
+      "dest": "/api/regenerate-week"
+    },
+    {
       "src": "/api/illustrate",
       "dest": "/api/regenerate-week"
     },
