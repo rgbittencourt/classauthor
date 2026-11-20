@@ -897,6 +897,37 @@ const APPROACH_HINTS = {
   atual: "Gera como até a versão 1.2.1, sem as regras da abordagem nova."
 };
 
+const VALIDATED_METHODOLOGIES = Object.freeze([
+  ["sala-invertida", "Sala de aula invertida", "O primeiro contato orientado acontece antes; o encontro é dedicado à aplicação."],
+  ["rotacao-estacoes", "Rotação por estações", "Grupos percorrem estações; pelo menos uma atividade é on-line."],
+  ["laboratorio-rotacional", "Laboratório rotacional", "Alternância planejada entre sala e laboratório ou ambiente tecnológico."],
+  ["rotacao-individual", "Rotação individual", "Cada estudante segue uma agenda definida por evidências e necessidades."],
+  ["flex", "Flex", "Percurso principalmente on-line, flexível, com tutoria sob demanda."],
+  ["a-la-carte", "À la carte", "Uma ou mais disciplinas integralmente on-line, articuladas ao percurso presencial."],
+  ["virtual-aprimorado", "Virtual aprimorado", "Percurso predominantemente on-line com encontros presenciais periódicos."]
+]);
+
+function installValidatedMethodologyOptions() {
+  const select = $("#methodology-default");
+  if (!select || select.dataset.referencesInstalled === "true") return;
+  const validated = new Set(VALIDATED_METHODOLOGIES.map(([id]) => id));
+  for (const option of [...select.options]) {
+    if (["nenhuma", "auto"].includes(option.value) || validated.has(option.value)) continue;
+    option.disabled = true;
+    option.textContent = `${option.textContent} — referencial pendente`;
+    option.dataset.hint = "Esta metodologia será liberada quando o administrador cadastrar e validar uma fonte própria.";
+  }
+  const anchor = [...select.options].find((option) => option.value === "design-thinking");
+  for (const [id, label, hint] of VALIDATED_METHODOLOGIES) {
+    if ([...select.options].some((option) => option.value === id)) continue;
+    const option = document.createElement("option"); option.value = id; option.textContent = label; option.dataset.hint = hint;
+    select.insertBefore(option, anchor || null);
+  }
+  select.dataset.referencesInstalled = "true";
+}
+
+installValidatedMethodologyOptions();
+
 function methodologyOptions() {
   return [...($("#methodology-default")?.options || [])].map((option) => ({ value: option.value, label: option.textContent, hint: option.dataset.hint || "" }));
 }
@@ -1590,6 +1621,7 @@ function formInput() {
     pedagogicalApproach: $("#pedagogical-approach")?.value || "nova",
     unit: $("#course-unit")?.value || "semana",
     methodologyPlan: collectMethodologyPlan(),
+    requireValidatedMethodologyReferences: true,
     academicProfile: {
       discipline: $("#course-title").value.trim(),
       level: $("#level").value,

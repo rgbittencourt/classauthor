@@ -6,6 +6,8 @@
 // (Biggs) e princípios de aprendizagem multimídia (Mayer) nos materiais.
 // As metodologias ativas podem ser escolhidas por semana em qualquer abordagem.
 
+import { HYBRID_METHOD_PROFILES, hybridProfileFor, hybridReferenceBlock, referencePolicyFor } from "./hybrid-reference.js";
+
 const text = (value) => String(value ?? "").trim();
 const object = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 
@@ -88,6 +90,51 @@ export const ACTIVE_METHODS = Object.freeze([
     keywords: ["estaç", "trilha"]
   },
   {
+    id: "laboratorio-rotacional",
+    label: "Laboratório rotacional",
+    hint: "Alternância planejada entre sala e laboratório ou ambiente tecnológico.",
+    text: hybridProfileFor("laboratorio-rotacional").definition,
+    activities: hybridProfileFor("laboratorio-rotacional").planningPrinciples.join("; "),
+    mediation: "Acompanhe a conexão entre os ambientes, a logística da rotação e quem precisa de tutoria; mantenha um plano B sem acesso ou equipamento.",
+    keywords: ["laboratório", "laboratorio", "rotação", "rotacao"]
+  },
+  {
+    id: "rotacao-individual",
+    label: "Rotação individual",
+    hint: "Cada estudante segue uma agenda definida por suas necessidades.",
+    text: hybridProfileFor("rotacao-individual").definition,
+    activities: hybridProfileFor("rotacao-individual").planningPrinciples.join("; "),
+    mediation: "Use evidências para encaminhar cada estudante, acompanhe o progresso e atualize a agenda; nem todos precisam passar pelas mesmas atividades.",
+    keywords: ["agenda", "individual", "percurso", "diagnóstico"]
+  },
+  {
+    id: "flex",
+    label: "Flex",
+    hint: "Percurso on-line flexível, com tutoria e intervenções sob demanda.",
+    text: hybridProfileFor("flex").definition,
+    activities: hybridProfileFor("flex").planningPrinciples.join("; "),
+    mediation: "Circule, ofereça tutoria individual ou em pequenos grupos e use dados do percurso para decidir intervenções e agrupamentos.",
+    keywords: ["plano de estudos", "ritmo", "tutoria", "flex"]
+  },
+  {
+    id: "a-la-carte",
+    label: "À la carte",
+    hint: "Uma ou mais disciplinas integralmente on-line, articuladas ao percurso presencial.",
+    text: hybridProfileFor("a-la-carte").definition,
+    activities: hybridProfileFor("a-la-carte").planningPrinciples.join("; "),
+    mediation: "Garanta tutoria, comunicação e avaliação no ambiente virtual e articule o componente on-line às demais experiências do curso.",
+    keywords: ["disciplina", "online", "on-line", "tutoria"]
+  },
+  {
+    id: "virtual-aprimorado",
+    label: "Virtual aprimorado",
+    hint: "Percurso predominantemente on-line com encontros presenciais periódicos.",
+    text: hybridProfileFor("virtual-aprimorado").definition,
+    activities: hybridProfileFor("virtual-aprimorado").planningPrinciples.join("; "),
+    mediation: "Acompanhe continuamente o percurso on-line e reserve os encontros presenciais para finalidades que realmente dependam da presença.",
+    keywords: ["virtual", "online", "on-line", "presencial", "periódico"]
+  },
+  {
     id: "design-thinking",
     label: "Design thinking",
     hint: "Empatia, definição, ideação e protótipo.",
@@ -106,6 +153,136 @@ export const METHOD_CHOICES = Object.freeze([
 
 const methodById = (id) => ACTIVE_METHODS.find((method) => method.id === id) || null;
 const validChoice = (id) => METHOD_CHOICES.some((choice) => choice.id === id);
+
+const VALIDATION_RULES = Object.freeze({
+  "sala-invertida": [
+    { id: "preparation", label: "estudo ou preparação antes do encontro/aplicação", patterns: [/estudo\s+pr[eé]vio/i, /antes\s+(?:do|da|de)\s+(?:encontro|aula|aplica)/i, /prepara(?:ç[aã]o|r)/i] },
+    { id: "verification", label: "verificação da preparação ou leitura", patterns: [/verifica(?:ç[aã]o|r)/i, /autoverifica/i, /quiz/i, /perguntas?\s+(?:de|da)\s+leitura/i] },
+    { id: "application", label: "aplicação do conteúdo a uma situação nova", patterns: [/aplica(?:ç[aã]o|r)/i, /situa(?:ç[aã]o|ções)\s+nov/i, /resolver/i, /produzir/i] }
+  ],
+  "estudo-de-caso": [
+    { id: "case", label: "caso âncora com dados, contexto ou dilema", patterns: [/caso\s+(?:[aâ]ncora|real|ilustrativo|contextualizado)/i, /estudo\s+de\s+caso/i, /dilema/i] },
+    { id: "analysis", label: "análise do caso com uso dos conceitos", patterns: [/analis(?:ar|e|ando)/i, /[àa]\s+luz\s+d[eo]s?\s+conceitos/i, /diagn[oó]stic/i] },
+    { id: "decision", label: "decisão, recomendação ou solução justificada", patterns: [/recomend/i, /decis[aã]o/i, /solu(?:ç[aã]o|ções)\s+justific/i, /justifi(?:car|que)/i] }
+  ],
+  pbl: [
+    { id: "open-problem", label: "problema aberto apresentado antes da solução", patterns: [/problema\s+aberto/i, /sem\s+(?:uma\s+)?resposta\s+[uú]nica/i, /situa(?:ç[aã]o|ções)[- ]problema/i] },
+    { id: "investigation", label: "levantamento do que já se sabe e investigação do que falta", patterns: [/o\s+que\s+(?:j[aá]\s+)?sabemos/i, /precisamos\s+(?:descobrir|investigar)/i, /investiga(?:ç[aã]o|r)/i] },
+    { id: "solution-reflection", label: "solução justificada e reflexão sobre a aprendizagem", patterns: [/proposta\s+de\s+solu(?:ç[aã]o|ções)/i, /solu(?:ç[aã]o|ções)\s+justific/i, /reflex[aã]o\s+(?:sobre|do)\s+(?:o\s+)?(?:aprendizado|aprendizagem)/i] }
+  ],
+  projetos: [
+    { id: "project-delivery", label: "entrega ou marco concreto do projeto", patterns: [/entrega\s+parcial/i, /marco\s+(?:do|de)\s+projeto/i, /produto\s+(?:do|de)\s+projeto/i] },
+    { id: "criteria", label: "critérios observáveis ou rubrica para a entrega", patterns: [/rubrica/i, /crit[eé]rios?\s+(?:observ[aá]ve|de\s+avalia)/i, /checklist/i] },
+    { id: "feedback", label: "momento de feedback antes da versão final", patterns: [/feedback\s+(?:entre\s+pares|do\s+professor)/i, /revis[aã]o\s+por\s+pares/i, /antes\s+da\s+vers[aã]o\s+final/i] }
+  ],
+  "peer-instruction": [
+    { id: "individual-answer", label: "resposta individual inicial a uma questão conceitual", patterns: [/responder?\s+(?:primeiro\s+)?sozinh/i, /resposta\s+individual/i, /quest[aã]o\s+conceitual/i] },
+    { id: "peer-discussion", label: "discussão entre pares com justificativa", patterns: [/discuss[aã]o\s+entre\s+pares/i, /discutir\s+com\s+(?:um\s+)?colega/i, /justifi(?:car|que).{0,60}(?:colega|pares)/i] },
+    { id: "second-answer", label: "nova resposta depois da discussão", patterns: [/responder?\s+de\s+novo/i, /segunda\s+resposta/i, /nova\s+resposta/i] }
+  ],
+  gamificacao: [
+    { id: "missions", label: "missões ou desafios ligados aos objetivos", patterns: [/miss[aã]o|miss[oõ]es/i, /desafios?\s+(?:ligad|associad)/i] },
+    { id: "progression", label: "progressão por níveis ou etapas", patterns: [/n[ií]veis?/i, /progress[aã]o/i, /etapas?\s+(?:progressiv|crescent)/i] },
+    { id: "feedback", label: "feedback por missão, sem substituir os critérios", patterns: [/feedback\s+imediato/i, /feedback\s+(?:por|da)\s+miss/i, /crit[eé]rios?\s+de\s+aprendizagem/i] }
+  ],
+  "juri-simulado": [
+    { id: "roles", label: "papéis e posições em disputa", patterns: [/defesa.{0,40}acusa(?:ç[aã]o|r)/i, /pap[eé]is?.{0,80}(?:jurad|debate)/i, /posi(?:ç[aã]o|ções)\s+em\s+disputa/i] },
+    { id: "evidence", label: "argumentos fundamentados em evidências", patterns: [/argumentos?\s+fundamentad/i, /evid[eê]ncias?\s+(?:para|em|que)/i, /cobrar\s+evid[eê]ncia/i] },
+    { id: "rounds", label: "rodadas e fechamento mediado", patterns: [/rodadas?/i, /r[eé]plica|tr[eé]plica/i, /fechamento.{0,60}(?:professor|mediador|objetivos)/i] }
+  ],
+  "rotacao-estacoes": [
+    { id: "stations", label: "três ou mais estações/trilhas identificáveis", test: (body) => (body.match(/esta(?:ç[aã]o|ções)|trilhas?/gi) || []).length >= 3 },
+    { id: "station-products", label: "tarefa, tempo ou produto definido em cada estação", patterns: [/tempo\s+(?:sugerido|previsto)/i, /produto\s+(?:de|da)\s+cada/i, /tarefa\s+(?:de|em|por)\s+cada/i] },
+    { id: "integration", label: "síntese final que integra as estações", patterns: [/s[ií]ntese.{0,80}integra/i, /integra(?:r|ç[aã]o).{0,80}esta(?:ç[aã]o|ções)/i, /fechamento\s+integrador/i] }
+  ],
+  "laboratorio-rotacional": [
+    { id: "two-spaces", label: "sala e laboratório/ambiente tecnológico estão definidos", patterns: [/sala.{0,120}laborat[oó]rio/i, /laborat[oó]rio.{0,120}sala/i, /dois\s+ambientes/i] },
+    { id: "rotation-time", label: "a rotação e o tempo de cada ambiente estão definidos", patterns: [/rota(?:ç[aã]o|cion).{0,100}(?:minutos|tempo|hor[aá]rio)/i, /(?:minutos|tempo).{0,100}laborat[oó]rio/i] },
+    { id: "online-purpose", label: "a atividade on-line possui finalidade pedagógica", patterns: [/on-?line.{0,120}(?:investig|pratic|produ|analis|dados)/i, /laborat[oó]rio.{0,120}(?:investig|pratic|produ|analis)/i] },
+    { id: "connection", label: "a produção do laboratório se conecta à etapa em sala", patterns: [/laborat[oó]rio.{0,160}(?:sala|discuss|retom|apresent)/i, /(?:sala|discuss|retom).{0,160}laborat[oó]rio/i] },
+    { id: "fallback", label: "há alternativa para falha de acesso ou equipamento", patterns: [/plano\s+b/i, /sem\s+(?:internet|acesso|equipamento)/i, /alternativa.{0,80}(?:acesso|equipamento|laborat[oó]rio)/i] }
+  ],
+  "rotacao-individual": [
+    { id: "diagnostic", label: "há diagnóstico ou evidência para definir o percurso", patterns: [/diagn[oó]stic/i, /evid[eê]ncia.{0,100}(?:agenda|percurso|necessidade)/i, /resultado.{0,100}(?:anterior|agenda|percurso)/i] },
+    { id: "individual-path", label: "cada estudante recebe agenda ou percurso individual", patterns: [/agenda\s+(?:pessoal|individual|personalizada)/i, /percurso\s+(?:individual|personalizado)/i, /roteiro\s+individual/i] },
+    { id: "not-all", label: "nem todos precisam realizar as mesmas atividades", patterns: [/n[aã]o\s+(?:precisa|devem).{0,80}(?:todas|mesmas)/i, /nem\s+todos.{0,80}(?:atividades|esta(?:ç[aã]o|ções))/i] },
+    { id: "tutoring", label: "há tutoria e atualização do percurso", patterns: [/tutoria/i, /acompanhar.{0,100}(?:progresso|percurso)/i, /atualizar.{0,80}(?:agenda|percurso)/i] }
+  ],
+  flex: [
+    { id: "online-core", label: "a aprendizagem on-line é o eixo principal", patterns: [/on-?line.{0,80}(?:eixo|central|principal)/i, /plano\s+de\s+estudos\s+on-?line/i] },
+    { id: "flexibility", label: "há flexibilidade real de ritmo ou caminho", patterns: [/ritmo\s+(?:pr[oó]prio|flex[ií]vel|individual)/i, /caminho\s+flex/i, /escolh(?:a|er).{0,100}(?:atividade|percurso|aprofundamento)/i] },
+    { id: "tutoring", label: "o professor oferece tutoria e intervenções sob demanda", patterns: [/tutoria/i, /interven(?:ç[aã]o|ções).{0,100}(?:demanda|necessidade)/i, /pequenos\s+grupos/i] },
+    { id: "data", label: "dados do percurso orientam a personalização", patterns: [/dados.{0,100}(?:personaliz|apoio|interven)/i, /progresso.{0,100}(?:apoio|pr[oó]ximos passos)/i] }
+  ],
+  "a-la-carte": [
+    { id: "online-discipline", label: "uma disciplina ou componente ocorre integralmente on-line", patterns: [/disciplina.{0,100}(?:inteiramente|integralmente|100%).{0,40}on-?line/i, /componente.{0,100}integralmente\s+on-?line/i] },
+    { id: "online-support", label: "ambiente, tutoria e avaliação on-line estão definidos", patterns: [/tutoria/i], allPatterns: [/ambiente\s+virtual|on-?line/i, /avalia/i] },
+    { id: "articulation", label: "o componente on-line se articula ao percurso presencial", patterns: [/articul.{0,100}presencial/i, /demais.{0,80}(?:disciplina|experi[eê]ncia).{0,80}presencial/i] }
+  ],
+  "virtual-aprimorado": [
+    { id: "online-majority", label: "o percurso é predominantemente on-line", patterns: [/predominantemente\s+on-?line/i, /maior\s+parte.{0,100}on-?line/i] },
+    { id: "periodic-meetings", label: "há encontros presenciais periódicos com finalidade definida", patterns: [/encontros?\s+presenciais?\s+peri[oó]dic/i, /presencial.{0,80}(?:periodic|semanal|mensal)/i] },
+    { id: "continuous-support", label: "o acompanhamento continua entre os encontros", patterns: [/acompanhamento\s+cont[ií]nuo/i, /entre\s+os\s+encontros.{0,80}(?:tutoria|acompanh)/i] }
+  ],
+  "design-thinking": [
+    { id: "empathy-definition", label: "empatia e definição do desafio", patterns: [/empatia/i, /mapa\s+de\s+empatia/i], allPatterns: [/defini(?:ç[aã]o|r)/i, /como\s+poder[ií]amos/i] },
+    { id: "ideation-prototype", label: "ideação e construção de protótipo", patterns: [/idea(?:ç[aã]o|r)/i], allPatterns: [/prot[oó]tip/i] },
+    { id: "test", label: "teste ou validação do protótipo com o usuário", patterns: [/test(?:e|ar|ando).{0,70}(?:prot[oó]tip|usu[aá]ri)/i, /validar.{0,70}(?:prot[oó]tip|usu[aá]ri)/i, /feedback\s+d[eo]\s+usu[aá]ri/i] }
+  ]
+});
+
+function validationBody(plan = {}) {
+  const source = {
+    welcome: plan.welcome,
+    sections: plan.contentSections,
+    activities: plan.activities,
+    checks: plan.formativeChecks,
+    methodology: plan.activeMethodology,
+    reflection: plan.reflection,
+    assessment: plan.assessment
+  };
+  return JSON.stringify(source).replace(/[{}[\]"_:,]+/g, " ").replace(/\\n/g, " ");
+}
+
+function rulePass(rule, body) {
+  if (typeof rule.test === "function" && rule.test(body)) return true;
+  const any = !rule.patterns?.length || rule.patterns.some((pattern) => pattern.test(body));
+  const all = !rule.allPatterns?.length || rule.allPatterns.every((pattern) => pattern.test(body));
+  return any && all;
+}
+
+// Validação determinística da aplicação da metodologia. Não tenta decidir se a aula é "boa":
+// confere se os componentes indispensáveis do método aparecem na atividade gerada e explica o que falta.
+export function validateActiveMethodology(input = {}, index = 0, plan = {}) {
+  const requested = methodForWeek(input, index);
+  const declared = object(plan.activeMethodology);
+  const declaredId = text(declared.id);
+  const effectiveId = requested.id === "auto" ? declaredId : requested.id;
+  if (requested.id === "nenhuma") return { applicable: false, status: "not-applicable", pass: true, methodId: "nenhuma", methodLabel: "Nenhuma específica", criteria: [], issues: [] };
+  const activities = Array.isArray(plan.activities) ? plan.activities : [];
+  const common = [
+    { id: "activities", label: "há pelo menos uma atividade produzida", pass: activities.length > 0 },
+    { id: "identification", label: "a metodologia aplicada está identificada", pass: Boolean(text(declared.label) && (effectiveId || requested.method)) },
+    { id: "rationale", label: "a escolha está justificada pelos objetivos", pass: text(declared.rationale).length >= 20 },
+    { id: "application", label: "a forma de aplicação está descrita", pass: text(declared.howApplied).length >= 30 }
+  ];
+  const rules = VALIDATION_RULES[effectiveId] || [];
+  const body = validationBody(plan);
+  const specific = rules.map((rule) => ({ id: rule.id, label: rule.label, pass: rulePass(rule, body) }));
+  if (requested.id === "auto" && !effectiveId) specific.unshift({ id: "auto-choice", label: "a IA registrou qual metodologia escolheu", pass: false });
+  if (effectiveId && !VALIDATION_RULES[effectiveId]) specific.unshift({ id: "known-method", label: "a metodologia escolhida pertence ao catálogo validado", pass: false });
+  const criteria = [...common, ...specific];
+  const issues = criteria.filter((criterion) => !criterion.pass).map((criterion) => criterion.label);
+  return {
+    applicable: true,
+    status: issues.length ? (criteria.filter((criterion) => criterion.pass).length >= Math.ceil(criteria.length / 2) ? "review" : "incomplete") : "ready",
+    pass: issues.length === 0,
+    methodId: effectiveId || requested.id,
+    methodLabel: text(declared.label) || requested.method?.label || requested.label,
+    criteria,
+    issues
+  };
+}
 
 export function normalizeApproach(value) {
   const raw = text(value).toLowerCase();
@@ -133,6 +310,19 @@ export function methodForWeek(input = {}, index = 0) {
   if (id === "auto") return { id: "auto", label: "A IA escolhe e justifica", method: null };
   const method = methodById(id);
   return method ? { id: method.id, label: method.label, method } : { id: "nenhuma", label: "Nenhuma específica", method: null };
+}
+
+function validatedCatalogLabels() { return HYBRID_METHOD_PROFILES.map((item) => item.label).join("; "); }
+
+export function assertMethodologyReference(input = {}, index = 0) {
+  if (!input.requireValidatedMethodologyReferences) return;
+  const choice = methodForWeek(input, index);
+  if (["nenhuma", "auto"].includes(choice.id)) return;
+  const policy = referencePolicyFor(choice.id);
+  if (policy.allowed) return;
+  const error = new Error(`A metodologia “${choice.label}” ainda não possui referencial institucional cadastrado. Selecione outra metodologia ou peça ao administrador para incluir uma fonte validada.`);
+  error.code = "METHODOLOGY_REFERENCE_MISSING";
+  throw error;
 }
 
 export function isNewApproach(input = {}) {
@@ -189,13 +379,15 @@ const HUMAN_VOICE = `VOZ HUMANA (o texto precisa soar como um professor de verda
 function methodText(choice) {
   if (choice.id === "auto") return `METODOLOGIA ATIVA DESTA SEMANA: a IA escolhe (ela será definida junto com as atividades). Escreva o texto de modo que prepare o estudante para uma atividade de aplicação, análise ou criação, e não só para lembrar.`;
   if (!choice.method) return "";
-  return `METODOLOGIA ATIVA DESTA SEMANA: ${choice.method.label}
+  const reference = hybridReferenceBlock(choice.id);
+  return `${reference ? `${reference}\n\n` : ""}METODOLOGIA ATIVA DESTA SEMANA: ${choice.method.label}
 ${choice.method.text}
 As atividades e a mediação da semana serão montadas depois, a partir deste texto, seguindo a mesma metodologia.`;
 }
 
 // Bloco acrescentado ao prompt de redação (texto do estudante).
 export function writerMethodologyBlock(input = {}, index = 0) {
+  assertMethodologyReference(input, index);
   const choice = methodForWeek(input, index);
   const parts = [];
   if (isNewApproach(input)) {
@@ -215,6 +407,7 @@ ${HUMAN_VOICE}`);
 
 // Bloco acrescentado ao prompt das peças derivadas (avaliação, atividades, mediação, explicações).
 export function derivativesMethodologyBlock(input = {}, index = 0, wants = {}) {
+  assertMethodologyReference(input, index);
   const choice = methodForWeek(input, index);
   const parts = [];
   if (isNewApproach(input) && (wants.assessment || wants.activities)) {
@@ -225,11 +418,13 @@ export function derivativesMethodologyBlock(input = {}, index = 0, wants = {}) {
   }
   if (wants.activities) {
     if (choice.method) {
-      parts.push(`METODOLOGIA ATIVA DESTA SEMANA: ${choice.method.label}
+      const reference = hybridReferenceBlock(choice.id, { includeTemplate: true });
+      parts.push(`${reference ? `${reference}\n\n` : ""}METODOLOGIA ATIVA DESTA SEMANA: ${choice.method.label}
 ATIVIDADES: ${choice.method.activities}
 Inclua no JSON "activeMethodology": { "id": "${choice.method.id}", "label": "${choice.method.label}", "rationale": "por que ela serve aos objetivos desta semana, em 1 ou 2 frases", "howApplied": "como as atividades desta semana aplicam a metodologia, em 2 a 4 frases", "modalityNote": "adaptação para EaD ou para a webprática, se necessária" }.`);
     } else if (choice.id === "auto") {
-      parts.push(`METODOLOGIA ATIVA DESTA SEMANA: escolha UMA destas, a que melhor servir aos objetivos e ao texto: ${ACTIVE_METHODS.map((method) => method.label).join("; ")}. Estruture as atividades por ela.
+      const catalog = input.requireValidatedMethodologyReferences ? validatedCatalogLabels() : ACTIVE_METHODS.map((method) => method.label).join("; ");
+      parts.push(`METODOLOGIA ATIVA DESTA SEMANA: escolha UMA destas, a que melhor servir aos objetivos e ao texto: ${catalog}. Estruture as atividades por ela.
 Inclua no JSON "activeMethodology": { "id": "identificador curto", "label": "nome da metodologia escolhida", "rationale": "por que ela serve aos objetivos desta semana, em 1 ou 2 frases", "howApplied": "como as atividades aplicam a metodologia, em 2 a 4 frases", "modalityNote": "adaptação para EaD ou para a webprática, se necessária" }.`);
     }
   }
@@ -315,7 +510,8 @@ export function methodologyGuideRules(input = {}, index = 0, plan = {}) {
   const method = choice.method || ACTIVE_METHODS.find((item) => item.label === text(declared.label) || item.id === text(declared.id)) || null;
   const label = method ? method.label : text(declared.label) || "a metodologia ativa escolhida para a semana";
   const activities = (Array.isArray(plan.activities) ? plan.activities : []).slice(0, 6).map((activity) => ({ titulo: text(activity.title), tipo: text(activity.type), instrucoes: text(activity.instructions).slice(0, 500), evidencia: text(activity.evidence) }));
-  return `REGRAS DO GUIA DE APLICAÇÃO DA METODOLOGIA
+  const reference = hybridReferenceBlock(method?.id || choice.id, { includeTemplate: true });
+  return `${reference ? `${reference}\n\n` : ""}REGRAS DO GUIA DE APLICAÇÃO DA METODOLOGIA
 - Metodologia desta semana: ${label}.${declared.howApplied ? ` Como as atividades já geradas a aplicam: ${text(declared.howApplied)}` : ""}${method ? `\n- Referência da metodologia: ${method.text} ${method.activities} ${method.mediation}` : ""}
 - O leitor é o professor que talvez nunca tenha usado esta metodologia: o guia precisa dizer COMO aplicar, QUANDO cada etapa acontece, DE QUE JEITO conduzir e COMO saber se está funcionando. Seja concreto e prático; nada de definição genérica de manual.
 - Amarre tudo ao que esta semana já tem: as seções do texto, as atividades abaixo, o quiz, o fórum, os vídeos e a webprática, se houver. Use os nomes reais delas. Não invente atividade nova sem dizer que é sugestão opcional.
@@ -323,4 +519,13 @@ export function methodologyGuideRules(input = {}, index = 0, plan = {}) {
 - "monitoring": de 3 a 5 indicadores que o professor consegue de fato ver no Moodle ou na turma. "warningSignals": de 3 a 5, cada um com ação concreta.
 - Escreva em português do Brasil, de colega para colega, sem jargão vazio.
 ${activities.length ? `ATIVIDADES JÁ GERADAS PARA A SEMANA:\n${JSON.stringify(activities, null, 2)}` : ""}`;
+}
+
+// Quando a política estrita está ativa, o ClassAuthor só aplica uma metodologia que
+// possua referencial administrativo. A opção "nenhuma" continua válida.
+export function methodologyReferencePolicy(input = {}, index = 0) {
+  const choice = methodForWeek(input, index);
+  if (choice.id === "nenhuma") return { allowed: true, reason: "sem-metodologia-especifica", choice };
+  if (choice.id === "auto") return { allowed: false, reason: "escolha-automatica-exige-catalogo-validado", choice };
+  return { ...referencePolicyFor(choice.id), choice };
 }

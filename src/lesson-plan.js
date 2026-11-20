@@ -6,7 +6,8 @@ import { accessRequired, hasValidAccess } from "./access.js";
 import { normalizeCourseInput, practiceScheduledForWeek } from "./aula-schema.js";
 import { callJson } from "./ai-client.js";
 import { buildCourseProgression, progressionForWeek } from "./curriculum.js";
-import { ACTIVE_METHODS, isNewApproach, methodForWeek } from "./methodology.js";
+import { ACTIVE_METHODS, assertMethodologyReference, isNewApproach, methodForWeek } from "./methodology.js";
+import { HYBRID_METHOD_PROFILES, hybridReferenceBlock } from "./hybrid-reference.js";
 
 const text = (value) => String(value ?? "").trim();
 const list = (value) => (Array.isArray(value) ? value.map((item) => (item && typeof item === "object" ? item : text(item))).filter(Boolean) : []);
@@ -14,14 +15,15 @@ const list = (value) => (Array.isArray(value) ? value.map((item) => (item && typ
 const SYSTEM = `Você é um designer instrucional experiente que planeja aulas junto com o professor. Antes de escrever qualquer material, você apresenta um PLANO curto e concreto de como a aula vai aplicar a metodologia escolhida, para o professor entender, discutir e aprovar. Escreva em português do Brasil, de colega para colega, sem jargão vazio. Responda somente JSON válido.`;
 
 export function buildLessonPlanPrompt(input, index, { previousPlan = "", instruction = "" } = {}) {
+  assertMethodologyReference(input, index);
   const focus = progressionForWeek(input, index, buildCourseProgression(input));
   const choice = methodForWeek(input, index);
   const practices = (input.webPractices || []).filter((practice) => practiceScheduledForWeek(practice, input, index)).map((practice) => ({ titulo: text(practice.title), modalidade: text(practice.modality), duracaoMin: practice.durationMinutes, objetivo: text(practice.objective) }));
   const sources = (input.materials || []).filter((material) => material.sourceUsage).map((material) => `${text(material.title)} (${material.sourceUsage === "base" ? "base do conteúdo" : material.sourceUsage === "pratica" ? "roteiro de prática" : "apoio"})`);
   const method = choice.method
-    ? `Metodologia escolhida pelo professor: ${choice.method.label}. Referência: ${choice.method.text} ${choice.method.activities}`
+    ? (hybridReferenceBlock(choice.id, { includeTemplate: true }) || `Metodologia escolhida pelo professor: ${choice.method.label}. Referência ainda não cadastrada: não gere até o administrador publicar uma fonte validada.`)
     : choice.id === "auto"
-      ? `O professor pediu que você escolha a metodologia ativa mais adequada entre: ${ACTIVE_METHODS.map((item) => item.label).join("; ")}. Diga qual escolheu e por quê.`
+      ? `O professor pediu que você escolha a metodologia mais adequada entre: ${(input.requireValidatedMethodologyReferences ? HYBRID_METHOD_PROFILES : ACTIVE_METHODS).map((item) => item.label).join("; ")}. Use somente este catálogo validado e diga qual escolheu e por quê.`
       : "O professor não escolheu metodologia ativa específica: proponha a sequência didática mais adequada aos objetivos.";
   const revision = previousPlan ? `
 

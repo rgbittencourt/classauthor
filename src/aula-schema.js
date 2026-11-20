@@ -648,6 +648,7 @@ export function normalizeCourseInput(raw = {}) {
     pedagogicalApproach: normalizeApproach(raw.pedagogicalApproach),
     unit: normalizeUnit(raw.unit),
     methodologyPlan: normalizeMethodologyPlan(raw.methodologyPlan, weeks),
+    requireValidatedMethodologyReferences: bool(raw.requireValidatedMethodologyReferences, false),
     sourceExcerpts: normalizeSourceExcerpts(raw.sourceExcerpts),
     approvedLessonPlan: text(raw.approvedLessonPlan).slice(0, 10000),
     startDate: calendarMode === "calendar" && validDate(raw.startDate) ? raw.startDate : null,

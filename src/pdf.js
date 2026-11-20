@@ -16,6 +16,8 @@ import { buildCourseProgression, progressionForWeek } from "./curriculum.js";
 import { formatDuration, productionVideos } from "./production-xlsx.js";
 import { RUBRIC_LEVELS, levelScore, normalizeRubricData } from "./rubric-core.js";
 import { GENERATOR_CREDIT } from "./student-export.js";
+import { methodForWeek } from "./methodology.js";
+import { hybridProfileFor } from "./hybrid-reference.js";
 
 // ---------- texto seguro para as fontes padrão do PDF (WinAnsi) ----------
 
@@ -382,6 +384,99 @@ export async function createMediationMaterialPdf(input, teacherGuides = [], gene
     ]);
   };
 
+  // Ficha do modelo de Ensino Híbrido: preserva os campos do template fornecido,
+  // mas entra no Material de Mediação em páginas A4 paisagem para ganhar legibilidade.
+  const hybridPlanSheet = (guide, position, methodologyGuide) => {
+    const choice = methodForWeek(input, position);
+    const profile = hybridProfileFor(choice.id || guide.activeMethodology?.id);
+    if (!profile) return;
+    const landscapeWidth = height;
+    const landscapeHeight = width;
+    const lm = 34;
+    const lw = landscapeWidth - lm * 2;
+    const bottom = 31;
+    const addLandscape = (part) => {
+      page = pdf.addPage([landscapeWidth, landscapeHeight]);
+      y = landscapeHeight - 45;
+      const pageNumber = pdf.getPageCount();
+      page.drawRectangle({ x: 0, y: landscapeHeight - 5, width: landscapeWidth, height: 5, color: coral });
+      page.drawText("PLANO DE AULA PARA O ENSINO HIBRIDO", { x: lm, y: landscapeHeight - 26, size: 8, font: bold, color: muted });
+      page.drawText(`PARTE ${part}`, { x: landscapeWidth - lm - 45, y: landscapeHeight - 26, size: 8, font: bold, color: muted });
+      page.drawLine({ start: { x: lm, y: bottom }, end: { x: landscapeWidth - lm, y: bottom }, thickness: 0.45, color: sage });
+      page.drawText(clean(`${courseTitle} · ficha baseada no referencial de Ensino Hibrido`), { x: lm, y: 18, size: 7.2, font: regular, color: lightMuted });
+      const label = `p. ${pageNumber}`; page.drawText(label, { x: landscapeWidth - lm - regular.widthOfTextAtSize(label, 7.2), y: 18, size: 7.2, font: regular, color: lightMuted });
+    };
+    const block = (title, body, options = {}) => {
+      const size = options.size || 8.4;
+      const lines = wrap(clip(body, options.max || 1400), regular, size, lw - 18);
+      const head = 18, lineHeight = size * 1.3;
+      const bodyHeight = Math.max(options.minHeight || 22, lines.length * lineHeight + 10);
+      page.drawRectangle({ x: lm, y: y - head, width: lw, height: head, color: rgb(0.86, 0.91, 0.96), borderColor: lightMuted, borderWidth: 0.45 });
+      page.drawText(clean(title), { x: lm + 8, y: y - 13, size: 9.2, font: bold, color: rgb(0.16, 0.36, 0.66) });
+      page.drawRectangle({ x: lm, y: y - head - bodyHeight, width: lw, height: bodyHeight, color: white, borderColor: lightMuted, borderWidth: 0.45 });
+      let ly = y - head - 11;
+      for (const line of lines) { if (ly < y - head - bodyHeight + 5) break; page.drawText(line, { x: lm + 8, y: ly, size, font: regular, color: ink }); ly -= lineHeight; }
+      y -= head + bodyHeight + 7;
+    };
+    const identityRow = (items) => {
+      const cellW = lw / items.length;
+      const rowH = 31;
+      items.forEach(([label, value], i) => {
+        const x = lm + i * cellW;
+        page.drawRectangle({ x, y: y - rowH, width: cellW, height: rowH, color: white, borderColor: lightMuted, borderWidth: 0.45 });
+        page.drawText(clean(label), { x: x + 6, y: y - 11, size: 7.5, font: bold, color: rgb(0.16, 0.36, 0.66) });
+        const line = wrap(clip(value, 120), regular, 8.2, cellW - 12)[0] || "-";
+        page.drawText(line, { x: x + 6, y: y - 24, size: 8.2, font: regular, color: ink });
+      });
+      y -= rowH;
+    };
+    addLandscape(1);
+    page.drawText("Modelo de Plano de aula para o Ensino Hibrido", { x: lm, y, size: 17, font: bold, color: rgb(0.16, 0.36, 0.66) }); y -= 23;
+    page.drawText(clean(`${profile.source.authors}. ${profile.source.title}. ${profile.source.publisher}, ${profile.source.year}.`), { x: lm, y, size: 7.6, font: regular, color: muted }); y -= 18;
+    identityRow([["Professor(a)", input.author || "A definir"], ["Disciplina", input.academicProfile?.discipline || input.title]]);
+    identityRow([["Ano ou serie / nivel", input.educationYear || input.level || "A definir"], ["Duracao", `${input.hoursPerWeek || "A definir"} h`], ["Numero de estudantes", input.studentCount || "A definir"]]);
+    block("Modelo de ensino hibrido", `${profile.label}. ${profile.definition}`, { max: 700 });
+    block("Objetivo da aula", entries(guide.objectives).join("; ") || guide.purpose, { max: 900 });
+    block("Conteudo(s)", entries(guide.keyIdeas).join("; ") || guide.weekSummary, { max: 900 });
+    block("O que pode ser feito para personalizar?", entries(guide.differentiation?.support).concat(entries(guide.differentiation?.extension)).join("; ") || methodologyGuide.whyHere || "Usar as evidencias da atividade para ajustar apoio, ritmo e aprofundamento.", { max: 900 });
+    const resourceText = list(guide.resourceNotes).map((item) => item.title || item.label || item.href).filter(Boolean).join("; ") || entries(methodologyGuide.beforeTheWeek).join("; ");
+    block("Recursos", resourceText || "Definir os recursos necessarios antes de publicar a aula.", { max: 1300, size: 8 });
+
+    addLandscape(2);
+    page.drawText(`Organizacao dos espacos e etapas · ${profile.label}`, { x: lm, y, size: 15, font: bold, color: rgb(0.16, 0.36, 0.66) }); y -= 23;
+    const columns = [{ label: "Espaco / etapa", pct: 18 }, { label: "Atividade", pct: 28 }, { label: "Duracao", pct: 10 }, { label: "Papel do estudante", pct: 22 }, { label: "Papel do professor", pct: 22 }];
+    const drawRow = (values, header = false) => {
+      const widths = columns.map((col) => lw * col.pct / 100);
+      const wrapped = values.map((value, i) => wrap(clip(value, 650), header ? bold : regular, header ? 8.2 : 7.6, widths[i] - 10));
+      const rowH = Math.max(header ? 25 : 38, Math.max(...wrapped.map((lines) => lines.length)) * (header ? 10 : 9.5) + 10);
+      let x = lm;
+      values.forEach((value, i) => {
+        page.drawRectangle({ x, y: y - rowH, width: widths[i], height: rowH, color: header ? rgb(0.86, 0.91, 0.96) : white, borderColor: lightMuted, borderWidth: 0.45 });
+        let ly = y - 12;
+        for (const line of wrapped[i]) { if (ly < y - rowH + 5) break; page.drawText(line, { x: x + 5, y: ly, size: header ? 8.2 : 7.6, font: header ? bold : regular, color: header ? rgb(0.16, 0.36, 0.66) : ink }); ly -= header ? 10 : 9.5; }
+        x += widths[i];
+      });
+      y -= rowH;
+    };
+    drawRow(columns.map((col) => col.label), true);
+    const phases = list(methodologyGuide.phases).slice(0, 6);
+    const rows = phases.length ? phases.map((phase) => [phase.when || phase.name, phase.goal || entries(phase.materials).join("; "), phase.duration || "A definir", entries(phase.studentActions).join("; "), entries(phase.teacherActions).join("; ")]) : list(guide.activities).slice(0, 5).map((activity) => [activity.moment || "Aula", activity.instructions || activity.title, activity.durationMinutes ? `${activity.durationMinutes} min` : "A definir", activity.evidence || "Realizar e registrar", activity.feedback || "Orientar e acompanhar"]);
+    rows.forEach((row) => { if (y < 185) return; drawRow(row); });
+    y -= 8;
+    block("Avaliacao", methodologyGuide.assessment?.howToAssess || guide.summativeAssessment?.format || "Observar as evidencias produzidas e sua relacao com os objetivos.", { max: 900, minHeight: 28 });
+    const postAssessmentPersonalization = list(methodologyGuide.monitoring)
+      .map((item) => {
+        if (!item || typeof item !== "object") return display(item);
+        const indicator = display(item.indicator);
+        const response = display(item.ifLow);
+        return [indicator, response].filter(Boolean).join(": ");
+      })
+      .filter(Boolean)
+      .join("; ");
+    block("Recursos de personalizacao pos-avaliacao", postAssessmentPersonalization || "Usar os dados coletados para ajustar apoio, percurso e aprofundamento da aula seguinte.", { max: 1000, minHeight: 28 });
+    newPage();
+  };
+
   const weekSection = (guide, position) => {
     const number = guide.weekNumber || position + 1;
     const released = isReleased(position);
@@ -452,6 +547,8 @@ export async function createMediationMaterialPdf(input, teacherGuides = [], gene
     } else if (guide.activeMethodology?.label || guide.methodologyRequested) {
       callout("Guia da metodologia ainda não gerado", "Na prévia da semana, use “Gerar o guia de aplicação da metodologia” para receber o passo a passo, como acompanhar e como avaliar.", { background: paleGold, border: rgb(0.9, 0.78, 0.45), size: 8.8 });
     }
+
+    if (Object.keys(mg).length) hybridPlanSheet(guide, position, mg);
 
     // 2. Roteiro de acompanhamento.
     heading("Roteiro de acompanhamento: antes, durante e depois", 2);

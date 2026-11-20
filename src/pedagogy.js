@@ -1,4 +1,4 @@
-import { aiClicheReport, bloomProfile, isNewApproach, methodForWeek } from "./methodology.js";
+import { aiClicheReport, bloomProfile, isNewApproach, methodForWeek, validateActiveMethodology } from "./methodology.js";
 const text = (value) => String(value ?? "").trim();
 // Itens que chegam como objeto (ex.: verbetes do glossário) viram o seu rótulo, e não "[object Object]".
 const itemText = (item) => item && typeof item === "object" ? text(item.term || item.title || item.label || item.name || item.text || item.description) : text(item);
@@ -166,8 +166,17 @@ export function pedagogicalReview(plan = {}, context = {}) {
   if (input) {
     const chosen = methodForWeek(input, Number(context.index) || 0);
     if (chosen.id !== "nenhuma") {
-      const declared = plan.activeMethodology && typeof plan.activeMethodology === "object" ? plan.activeMethodology : {};
-      checks.push({ id: "methodology-applied", label: `As atividades aplicam a metodologia ativa${chosen.method ? ` escolhida (${chosen.method.label})` : " escolhida pela IA"}, com justificativa.`, pass: activities.length > 0 && Boolean(text(declared.label) && text(declared.howApplied)) });
+      const validation = validateActiveMethodology(input, Number(context.index) || 0, plan);
+      checks.push({
+        id: "methodology-applied",
+        label: `As atividades aplicam a metodologia ativa${chosen.method ? ` escolhida (${chosen.method.label})` : " escolhida pela IA"}, com seus componentes essenciais.`,
+        pass: validation.pass,
+        status: validation.status,
+        methodId: validation.methodId,
+        methodLabel: validation.methodLabel,
+        detail: validation.issues,
+        criteria: validation.criteria
+      });
     }
   }
   const passed = checks.filter((check) => check.pass).length;

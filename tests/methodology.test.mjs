@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { bloomLevel, bloomProfile, derivativesMethodologyBlock, methodForWeek, normalizeMethodologyPlan, productionMethodologyBlock, writerMethodologyBlock } from "../src/methodology.js";
+import { bloomLevel, bloomProfile, derivativesMethodologyBlock, methodForWeek, normalizeMethodologyPlan, productionMethodologyBlock, validateActiveMethodology, writerMethodologyBlock } from "../src/methodology.js";
 import { normalizeCourseInput } from "../src/aula-schema.js";
 import { buildWriterPrompt, derivativesPrompt } from "../src/claude-writer.js";
 import { pedagogicalReview } from "../src/pedagogy.js";
@@ -66,8 +66,38 @@ test("revisão pedagógica: checagens novas só na abordagem nova; metodologia e
   assert.equal(byId["bloom-verbs"], false);
   assert.equal(byId["bloom-balance"], false);
   assert.equal(byId["methodology-applied"], false);
-  const ok = pedagogicalReview({ ...plan, learningObjectives: ["Analisar X"], activeMethodology: { label: "Estudo de caso", howApplied: "O caso conduz o fórum." } }, { input: baseInput({ pedagogicalApproach: "nova", methodologyPlan: { default: "estudo-de-caso" } }), index: 0 });
+  const ok = pedagogicalReview({ ...plan, learningObjectives: ["Analisar X"], activities: [{ title: "Análise do estudo de caso", instructions: "Analise o caso âncora à luz dos conceitos e faça uma recomendação justificada para o dilema apresentado." }], activeMethodology: { id: "estudo-de-caso", label: "Estudo de caso", rationale: "O caso permite aplicar os objetivos a uma decisão realista.", howApplied: "Um caso âncora com dados e dilema conduz a análise e termina em recomendação justificada." } }, { input: baseInput({ pedagogicalApproach: "nova", methodologyPlan: { default: "estudo-de-caso" } }), index: 0 });
   assert.ok(ok.checks.filter((check) => ["bloom-verbs", "bloom-balance", "methodology-applied"].includes(check.id)).every((check) => check.pass));
+});
+
+test("validador de metodologia ativa aponta componentes ausentes", () => {
+  const input = baseInput({ methodologyPlan: { default: "pbl" } });
+  const incomplete = validateActiveMethodology(input, 0, { activities: [{ title: "Responder perguntas" }], activeMethodology: { id: "pbl", label: "ABP", rationale: "Adequada aos objetivos desta aula.", howApplied: "A turma responde perguntas propostas pelo professor durante a atividade." } });
+  assert.equal(incomplete.pass, false);
+  assert.ok(incomplete.issues.some((issue) => /problema aberto/.test(issue)));
+  assert.ok(incomplete.issues.some((issue) => /investiga/.test(issue)));
+});
+
+test("validador de metodologia ativa aprova PBL com o ciclo essencial", () => {
+  const input = baseInput({ methodologyPlan: { default: "pbl" } });
+  const ready = validateActiveMethodology(input, 0, {
+    activities: [{
+      title: "Problema aberto",
+      instructions: "Antes da teoria, registre o que já sabemos e o que precisamos investigar. Faça a investigação e apresente uma proposta de solução justificada.",
+      reflection: "Reflexão sobre o que foi aprendido durante a solução do problema."
+    }],
+    activeMethodology: { id: "pbl", label: "Aprendizagem Baseada em Problemas", rationale: "O problema aberto mobiliza os objetivos de análise e aplicação.", howApplied: "O problema vem antes da teoria; a turma investiga o que falta e propõe uma solução justificada." }
+  });
+  assert.equal(ready.status, "ready");
+  assert.equal(ready.pass, true);
+  assert.equal(ready.issues.length, 0);
+});
+
+test("validador exige que a escolha automática seja registrada", () => {
+  const input = baseInput({ methodologyPlan: { default: "auto" } });
+  const validation = validateActiveMethodology(input, 0, { activities: [{ title: "Atividade" }], activeMethodology: { label: "Método não registrado", rationale: "Escolha coerente com os objetivos definidos.", howApplied: "A atividade descreve uma aplicação, mas não informa o identificador do método escolhido." } });
+  assert.equal(validation.pass, false);
+  assert.ok(validation.issues.some((issue) => /registrou qual metodologia/.test(issue)));
 });
 
 test("plano de metodologia normaliza lixo sem quebrar", () => {
@@ -189,6 +219,29 @@ test("plano da aula: prompt com a metodologia, texto editável e plano aprovado 
   assert.match(buildWriterPrompt(approved, 0), /PLANO DA AULA APROVADO PELO PROFESSOR/);
   assert.match(derivativesPrompt(approved, 0, { theme: "T", contentSections: [], learningObjectives: [] }, [], "activities"), /PLANO DA AULA APROVADO/);
   assert.doesNotMatch(buildWriterPrompt(baseInput(), 0), /PLANO DA AULA APROVADO/);
+});
+
+test("referencial obrigatório entra antes do planejamento e bloqueia método sem fonte", async () => {
+  const { buildLessonPlanPrompt } = await import("../src/lesson-plan.js");
+  const referenced = baseInput({ requireValidatedMethodologyReferences: true, methodologyPlan: { default: "sala-invertida" } });
+  assert.match(buildLessonPlanPrompt(referenced, 0), /REFERENCIAL INSTITUCIONAL OBRIGATÓRIO/);
+  assert.match(buildLessonPlanPrompt(referenced, 0), /plano-exemplo na p\. 215/);
+  const unsupported = baseInput({ requireValidatedMethodologyReferences: true, methodologyPlan: { default: "pbl" } });
+  assert.throws(() => buildLessonPlanPrompt(unsupported, 0), (error) => error.code === "METHODOLOGY_REFERENCE_MISSING");
+});
+
+test("Material de Mediação inclui a ficha do ensino híbrido em páginas paisagem", async () => {
+  const { createMediationMaterialPdf } = await import("../src/pdf.js");
+  const { PDFDocument } = await import("pdf-lib");
+  const input = baseInput({ author: "Professora", requireValidatedMethodologyReferences: true, methodologyPlan: { default: "sala-invertida" } });
+  const guide = {
+    weekNumber: 1, theme: "Aula invertida", objectives: ["Analisar um problema"], keyIdeas: ["Conceito central"], activities: [{ title: "Aplicação", instructions: "Resolver o problema", durationMinutes: 30, evidence: "Solução" }],
+    activeMethodology: { id: "sala-invertida", label: "Sala de aula invertida" }, methodologyRequested: true,
+    methodologyGuide: { method: "Sala de aula invertida", whatItIs: "Preparação antes e aplicação no encontro.", whyHere: "Serve ao objetivo de análise.", beforeTheWeek: ["Publicar a leitura"], phases: [{ name: "Antes", when: "Antes do encontro", goal: "Preparar", teacherActions: ["Publicar e acompanhar"], studentActions: ["Ler e registrar"], materials: ["Texto"] }, { name: "Durante", when: "Encontro", goal: "Aplicar", teacherActions: ["Mediar"], studentActions: ["Resolver"], materials: ["Caso"] }], assessment: { howToAssess: "Avaliar a solução." }, monitoring: [{}] }
+  };
+  const bytes = await createMediationMaterialPdf(input, [guide]);
+  const pdf = await PDFDocument.load(bytes);
+  assert.ok(pdf.getPages().some((page) => page.getWidth() > page.getHeight()));
 });
 
 test("unidade aula: nomes trocados, estrutura igual, calendário real protegido", async () => {
