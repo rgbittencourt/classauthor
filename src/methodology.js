@@ -6,7 +6,8 @@
 // (Biggs) e princípios de aprendizagem multimídia (Mayer) nos materiais.
 // As metodologias ativas podem ser escolhidas por semana em qualquer abordagem.
 
-import { HYBRID_METHOD_PROFILES, hybridProfileFor, hybridReferenceBlock, referencePolicyFor } from "./hybrid-reference.js";
+import { hybridProfileFor } from "./hybrid-reference.js";
+import { VALIDATED_METHOD_REFERENCE_PROFILES, activeMethodReferenceBlock, activeMethodReferencePolicy } from "./active-method-reference.js";
 
 const text = (value) => String(value ?? "").trim();
 const object = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -63,6 +64,33 @@ export const ACTIVE_METHODS = Object.freeze([
     keywords: ["pares", "conceitua"]
   },
   {
+    id: "ensino-sob-medida",
+    label: "Ensino sob medida (Just-in-Time Teaching)",
+    hint: "Respostas prévias dos estudantes ajustam a aula antes do encontro.",
+    text: "Proponha antes do encontro uma tarefa curta que revele dúvidas e raciocínios. O conteúdo do encontro deve responder às evidências coletadas, deixando explícito o que foi ajustado.",
+    activities: "Tarefa antecipada com prazo para análise; triagem das respostas; retomada seletiva dos pontos frágeis; atividade de aplicação adaptada ao diagnóstico; devolutiva mostrando como as respostas orientaram a aula.",
+    mediation: "Analise as respostas antes do encontro, agrupe padrões sem expor estudantes e prepare explicações ou tarefas diferentes para as necessidades encontradas.",
+    keywords: ["antes do encontro", "respostas", "ajust", "diagnóstico"]
+  },
+  {
+    id: "tbl",
+    label: "Aprendizagem Baseada em Equipes (TBL)",
+    hint: "Preparação, teste individual, teste em equipe e aplicação significativa.",
+    text: "Organize o conteúdo para preparação prévia e para uma decisão de aplicação comum a equipes estáveis. Dê base para que os estudantes justifiquem respostas e apelações.",
+    activities: "Preparação; teste individual de garantia; o mesmo teste respondido em equipe; feedback e apelação fundamentada; problema significativo comum com escolha específica e relato simultâneo; avaliação entre pares quando pertinente.",
+    mediation: "Mantenha equipes estáveis, cobre consenso fundamentado, trate apelações com evidências e compare as decisões das equipes antes de explicar.",
+    keywords: ["equipe", "teste individual", "garantia", "apelação"]
+  },
+  {
+    id: "poe",
+    label: "Método POE (Predizer, Observar e Explicar)",
+    hint: "Previsão justificada, observação registrada e explicação da diferença.",
+    text: "Apresente um fenômeno sem antecipar sua explicação. O estudante precisa prever e justificar antes de observar; depois compara evidências e reconstrói a explicação.",
+    activities: "Predição individual justificada; observação ou experimento com registro; comparação entre previsão e resultado; explicação conceitual; revisão explícita da ideia inicial.",
+    mediation: "Não confirme a resposta antes da observação; valorize previsões como diagnóstico e use as divergências para discutir modelos explicativos.",
+    keywords: ["predi", "observ", "explic", "previsão"]
+  },
+  {
     id: "gamificacao",
     label: "Gamificação",
     hint: "Missões, níveis e feedback imediato ligados aos objetivos.",
@@ -70,6 +98,51 @@ export const ACTIVE_METHODS = Object.freeze([
     activities: "Organize as atividades como missões em níveis (do básico ao desafio), cada uma ligada a um objetivo, com feedback imediato e pontuação ou insígnia por missão. A pontuação nunca substitui os critérios de aprendizagem: deixe claro o que conta para a nota.",
     mediation: "Dê ao professor orientações para manter o engajamento sem competição excessiva e para acolher quem fica para trás nas missões.",
     keywords: ["missão", "missões", "nível", "níveis"]
+  },
+  {
+    id: "aprendizagem-jogos",
+    label: "Aprendizagem Baseada em Jogos",
+    hint: "Um jogo completo é o ambiente de aprendizagem e termina com debriefing.",
+    text: "Prepare os conceitos e decisões que o jogo exigirá. Diferencie aprendizagem baseada em jogos de simples pontuação: aqui há um jogo com meta, regras, desafios e consequências.",
+    activities: "Jogo alinhado aos objetivos, com enredo ou contexto, meta, regras, desafios e decisões; registro de estratégias; feedback durante a experiência; debriefing que liga ações e resultados aos conceitos.",
+    mediation: "Garanta participação, observe estratégias e conduza o debriefing; jogar sem reflexão final não completa a metodologia.",
+    keywords: ["jogo", "regras", "desafio", "debriefing"]
+  },
+  {
+    id: "storytelling",
+    label: "Storytelling",
+    hint: "Pesquisa e narrativa com propósito, evidências, roteiro e compartilhamento.",
+    text: "O estudante transforma pesquisa em narrativa para um público definido. Preserve a precisão factual e organize começo, conflito, desenvolvimento e desfecho.",
+    activities: "Definir propósito e público; investigar; selecionar evidências; escrever narrativa e roteiro; produzir com recursos adequados; compartilhar; receber feedback e refletir sobre conteúdo e processo.",
+    mediation: "Separe critérios de conteúdo e de expressão, ajude a distinguir criação narrativa de invenção de evidências e ofereça modelos antes da produção.",
+    keywords: ["narrativa", "roteiro", "história", "público"]
+  },
+  {
+    id: "escape-room",
+    label: "Escape room educacional",
+    hint: "Enigmas cooperativos encadeados, tempo definido e reflexão final.",
+    text: "Apresente uma missão narrativa cujo avanço dependa da aplicação do conteúdo. Cada enigma deve corresponder a um objetivo, não apenas esconder códigos.",
+    activities: "Missão, regras e tempo; enigmas encadeados; grupos e papéis; pistas graduadas; teste prévio; registro das estratégias; debriefing sobre decisões, colaboração e aprendizagem.",
+    mediation: "Distribua pistas sem retirar o desafio, observe a participação e use o debriefing para transformar a experiência em aprendizagem explícita.",
+    keywords: ["enigma", "pista", "missão", "debriefing"]
+  },
+  {
+    id: "pesquisa",
+    label: "Ensino com pesquisa",
+    hint: "Pergunta investigável, fontes ou dados, análise e comunicação dos resultados.",
+    text: "Estruture a semana em torno de uma pergunta investigável. Ensine a selecionar fontes, organizar dados, analisar limites e sustentar conclusões.",
+    activities: "Pergunta e hipótese; plano de investigação; busca ou coleta; avaliação de confiabilidade; organização e análise; conclusão; comunicação com referências e reflexão sobre limites.",
+    mediation: "Acompanhe o recorte da pergunta, ensine integridade acadêmica e devolva perguntas que façam o estudante relacionar evidência e conclusão.",
+    keywords: ["pesquisa", "pergunta", "fontes", "dados", "evidência"]
+  },
+  {
+    id: "wac",
+    label: "Escrita através do currículo (WAC)",
+    hint: "Escrever para aprender e comunicar nos gêneros próprios da área.",
+    text: "Use a escrita tanto para pensar o conteúdo quanto para comunicar em um gênero autêntico da área. Defina propósito, audiência e critérios antes da produção.",
+    activities: "Registro exploratório; análise de modelo do gênero; rascunho; feedback; revisão; versão final ou reflexão metacognitiva, com critérios separados para conteúdo e comunicação.",
+    mediation: "Dê feedback utilizável na revisão, não corrija apenas a superfície e deixe claro quando a escrita é para aprender e quando é para avaliação formal.",
+    keywords: ["escrita", "gênero", "rascunho", "revisão", "audiência"]
   },
   {
     id: "juri-simulado",
@@ -180,10 +253,54 @@ const VALIDATION_RULES = Object.freeze({
     { id: "peer-discussion", label: "discussão entre pares com justificativa", patterns: [/discuss[aã]o\s+entre\s+pares/i, /discutir\s+com\s+(?:um\s+)?colega/i, /justifi(?:car|que).{0,60}(?:colega|pares)/i] },
     { id: "second-answer", label: "nova resposta depois da discussão", patterns: [/responder?\s+de\s+novo/i, /segunda\s+resposta/i, /nova\s+resposta/i] }
   ],
+  "ensino-sob-medida": [
+    { id: "advance-task", label: "tarefa respondida antes do encontro", patterns: [/tarefa.{0,80}antes\s+do\s+encontro/i, /atividade\s+antecipada/i, /respostas?\s+pr[eé]vias?/i] },
+    { id: "analysis", label: "análise das respostas antes da aula", patterns: [/analis(?:ar|e).{0,100}respostas?/i, /triagem.{0,80}respostas?/i, /d[uú]vidas?.{0,80}(?:antes|previamente)/i] },
+    { id: "adaptation", label: "a aula foi ajustada a partir das evidências", patterns: [/ajust(?:ar|e|ada).{0,100}(?:aula|encontro|atividade)/i, /adapt(?:ar|ada).{0,100}(?:respostas|diagn[oó]stico)/i] }
+  ],
+  tbl: [
+    { id: "readiness", label: "preparação e teste individual de garantia", patterns: [/prepara(?:ç[aã]o|r).{0,140}teste\s+individual/i, /teste\s+individual.{0,100}garantia/i] },
+    { id: "team-test", label: "o mesmo teste é respondido em equipe", patterns: [/(?:mesmo|id[eê]ntico)\s+teste.{0,100}equipe/i, /teste.{0,80}(?:grupo|equipe).{0,60}consenso/i] },
+    { id: "appeal", label: "feedback ou apelação fundamentada", patterns: [/apela(?:ç[aã]o|r)/i, /feedback.{0,100}(?:respostas|equipe)/i] },
+    { id: "application", label: "problema significativo com decisão e relato simultâneo", patterns: [/problema\s+signific/i, /escolha\s+espec[ií]fica/i], allPatterns: [/relato\s+simult[aâ]neo|resposta\s+simult[aâ]nea/i] }
+  ],
+  poe: [
+    { id: "predict", label: "predição ou previsão justificada antes da observação", patterns: [/predi(?:ç[aã]o|zer)/i, /previs[aã]o.{0,80}justific/i] },
+    { id: "observe", label: "observação do fenômeno com registro", patterns: [/observa(?:ç[aã]o|r).{0,100}(?:fen[oô]meno|registro|resultado)/i] },
+    { id: "explain", label: "explicação compara previsão e evidência", patterns: [/explica(?:ç[aã]o|r).{0,120}(?:previs[aã]o|predi|observ)/i, /comparar.{0,100}(?:previs[aã]o|predi).{0,100}(?:resultado|observ)/i] }
+  ],
   gamificacao: [
     { id: "missions", label: "missões ou desafios ligados aos objetivos", patterns: [/miss[aã]o|miss[oõ]es/i, /desafios?\s+(?:ligad|associad)/i] },
     { id: "progression", label: "progressão por níveis ou etapas", patterns: [/n[ií]veis?/i, /progress[aã]o/i, /etapas?\s+(?:progressiv|crescent)/i] },
     { id: "feedback", label: "feedback por missão, sem substituir os critérios", patterns: [/feedback\s+imediato/i, /feedback\s+(?:por|da)\s+miss/i, /crit[eé]rios?\s+de\s+aprendizagem/i] }
+  ],
+  "aprendizagem-jogos": [
+    { id: "game", label: "há jogo com meta, regras e desafios", patterns: [/meta.{0,80}regras?.{0,80}desafios?/i, /jogo.{0,100}(?:enredo|regras|objetivo)/i] },
+    { id: "decisions", label: "os estudantes tomam decisões e recebem feedback", patterns: [/decis(?:[aã]o|ões).{0,100}feedback/i, /feedback.{0,100}(?:jogador|estrat[eé]gia|decis)/i] },
+    { id: "debriefing", label: "há debriefing que conecta o jogo aos conceitos", patterns: [/debriefing/i, /reflex[aã]o\s+final.{0,100}(?:jogo|conceito|aprendizagem)/i] }
+  ],
+  storytelling: [
+    { id: "purpose", label: "a narrativa tem propósito e público definidos", patterns: [/prop[oó]sito.{0,80}p[uú]blico/i, /audi[eê]ncia.{0,100}narrativ/i] },
+    { id: "research", label: "a história se apoia em pesquisa ou evidências", patterns: [/investig(?:ar|a(?:ç[aã]o)?).{0,100}(?:tema|evid[eê]ncia|fontes?)/i, /pesquisa.{0,100}narrativ/i] },
+    { id: "narrative", label: "há começo, conflito/desenvolvimento e desfecho", patterns: [/come(?:ç|c)o.{0,100}(?:conflito|meio|desenvolvimento).{0,100}(?:fim|desfecho)/i] },
+    { id: "sharing", label: "a produção é compartilhada, recebe feedback e gera reflexão", patterns: [/compartilh(?:ar|ada).{0,100}feedback/i, /reflex[aã]o.{0,100}(?:processo|narrativa)/i] }
+  ],
+  "escape-room": [
+    { id: "mission", label: "missão narrativa com regras e tempo", patterns: [/miss[aã]o.{0,100}(?:regras|tempo)/i, /narrativa.{0,100}(?:tempo|cron[oô]metro)/i] },
+    { id: "puzzles", label: "enigmas encadeados aplicam o conteúdo", patterns: [/enigmas?\s+encadead/i, /enigmas?.{0,120}(?:conte[uú]do|objetivo)/i] },
+    { id: "hints", label: "há pistas graduadas e teste prévio", patterns: [/pistas?\s+graduad/i, /sistema\s+de\s+pistas/i], allPatterns: [/teste\s+pr[eé]vio|testar\s+antes/i] },
+    { id: "debriefing", label: "há debriefing após a experiência", patterns: [/debriefing/i, /reflex[aã]o.{0,80}(?:ap[oó]s|final).{0,80}(?:escape|enigma|experi[eê]ncia)/i] }
+  ],
+  pesquisa: [
+    { id: "question", label: "pergunta investigável e plano de investigação", patterns: [/pergunta\s+investig[aá]vel/i, /problema\s+de\s+pesquisa/i], allPatterns: [/plano\s+de\s+(?:pesquisa|investiga)/i] },
+    { id: "sources", label: "fontes ou dados são avaliados e organizados", patterns: [/(?:fontes|dados).{0,100}(?:confiabilidade|crit[eé]rios|organiza)/i] },
+    { id: "analysis", label: "evidências sustentam análise e conclusão", patterns: [/an[aá]lise.{0,100}(?:evid[eê]ncia|dados)/i, /conclus[aã]o.{0,100}(?:evid[eê]ncia|dados)/i] },
+    { id: "communication", label: "resultados são comunicados com referências", patterns: [/comunicar.{0,100}(?:resultados|conclus)/i, /apresenta(?:ç[aã]o|r).{0,100}refer[eê]ncias/i] }
+  ],
+  wac: [
+    { id: "purpose", label: "propósito, audiência e gênero estão definidos", patterns: [/prop[oó]sito.{0,80}(?:audi[eê]ncia|p[uú]blico).{0,80}g[eê]nero/i, /g[eê]nero.{0,100}(?:audi[eê]ncia|destinat[aá]rio)/i] },
+    { id: "draft", label: "há rascunho e feedback utilizável", patterns: [/rascunho.{0,100}feedback/i, /feedback.{0,100}rascunho/i] },
+    { id: "revision", label: "o estudante revisa e produz nova versão", patterns: [/revis[aã]o.{0,100}(?:vers[aã]o|texto)/i, /nova\s+vers[aã]o/i] }
   ],
   "juri-simulado": [
     { id: "roles", label: "papéis e posições em disputa", patterns: [/defesa.{0,40}acusa(?:ç[aã]o|r)/i, /pap[eé]is?.{0,80}(?:jurad|debate)/i, /posi(?:ç[aã]o|ções)\s+em\s+disputa/i] },
@@ -312,13 +429,13 @@ export function methodForWeek(input = {}, index = 0) {
   return method ? { id: method.id, label: method.label, method } : { id: "nenhuma", label: "Nenhuma específica", method: null };
 }
 
-function validatedCatalogLabels() { return HYBRID_METHOD_PROFILES.map((item) => item.label).join("; "); }
+function validatedCatalogLabels() { return VALIDATED_METHOD_REFERENCE_PROFILES.map((item) => item.label).join("; "); }
 
 export function assertMethodologyReference(input = {}, index = 0) {
   if (!input.requireValidatedMethodologyReferences) return;
   const choice = methodForWeek(input, index);
   if (["nenhuma", "auto"].includes(choice.id)) return;
-  const policy = referencePolicyFor(choice.id);
+  const policy = activeMethodReferencePolicy(choice.id);
   if (policy.allowed) return;
   const error = new Error(`A metodologia “${choice.label}” ainda não possui referencial institucional cadastrado. Selecione outra metodologia ou peça ao administrador para incluir uma fonte validada.`);
   error.code = "METHODOLOGY_REFERENCE_MISSING";
@@ -379,7 +496,7 @@ const HUMAN_VOICE = `VOZ HUMANA (o texto precisa soar como um professor de verda
 function methodText(choice) {
   if (choice.id === "auto") return `METODOLOGIA ATIVA DESTA SEMANA: a IA escolhe (ela será definida junto com as atividades). Escreva o texto de modo que prepare o estudante para uma atividade de aplicação, análise ou criação, e não só para lembrar.`;
   if (!choice.method) return "";
-  const reference = hybridReferenceBlock(choice.id);
+  const reference = activeMethodReferenceBlock(choice.id);
   return `${reference ? `${reference}\n\n` : ""}METODOLOGIA ATIVA DESTA SEMANA: ${choice.method.label}
 ${choice.method.text}
 As atividades e a mediação da semana serão montadas depois, a partir deste texto, seguindo a mesma metodologia.`;
@@ -418,7 +535,7 @@ export function derivativesMethodologyBlock(input = {}, index = 0, wants = {}) {
   }
   if (wants.activities) {
     if (choice.method) {
-      const reference = hybridReferenceBlock(choice.id, { includeTemplate: true });
+      const reference = activeMethodReferenceBlock(choice.id, { includeTemplate: true });
       parts.push(`${reference ? `${reference}\n\n` : ""}METODOLOGIA ATIVA DESTA SEMANA: ${choice.method.label}
 ATIVIDADES: ${choice.method.activities}
 Inclua no JSON "activeMethodology": { "id": "${choice.method.id}", "label": "${choice.method.label}", "rationale": "por que ela serve aos objetivos desta semana, em 1 ou 2 frases", "howApplied": "como as atividades desta semana aplicam a metodologia, em 2 a 4 frases", "modalityNote": "adaptação para EaD ou para a webprática, se necessária" }.`);
@@ -510,7 +627,7 @@ export function methodologyGuideRules(input = {}, index = 0, plan = {}) {
   const method = choice.method || ACTIVE_METHODS.find((item) => item.label === text(declared.label) || item.id === text(declared.id)) || null;
   const label = method ? method.label : text(declared.label) || "a metodologia ativa escolhida para a semana";
   const activities = (Array.isArray(plan.activities) ? plan.activities : []).slice(0, 6).map((activity) => ({ titulo: text(activity.title), tipo: text(activity.type), instrucoes: text(activity.instructions).slice(0, 500), evidencia: text(activity.evidence) }));
-  const reference = hybridReferenceBlock(method?.id || choice.id, { includeTemplate: true });
+  const reference = activeMethodReferenceBlock(method?.id || choice.id, { includeTemplate: true });
   return `${reference ? `${reference}\n\n` : ""}REGRAS DO GUIA DE APLICAÇÃO DA METODOLOGIA
 - Metodologia desta semana: ${label}.${declared.howApplied ? ` Como as atividades já geradas a aplicam: ${text(declared.howApplied)}` : ""}${method ? `\n- Referência da metodologia: ${method.text} ${method.activities} ${method.mediation}` : ""}
 - O leitor é o professor que talvez nunca tenha usado esta metodologia: o guia precisa dizer COMO aplicar, QUANDO cada etapa acontece, DE QUE JEITO conduzir e COMO saber se está funcionando. Seja concreto e prático; nada de definição genérica de manual.
@@ -527,5 +644,5 @@ export function methodologyReferencePolicy(input = {}, index = 0) {
   const choice = methodForWeek(input, index);
   if (choice.id === "nenhuma") return { allowed: true, reason: "sem-metodologia-especifica", choice };
   if (choice.id === "auto") return { allowed: false, reason: "escolha-automatica-exige-catalogo-validado", choice };
-  return { ...referencePolicyFor(choice.id), choice };
+  return { ...activeMethodReferencePolicy(choice.id), choice };
 }

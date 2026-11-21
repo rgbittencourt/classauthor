@@ -904,7 +904,22 @@ const VALIDATED_METHODOLOGIES = Object.freeze([
   ["rotacao-individual", "Rotação individual", "Cada estudante segue uma agenda definida por evidências e necessidades."],
   ["flex", "Flex", "Percurso principalmente on-line, flexível, com tutoria sob demanda."],
   ["a-la-carte", "À la carte", "Uma ou mais disciplinas integralmente on-line, articuladas ao percurso presencial."],
-  ["virtual-aprimorado", "Virtual aprimorado", "Percurso predominantemente on-line com encontros presenciais periódicos."]
+  ["virtual-aprimorado", "Virtual aprimorado", "Percurso predominantemente on-line com encontros presenciais periódicos."],
+  ["estudo-de-caso", "Estudo de caso", "Caso contextualizado, análise conceitual e decisão fundamentada."],
+  ["pbl", "Aprendizagem Baseada em Problemas (ABP/PBL)", "Problema aberto, investigação orientada e solução fundamentada."],
+  ["projetos", "Aprendizagem Baseada em Projetos", "Questão orientadora, produto para um público, marcos, feedback e revisão."],
+  ["peer-instruction", "Instrução por pares (Peer Instruction)", "Preparação, resposta individual, discussão entre pares e nova resposta."],
+  ["ensino-sob-medida", "Ensino sob medida (Just-in-Time Teaching)", "Respostas antecipadas dos estudantes ajustam a aula antes do encontro."],
+  ["tbl", "Aprendizagem Baseada em Equipes (TBL)", "Preparação, testes individual e em equipe, feedback e aplicação significativa."],
+  ["poe", "Método POE (Predizer, Observar e Explicar)", "Previsão justificada, observação registrada e explicação conceitual."],
+  ["gamificacao", "Gamificação", "Design de desafios, regras, progressão e feedback alinhado à aprendizagem."],
+  ["aprendizagem-jogos", "Aprendizagem Baseada em Jogos", "Um jogo completo organiza decisões e termina com debriefing."],
+  ["storytelling", "Storytelling", "Pesquisa e narrativa com propósito, evidências, roteiro e compartilhamento."],
+  ["design-thinking", "Design thinking", "Empatia, definição, ideação, prototipagem, teste e iteração."],
+  ["escape-room", "Escape room educacional", "Enigmas cooperativos alinhados aos objetivos, pistas e reflexão final."],
+  ["pesquisa", "Ensino com pesquisa", "Pergunta investigável, fontes ou dados, análise e comunicação."],
+  ["wac", "Escrita através do currículo (WAC)", "Escrita para aprender e comunicar com rascunho, feedback e revisão."],
+  ["juri-simulado", "Júri simulado / debate", "Papéis, pesquisa, argumentos, rodadas e decisão fundamentada."]
 ]);
 
 function installValidatedMethodologyOptions() {

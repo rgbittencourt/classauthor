@@ -226,8 +226,22 @@ test("referencial obrigatório entra antes do planejamento e bloqueia método se
   const referenced = baseInput({ requireValidatedMethodologyReferences: true, methodologyPlan: { default: "sala-invertida" } });
   assert.match(buildLessonPlanPrompt(referenced, 0), /REFERENCIAL INSTITUCIONAL OBRIGATÓRIO/);
   assert.match(buildLessonPlanPrompt(referenced, 0), /plano-exemplo na p\. 215/);
-  const unsupported = baseInput({ requireValidatedMethodologyReferences: true, methodologyPlan: { default: "pbl" } });
-  assert.throws(() => buildLessonPlanPrompt(unsupported, 0), (error) => error.code === "METHODOLOGY_REFERENCE_MISSING");
+  const pbl = baseInput({ requireValidatedMethodologyReferences: true, methodologyPlan: { default: "pbl" } });
+  assert.match(buildLessonPlanPrompt(pbl, 0), /Parte 1, cap\. 7, p\. 34-37/);
+  assert.match(buildLessonPlanPrompt(pbl, 0), /problema aberto antes da teoria pronta/);
+  const { activeMethodReferencePolicy } = await import("../src/active-method-reference.js");
+  assert.equal(activeMethodReferencePolicy("aprendizagem-servico").allowed, false);
+});
+
+test("novos referenciais administrativos cobrem as metodologias e entram antes da geração", async () => {
+  const { activeMethodProfileFor, activeMethodReferenceBlock, VALIDATED_METHOD_REFERENCE_PROFILES } = await import("../src/active-method-reference.js");
+  const expected = ["estudo-de-caso", "pbl", "projetos", "peer-instruction", "ensino-sob-medida", "tbl", "poe", "gamificacao", "aprendizagem-jogos", "storytelling", "design-thinking", "escape-room", "pesquisa", "wac", "juri-simulado"];
+  for (const id of expected) {
+    assert.ok(activeMethodProfileFor(id), `perfil ausente: ${id}`);
+    assert.match(activeMethodReferenceBlock(id), /Use este perfil ANTES de redigir/);
+  }
+  assert.ok(VALIDATED_METHOD_REFERENCE_PROFILES.length >= 22);
+  assert.match(writerMethodologyBlock(baseInput({ requireValidatedMethodologyReferences: true, methodologyPlan: { default: "tbl" } }), 0), /teste individual de garantia/i);
 });
 
 test("Material de Mediação inclui a ficha do ensino híbrido em páginas paisagem", async () => {
