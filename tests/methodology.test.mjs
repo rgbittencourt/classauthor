@@ -55,6 +55,21 @@ test("Bloom: verbos vagos e níveis", () => {
   const profile = bloomProfile(["Conhecer X", "Aplicar Y"]);
   assert.equal(profile.vague.length, 1);
   assert.equal(profile.higher.length, 1);
+  const audited = bloomProfile(["Analisar riscos no contexto do projeto", "Compreender", "Inventariar dados do acervo institucional"]);
+  assert.equal(audited.incomplete.length, 1);
+  assert.equal(audited.unknown.length, 1);
+});
+
+test("referencial de Bloom entra antes do plano, da redação e da avaliação", async () => {
+  const { buildLessonPlanPrompt } = await import("../src/lesson-plan.js");
+  const { bloomReferenceBlock, auditBloomObjective } = await import("../src/bloom-reference.js");
+  const input = baseInput({ requireValidatedBloomReference: true });
+  assert.match(buildLessonPlanPrompt(input, 0), /REFERENCIAL INSTITUCIONAL OBRIGATÓRIO — TAXONOMIA REVISADA DE BLOOM/);
+  assert.match(buildLessonPlanPrompt(input, 0), /Dimensão do conhecimento:[\s\S]*Factual[\s\S]*Metacognitivo/);
+  assert.match(writerMethodologyBlock(input, 0), /Use este referencial ANTES de definir objetivos/);
+  assert.match(derivativesMethodologyBlock(input, 0, { assessment: true }), /demanda cognitiva compatível/);
+  assert.match(bloomReferenceBlock(), /Ferraz/);
+  assert.equal(auditBloomObjective("Analisar riscos no contexto institucional").observable, true);
 });
 
 test("revisão pedagógica: checagens novas só na abordagem nova; metodologia em qualquer abordagem", () => {
@@ -66,7 +81,7 @@ test("revisão pedagógica: checagens novas só na abordagem nova; metodologia e
   assert.equal(byId["bloom-verbs"], false);
   assert.equal(byId["bloom-balance"], false);
   assert.equal(byId["methodology-applied"], false);
-  const ok = pedagogicalReview({ ...plan, learningObjectives: ["Analisar X"], activities: [{ title: "Análise do estudo de caso", instructions: "Analise o caso âncora à luz dos conceitos e faça uma recomendação justificada para o dilema apresentado." }], activeMethodology: { id: "estudo-de-caso", label: "Estudo de caso", rationale: "O caso permite aplicar os objetivos a uma decisão realista.", howApplied: "Um caso âncora com dados e dilema conduz a análise e termina em recomendação justificada." } }, { input: baseInput({ pedagogicalApproach: "nova", methodologyPlan: { default: "estudo-de-caso" } }), index: 0 });
+  const ok = pedagogicalReview({ ...plan, learningObjectives: ["Analisar o caso no contexto institucional"], activities: [{ title: "Análise do estudo de caso", instructions: "Analise o caso âncora à luz dos conceitos e faça uma recomendação justificada para o dilema apresentado." }], activeMethodology: { id: "estudo-de-caso", label: "Estudo de caso", rationale: "O caso permite aplicar os objetivos a uma decisão realista.", howApplied: "Um caso âncora com dados e dilema conduz a análise e termina em recomendação justificada." } }, { input: baseInput({ pedagogicalApproach: "nova", methodologyPlan: { default: "estudo-de-caso" } }), index: 0 });
   assert.ok(ok.checks.filter((check) => ["bloom-verbs", "bloom-balance", "methodology-applied"].includes(check.id)).every((check) => check.pass));
 });
 

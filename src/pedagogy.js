@@ -1,4 +1,6 @@
 import { aiClicheReport, bloomProfile, isNewApproach, methodForWeek, validateActiveMethodology } from "./methodology.js";
+import { usesValidatedBloomReference } from "./bloom-reference.js";
+import { bloomLevel, BLOOM_KNOWLEDGE_DIMENSIONS } from "./bloom.js";
 const text = (value) => String(value ?? "").trim();
 // Itens que chegam como objeto (ex.: verbetes do glossário) viram o seu rótulo, e não "[object Object]".
 const itemText = (item) => item && typeof item === "object" ? text(item.term || item.title || item.label || item.name || item.text || item.description) : text(item);
@@ -85,6 +87,8 @@ export function buildAlignmentMatrix(plan = {}) {
     return {
       id: text(source.id, `alignment-${index + 1}`),
       objective,
+      cognitiveLevel: text(source.cognitiveLevel, bloomLevel(objective) || ""),
+      knowledgeDimension: BLOOM_KNOWLEDGE_DIMENSIONS.includes(text(source.knowledgeDimension).toLowerCase()) ? text(source.knowledgeDimension).toLowerCase() : "",
       contentSections: ids(source.contentSections, section ? text(section.number || String(index + 1)) : ""),
       activities: ids(source.activities, activity ? text(activity.id || activity.title) : ""),
       evidence: text(source.evidence || activity?.evidence || activity?.product || activity?.delivery || (question ? "Resposta fundamentada na avaliação" : "Registro de aplicação ou reflexão")),
@@ -155,14 +159,18 @@ export function pedagogicalReview(plan = {}, context = {}) {
     { id: "self-assessment", label: "O estudante recebe autoavaliação ou reflexão final.", pass: Boolean(plan.selfAssessment?.questions?.length || plan.selfAssessment?.prompts?.length || plan.reflection) }
   ];
   const input = context.input || null;
-  if (input && isNewApproach(input)) {
+  if (input && usesValidatedBloomReference(input)) {
     const bloom = bloomProfile(objectives);
     checks.push(
       { id: "bloom-verbs", label: "Os objetivos usam verbos observáveis (sem compreender, conhecer, entender, saber…).", pass: objectives.length > 0 && bloom.vague.length === 0, detail: bloom.vague.map((item) => item.objective) },
-      { id: "human-voice", label: "O texto evita marcas de texto de IA (\"além disso\", \"vale ressaltar\", \"é fundamental\"…).", ...(() => { const body = sections.map((section) => `${text(section.body)} ${(section.subsections || []).map((sub) => text(sub.body)).join(" ")}`).join(" ").replace(/<[^>]+>/g, " "); const report = aiClicheReport(`${text(plan.welcome)} ${body}`); return { pass: report.total <= 4 && report.perThousand <= 1.5, detail: report.hits.slice(0, 8).map((hit) => `${hit.term} (${hit.count}×)`) }; })() },
+      { id: "bloom-known", label: "Todos os verbos dos objetivos pertencem a uma categoria cognitiva reconhecida.", pass: bloom.unknown.length === 0, detail: bloom.unknown.map((item) => `${item.verb}: ${item.objective}`) },
+      { id: "bloom-complete", label: "Cada objetivo contém verbo, objeto de conhecimento e contexto suficiente.", pass: bloom.incomplete.length === 0, detail: bloom.incomplete.map((item) => item.objective) },
       { id: "bloom-balance", label: "Pelo menos um objetivo está em nível de aplicação ou acima (aplicar, analisar, avaliar ou criar).", pass: bloom.higher.length > 0, levels: bloom.items.map((item) => ({ objective: item.objective, verb: item.verb, level: item.level })) }
     );
   }
+  if (input && isNewApproach(input)) checks.push(
+    { id: "human-voice", label: "O texto evita marcas de texto de IA (\"além disso\", \"vale ressaltar\", \"é fundamental\"…).", ...(() => { const body = sections.map((section) => `${text(section.body)} ${(section.subsections || []).map((sub) => text(sub.body)).join(" ")}`).join(" ").replace(/<[^>]+>/g, " "); const report = aiClicheReport(`${text(plan.welcome)} ${body}`); return { pass: report.total <= 4 && report.perThousand <= 1.5, detail: report.hits.slice(0, 8).map((hit) => `${hit.term} (${hit.count}×)`) }; })() }
+  );
   if (input) {
     const chosen = methodForWeek(input, Number(context.index) || 0);
     if (chosen.id !== "nenhuma") {

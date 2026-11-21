@@ -1637,6 +1637,7 @@ function formInput() {
     unit: $("#course-unit")?.value || "semana",
     methodologyPlan: collectMethodologyPlan(),
     requireValidatedMethodologyReferences: true,
+    requireValidatedBloomReference: true,
     academicProfile: {
       discipline: $("#course-title").value.trim(),
       level: $("#level").value,

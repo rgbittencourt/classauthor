@@ -8,6 +8,7 @@ import { callJson } from "./ai-client.js";
 import { buildCourseProgression, progressionForWeek } from "./curriculum.js";
 import { ACTIVE_METHODS, assertMethodologyReference, isNewApproach, methodForWeek } from "./methodology.js";
 import { VALIDATED_METHOD_REFERENCE_PROFILES, activeMethodReferenceBlock } from "./active-method-reference.js";
+import { bloomReferenceBlock, usesValidatedBloomReference } from "./bloom-reference.js";
 
 const text = (value) => String(value ?? "").trim();
 const list = (value) => (Array.isArray(value) ? value.map((item) => (item && typeof item === "object" ? item : text(item))).filter(Boolean) : []);
@@ -25,6 +26,7 @@ export function buildLessonPlanPrompt(input, index, { previousPlan = "", instruc
     : choice.id === "auto"
       ? `O professor pediu que você escolha a metodologia mais adequada entre: ${(input.requireValidatedMethodologyReferences ? VALIDATED_METHOD_REFERENCE_PROFILES : ACTIVE_METHODS).map((item) => item.label).join("; ")}. Use somente este catálogo validado e diga qual escolheu e por quê.`
       : "O professor não escolheu metodologia ativa específica: proponha a sequência didática mais adequada aos objetivos.";
+  const bloom = usesValidatedBloomReference(input) ? bloomReferenceBlock() : "";
   const revision = previousPlan ? `
 
 PLANO ANTERIOR (o professor leu e pode ter editado):
@@ -37,6 +39,7 @@ Refaça o plano incorporando o pedido. Mantenha o que ele não mencionou.` : "Ma
 Tema previsto: ${text(focus.theme)}
 Pergunta central: ${text(focus.centralQuestion)}
 Objetivos: ${(focus.objectives || []).join("; ")}
+${bloom}
 ${method}
 ${isNewApproach(input) ? "Abordagem: planejamento reverso (comece pela evidência de aprendizagem), objetivos observáveis e alinhamento entre objetivos, atividades e avaliação." : ""}
 ${practices.length ? `Sessões práticas nesta aula: ${JSON.stringify(practices)}` : "Não há sessão prática agendada nesta aula."}

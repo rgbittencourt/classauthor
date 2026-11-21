@@ -430,7 +430,7 @@ lessonPlan obrigatório:
 - webPractices: retorne sempre [] dentro de lessonPlan. Se houver prática programada para esta semana, desenvolva o projeto completo exclusivamente em teacherGuide.webPracticeProjects, com problem, context, studentRole, challenge, deliverable, prerequisites, materials, data, steps (cada uma com minutes, instructions e evidence), criteria, rubric com níveis, examples, revision, fallbackPlan, accessibility, prompts, artifacts e versões simplified/advanced;
 - diagnostic com pergunta/problema inicial, evidência esperada e feedback; formativeChecks com perguntas durante o texto, momento, evidência, feedback e ação de intervenção;
 - activities para fóruns, discussões, produção, estudo de caso ou encontro síncrono, com type, title, instructions, durationMinutes, evidence, evidenceType, feedback, criteria e required;
-- alignmentMatrix: uma linha por objetivo, ligando contentSections, activities, evidence e assessmentQuestions. Não deixe objetivo sem atividade, evidência e avaliação;
+- alignmentMatrix: uma linha por objetivo, com cognitiveLevel (lembrar, entender, aplicar, analisar, avaliar ou criar), knowledgeDimension (factual, conceitual, procedimental ou metacognitivo), contentSections, activities, evidence e assessmentQuestions. Não deixe objetivo sem atividade, evidência e avaliação; atividade, evidência e questão devem exigir demanda cognitiva compatível com o objetivo;
 - differentiation com trilhas support/essential, standard e extension, cada uma com instruções e recursos;
 - accessibility com alternativas para baixa conexão, linguagem clara, uso em celular, diagramas e mídias;
 - selfAssessment com perguntas de autoavaliação, escala e feedback;

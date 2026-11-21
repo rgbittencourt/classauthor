@@ -8,6 +8,7 @@
 
 import { hybridProfileFor } from "./hybrid-reference.js";
 import { VALIDATED_METHOD_REFERENCE_PROFILES, activeMethodReferenceBlock, activeMethodReferencePolicy } from "./active-method-reference.js";
+import { auditBloomObjective, bloomReferenceBlock, usesValidatedBloomReference } from "./bloom-reference.js";
 
 const text = (value) => String(value ?? "").trim();
 const object = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -453,10 +454,12 @@ export { BLOOM_LEVELS, VAGUE_VERBS, objectiveVerb, bloomLevel };
 
 export function bloomProfile(objectives = []) {
   const list = (Array.isArray(objectives) ? objectives : []).map(text).filter(Boolean);
-  const items = list.map((objective) => ({ objective, verb: objectiveVerb(objective), level: bloomLevel(objective) }));
+  const items = list.map(auditBloomObjective);
   const vague = items.filter((item) => item.level === "vago");
+  const unknown = items.filter((item) => item.verb && item.level == null);
+  const incomplete = items.filter((item) => !item.complete);
   const higher = items.filter((item) => ["aplicar", "analisar", "avaliar", "criar"].includes(item.level));
-  return { items, vague, higher };
+  return { items, vague, unknown, incomplete, higher };
 }
 
 // ---------- Blocos de prompt ----------
@@ -507,6 +510,7 @@ export function writerMethodologyBlock(input = {}, index = 0) {
   assertMethodologyReference(input, index);
   const choice = methodForWeek(input, index);
   const parts = [];
+  if (usesValidatedBloomReference(input)) parts.push(bloomReferenceBlock());
   if (isNewApproach(input)) {
     parts.push(`ABORDAGEM PEDAGÓGICA (planejamento reverso, objetivos observáveis e aprendizagem multimídia)
 - Planeje de trás para frente: antes de escrever, defina para si qual evidência o estudante vai produzir para cada objetivo (a avaliação e as atividades desta semana serão geradas depois, a partir deste texto, e vão cobrar exatamente isso). Toda seção precisa preparar para pelo menos uma dessas evidências; se uma seção não serve a nenhum objetivo, ela não entra.
@@ -527,6 +531,7 @@ export function derivativesMethodologyBlock(input = {}, index = 0, wants = {}) {
   assertMethodologyReference(input, index);
   const choice = methodForWeek(input, index);
   const parts = [];
+  if (usesValidatedBloomReference(input) && (wants.assessment || wants.activities)) parts.push(bloomReferenceBlock({ compact: true }));
   if (isNewApproach(input) && (wants.assessment || wants.activities)) {
     parts.push(`ALINHAMENTO CONSTRUTIVO (abordagem nova)
 - Cada objetivo precisa de pelo menos uma atividade e de pelo menos uma questão que exijam o MESMO nível de pensamento do verbo do objetivo: se o objetivo pede "analisar", a questão não pode pedir só "lembrar"; se pede "propor", a atividade precisa gerar uma proposta.
@@ -592,14 +597,17 @@ Em cada projeto com metodologia, inclua "activeMethodology": { "label": "nome da
 
 // Regra extra para "Preencher vazios com IA" (abordagem nova): objetivos pela Taxonomia de Bloom revisada.
 export function briefingObjectivesRule(input = {}) {
-  if (!isNewApproach(input)) return "";
+  if (!usesValidatedBloomReference(input)) return "";
   return `
+${bloomReferenceBlock()}
+
 OBJETIVOS PELA TAXONOMIA DE BLOOM REVISADA (obrigatório nesta abordagem):
 - Cada objetivo começa com UM verbo observável no infinitivo, seguido do objeto e do contexto (ex.: "Comparar SIGAA e SUAP quanto a ... no contexto de ...").
 - Proibido começar com verbo vago: compreender, conhecer, entender, saber, aprender, perceber, refletir, familiarizar-se.
 - Faça os objetivos progredirem ao longo do curso, dos níveis mais simples aos mais complexos: no máximo um objetivo de lembrar/entender (identificar, explicar, descrever…); os demais em aplicar (aplicar, resolver, utilizar…), analisar (comparar, analisar, diferenciar…), avaliar (avaliar, justificar, argumentar…) e criar (elaborar, propor, planejar…). Pelo menos um objetivo deve ser de avaliar ou criar.
 - Ajuste o teto ao nível da turma: pós-graduação e superior chegam a avaliar/criar; FIC e cursos introdutórios podem parar em aplicar/analisar.
-- Não escreva o nome do nível no texto do objetivo; o verbo já o indica.`;
+- Considere também o tipo de conhecimento mobilizado: factual, conceitual, procedimental ou metacognitivo.
+- Não escreva o nome do nível no texto do objetivo; a ação e o objeto devem demonstrá-lo.`;
 }
 
 // ---------- Guia de aplicação da metodologia (Material de Mediação) ----------

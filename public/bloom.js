@@ -5,6 +5,7 @@
 const text = (value) => String(value ?? "").trim();
 
 export const BLOOM_LEVELS = Object.freeze(["lembrar", "entender", "aplicar", "analisar", "avaliar", "criar"]);
+export const BLOOM_KNOWLEDGE_DIMENSIONS = Object.freeze(["factual", "conceitual", "procedimental", "metacognitivo"]);
 
 const BLOOM_VERBS = {
   lembrar: ["listar", "nomear", "identificar", "reconhecer", "definir", "citar", "recordar", "enumerar", "localizar", "indicar", "apontar", "memorizar"],
