@@ -15,6 +15,7 @@ import { deepLocalizeUnit, localizeUnitText } from "./unit-text.js";
 import { ownKeys, installKeyFetch, openKeysModal } from "./own-keys.js";
 import { DRAFT_FILE, chooseProjectFolder, folderPermission, folderSupported, forgetProjectFolder, loadProjectFolder, openExistingProjectFolder, projectFolder, readFromProjectFolder, saveToProjectFolder, SUBFOLDERS } from "./project-folder.js";
 import { applyAdjustment, applyRewrite, approveWeek, bridgesBefore, canGenerateNext, dismissIssue, emptyFlow, normalizeFlow, recordGenerated, weekFlowStatus } from "./step-flow.js";
+import { methodologyDecisionGuide } from "./methodology-decision.js";
 
 const $ = (selector) => document.querySelector(selector);
 const isGitHubPages = window.location.hostname.endsWith(".github.io");
@@ -856,7 +857,10 @@ function applyInputToForm(input = {}) {
   renderResourcePlanWeeks(resourcePlan);
   if ($("#pedagogical-approach")) $("#pedagogical-approach").value = input.pedagogicalApproach === "atual" ? "atual" : "nova";
   if ($("#course-unit")) { $("#course-unit").value = input.unit === "aula" ? "aula" : "semana"; applyUnitToUi(); }
-  if ($("#methodology-default")) $("#methodology-default").value = methodologyOptionExists(input.methodologyPlan?.default) ? input.methodologyPlan.default : "nenhuma";
+  if ($("#methodology-default")) {
+    $("#methodology-default").value = methodologyOptionExists(input.methodologyPlan?.default) ? input.methodologyPlan.default : "nenhuma";
+    $("#methodology-default").dataset.confirmedValue = $("#methodology-default").value;
+  }
   renderMethodologyWeeks(input.methodologyPlan || {});
   updateMethodologyHints();
   updateBloomMeter();
@@ -973,7 +977,7 @@ function renderMethodologyWeeks(plan = {}) {
     const weekNumber = index + 1;
     const chosen = byWeek.get(weekNumber) || "";
     const choices = [`<option value="">Padrão (${escapeHtml(defaultLabel)})</option>`, ...options.map((option) => `<option value="${escapeHtml(option.value)}" title="${escapeHtml(option.hint)}" ${option.value === chosen ? "selected" : ""}>${escapeHtml(option.label)}</option>`)].join("");
-    return `<label class="methodology-week ${chosen ? "is-override" : ""}" data-methodology-week="${weekNumber}"><span>Semana ${weekNumber}</span><select aria-label="Metodologia ativa da semana ${weekNumber}">${choices}</select></label>`;
+    return `<label class="methodology-week ${chosen ? "is-override" : ""}" data-methodology-week="${weekNumber}"><span>Semana ${weekNumber}</span><select data-confirmed-value="${escapeHtml(chosen)}" aria-label="Metodologia ativa da semana ${weekNumber}">${choices}</select></label>`;
   }).join("");
 }
 
@@ -982,6 +986,67 @@ function updateMethodologyHints() {
   if ($("#pedagogical-approach-hint")) $("#pedagogical-approach-hint").textContent = APPROACH_HINTS[approach] || "";
   const selected = $("#methodology-default")?.selectedOptions?.[0];
   if ($("#methodology-default-hint")) $("#methodology-default-hint").textContent = selected?.dataset.hint || "";
+}
+
+function methodologyDecisionMarkup(item) {
+  const list = (items) => `<ul>${items.map((entry) => `<li>${escapeHtml(entry)}</li>`).join("")}</ul>`;
+  return `<p class="methodology-decision-summary">${escapeHtml(item.summary)}</p>
+    <div class="methodology-decision-grid">
+      <section><h3>Quando funciona melhor</h3>${list(item.bestUsedWhen)}</section>
+      <section><h3>Pontos fortes</h3>${list(item.strengths)}</section>
+    </div>
+    <section><h3>Como operacionalizar</h3><ol class="methodology-decision-steps">${item.steps.map((step, index) => `<li><span>${index + 1}</span><p>${escapeHtml(step)}</p></li>`).join("")}</ol></section>
+    <section class="methodology-decision-limitations"><h3>Limitações e desvantagens</h3>${list(item.limitations)}</section>
+    <section><h3>O que pode dar errado — e como prevenir</h3><div class="methodology-risk-list">${item.risks.map((entry) => `<article><strong>${escapeHtml(entry.risk)}</strong><p>${escapeHtml(entry.prevention)}</p></article>`).join("")}</div></section>`;
+}
+
+function confirmMethodologyChoice(value) {
+  const item = methodologyDecisionGuide(value);
+  if (!item) return Promise.resolve(true);
+  const modal = $("#methodology-decision-modal");
+  $("#methodology-decision-title").textContent = item.label;
+  $("#methodology-decision-body").innerHTML = methodologyDecisionMarkup(item);
+  modal.classList.remove("hidden");
+  modal.setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+  return new Promise((resolve) => {
+    const confirm = $("#methodology-decision-confirm");
+    const cancel = $("#methodology-decision-cancel");
+    const close = $("#methodology-decision-close");
+    const finish = (accepted) => {
+      modal.classList.add("hidden");
+      modal.setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+      confirm.removeEventListener("click", accept);
+      cancel.removeEventListener("click", reject);
+      close.removeEventListener("click", reject);
+      modal.removeEventListener("click", backdrop);
+      document.removeEventListener("keydown", keyboard);
+      resolve(accepted);
+    };
+    const accept = () => finish(true);
+    const reject = () => finish(false);
+    const backdrop = (event) => { if (event.target === modal) reject(); };
+    const keyboard = (event) => { if (event.key === "Escape") reject(); };
+    confirm.addEventListener("click", accept);
+    cancel.addEventListener("click", reject);
+    close.addEventListener("click", reject);
+    modal.addEventListener("click", backdrop);
+    document.addEventListener("keydown", keyboard);
+    setTimeout(() => cancel.focus(), 0);
+  });
+}
+
+async function handleMethodologyChoice(select, onConfirm) {
+  const previous = select.dataset.confirmedValue ?? "";
+  const next = select.value;
+  if (next === previous) return;
+  if (!await confirmMethodologyChoice(next)) {
+    select.value = previous;
+    return;
+  }
+  select.dataset.confirmedValue = next;
+  onConfirm?.();
 }
 
 // Taxonomia de Bloom revisada: leitura dos verbos dos objetivos (mesma lista de src/methodology.js).
@@ -1391,7 +1456,7 @@ function practiceCard(data = {}) {
     <div class="item-card-heading"><strong>Sessão prática <span class="item-index">${practiceSequence}</span></strong><button class="remove-item" type="button" data-remove-practice aria-label="Remover prática">×</button></div>
     <div class="field-grid two">
       <label class="field"><span>Título da sessão</span><input class="practice-title" value="${escapeHtml(data.title || data.sessionTitle || "")}" placeholder="Ex.: Laboratório de prototipagem com IA" /></label>
-      <label class="field practice-methodology-field"><span>Metodologia ativa da sessão</span><select class="practice-methodology">${practiceMethodologyOptions(data.methodology)}</select><small class="hint">“Mesma da semana” herda a metodologia escolhida para a semana em que a sessão acontece.</small></label>
+      <label class="field practice-methodology-field"><span>Metodologia ativa da sessão</span><select class="practice-methodology" data-confirmed-value="${escapeHtml(data.methodology || "semana")}">${practiceMethodologyOptions(data.methodology)}</select><small class="hint">“Mesma da semana” herda a metodologia escolhida para a semana em que a sessão acontece.</small></label>
       <label class="field"><span>Modalidade</span><select class="practice-modality">${(() => { const current = practiceModality(data.modality); return PRACTICE_MODALITIES.map((value) => `<option ${current === value ? "selected" : ""}>${value}</option>`).join(""); })()}</select></label>
     </div>
     <div class="field-grid three">
@@ -4304,6 +4369,11 @@ $("#practice-list").addEventListener("click", (event) => {
   if (!document.querySelector("#practice-list .practice-card")) addPractice();
   refreshItemButtons(); syncPracticeCount(); togglePractice(); updateSummary(); scheduleSave();
 });
+$("#practice-list").addEventListener("change", async (event) => {
+  const select = event.target.closest(".practice-methodology");
+  if (!select) return;
+  await handleMethodologyChoice(select, scheduleSave);
+});
 $("#materials-list").addEventListener("click", (event) => {
   const button = event.target.closest("[data-remove-material]");
   if (!button) return;
@@ -4597,11 +4667,20 @@ async function ensureLessonPlan(input, index, headers, button) {
 }
 
 $("#pedagogical-approach")?.addEventListener("change", () => { updateMethodologyHints(); scheduleSave(); });
-$("#methodology-default")?.addEventListener("change", () => { updateMethodologyHints(); renderMethodologyWeeks(collectMethodologyPlan()); scheduleSave(); });
-$("#methodology-weeks")?.addEventListener("change", (event) => { const row = event.target.closest("[data-methodology-week]"); if (row) row.classList.toggle("is-override", Boolean(event.target.value)); scheduleSave(); });
+$("#methodology-default")?.addEventListener("change", async (event) => {
+  await handleMethodologyChoice(event.target, () => { updateMethodologyHints(); renderMethodologyWeeks(collectMethodologyPlan()); scheduleSave(); });
+});
+$("#methodology-weeks")?.addEventListener("change", async (event) => {
+  const row = event.target.closest("[data-methodology-week]");
+  if (!row || event.target.tagName !== "SELECT") return;
+  await handleMethodologyChoice(event.target, () => { row.classList.toggle("is-override", Boolean(event.target.value)); scheduleSave(); });
+});
 $("#weeks").addEventListener("input", () => { const resourcePlan = collectResourcePlan(); const compositionPlan = collectCompositionPlan(); renderResourcePlanWeeks(resourcePlan); renderMethodologyWeeks(collectMethodologyPlan()); renderCompositionPlanWeeks(compositionPlan); updateSummary(); updateProgress(); scheduleSave(); });
 $("#practice-enabled").addEventListener("change", () => { togglePractice(); scheduleSave(); });
-$("#course-form").addEventListener("input", () => { updateBloomMeter(); updateAcademicInheritance(); updateSummary(); updateProgress(); scheduleSave(); });
+$("#course-form").addEventListener("input", (event) => {
+  if (event.target.matches?.("#methodology-default, [data-methodology-week] select, .practice-methodology")) return;
+  updateBloomMeter(); updateAcademicInheritance(); updateSummary(); updateProgress(); scheduleSave();
+});
 $("#save-backup-button").addEventListener("click", downloadBackup);
 $("#restore-backup-button").addEventListener("click", () => $("#backup-file-input").click());
 $("#backup-file-input").addEventListener("change", (event) => { restoreBackupFile(event.target.files?.[0]); event.target.value = ""; });
@@ -4614,6 +4693,7 @@ if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 $("#generate-button").dataset.label = "Gerar com IA";
 $("#assist-button").dataset.label = "Preencher vazios com IA";
 $("#recalculate-button").dataset.label = "Recalcular qualidade";
+if ($("#methodology-default")) $("#methodology-default").dataset.confirmedValue = $("#methodology-default").value;
 initializeWelcome();
 enhanceLayout();
 renderResourcePlanWeeks(); renderMethodologyWeeks(); updateMethodologyHints(); updateBloomMeter(); applyUnitToUi(); renderCompositionPlanWeeks(); toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();
