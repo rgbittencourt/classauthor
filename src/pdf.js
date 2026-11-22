@@ -302,7 +302,9 @@ export async function createMediationMaterialPdf(input, teacherGuides = [], gene
   const authorship = [display(input.author), display(input.role), display(input.institution)].filter(Boolean).join(" · ");
   if (authorship) paragraph(`Autoria: ${authorship}`, { size: 9.4, color: ink, after: 2 });
   paragraph(GENERATOR_CREDIT, { size: 8.6, color: muted, after: 6 });
-  paragraph(`Público: ${display(input.audience) || "não informado"}  ·  Nível: ${display(input.level) || "não informado"}  ·  Atualizado em ${dateLabel}`, { size: 9, color: muted, after: 14 });
+  const education = input.educationIdentity || {};
+  const educationLine = education.educationLevelLabel ? ` · Modalidade: ${display(education.educationLevelLabel)}${education.grade ? ` · ${education.grade}º ano/série` : ""}${education.componentLabel ? ` · ${display(education.componentLabel)}` : ""}` : "";
+  paragraph(`Público: ${display(input.audience) || "não informado"}  ·  Nível: ${display(input.level) || "não informado"}${educationLine}  ·  Atualizado em ${dateLabel}`, { size: 9, color: muted, after: 14 });
 
   const cards = [[String(teacherGuides.length), `semana(s) neste material`], [String(releasedCount), explicitScope ? "liberada(s)" : "incluída(s)"], [String(draftCount), "rascunho(s) em revisão"], [String(pendingCount), "ainda a gerar"]];
   const cardWidth = (contentWidth - 3 * 8) / 4;
@@ -507,6 +509,13 @@ export async function createMediationMaterialPdf(input, teacherGuides = [], gene
     else paragraph(guide.purpose, { color: ink });
     if (!guide.weekSummary) callout("Resumo para o professor ainda não gerado", "Na prévia da semana, use “Completar explicações do Material de Mediação” para gerar o resumo, as perguntas dos alunos, os equívocos comuns e os sinais de alerta desta semana.", { background: paleCoral, border: coral, size: 8.8 });
     if (guide.objectives?.length) { paragraph("O estudante, ao fim da semana, deve ser capaz de:", { font: bold, size: 9.2, after: 2 }); bullets(guide.objectives); }
+    if (guide.bnccAlignment?.length) {
+      heading("Habilidades da BNCC", 3);
+      paragraph("Códigos e descrições oficiais relacionados ao planejamento desta semana. Confira os vínculos com o objetivo, a atividade e a evidência antes de liberar.", { color: muted, size: 8.6 });
+      guide.bnccAlignment.forEach((item) => labelled([
+        ["Código", item.code], ["Habilidade", item.description], ["Objetivo", item.objective], ["Atividade", item.activity], ["Evidência", item.evidence]
+      ], { background: paleGreen, max: 1800 }));
+    }
     if (guide.keyIdeas?.length) { heading("Ideias-chave para levar", 3); bullets(guide.keyIdeas); }
 
     // 1b. Como aplicar a metodologia ativa da semana.

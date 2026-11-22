@@ -1,6 +1,7 @@
 import { aiClicheReport, bloomProfile, isNewApproach, methodForWeek, validateActiveMethodology } from "./methodology.js";
 import { usesValidatedBloomReference } from "./bloom-reference.js";
 import { bloomLevel, BLOOM_KNOWLEDGE_DIMENSIONS } from "./bloom.js";
+import { validateBnccAlignment } from "./bncc.js";
 const text = (value) => String(value ?? "").trim();
 // Itens que chegam como objeto (ex.: verbetes do glossário) viram o seu rótulo, e não "[object Object]".
 const itemText = (item) => item && typeof item === "object" ? text(item.term || item.title || item.label || item.name || item.text || item.description) : text(item);
@@ -171,6 +172,16 @@ export function pedagogicalReview(plan = {}, context = {}) {
   if (input && isNewApproach(input)) checks.push(
     { id: "human-voice", label: "O texto evita marcas de texto de IA (\"além disso\", \"vale ressaltar\", \"é fundamental\"…).", ...(() => { const body = sections.map((section) => `${text(section.body)} ${(section.subsections || []).map((sub) => text(sub.body)).join(" ")}`).join(" ").replace(/<[^>]+>/g, " "); const report = aiClicheReport(`${text(plan.welcome)} ${body}`); return { pass: report.total <= 4 && report.perThousand <= 1.5, detail: report.hits.slice(0, 8).map((hit) => `${hit.term} (${hit.count}×)`) }; })() }
   );
+  if (input?.educationIdentity?.bnccEnabled) {
+    const bncc = validateBnccAlignment(plan, input.educationIdentity);
+    checks.push({
+      id: "bncc-alignment",
+      label: "As habilidades da BNCC são oficiais, compatíveis com a turma e ligadas a objetivo, atividade e evidência.",
+      pass: bncc.pass,
+      detail: bncc.issues,
+      alignments: bncc.alignments
+    });
+  }
   if (input) {
     const chosen = methodForWeek(input, Number(context.index) || 0);
     if (chosen.id !== "nenhuma") {

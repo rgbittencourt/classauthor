@@ -9,6 +9,7 @@ import { buildCourseProgression, progressionForWeek } from "./curriculum.js";
 import { ACTIVE_METHODS, assertMethodologyReference, isNewApproach, methodForWeek } from "./methodology.js";
 import { VALIDATED_METHOD_REFERENCE_PROFILES, activeMethodReferenceBlock } from "./active-method-reference.js";
 import { bloomReferenceBlock, usesValidatedBloomReference } from "./bloom-reference.js";
+import { bnccReferenceBlock } from "./bncc.js";
 
 const text = (value) => String(value ?? "").trim();
 const list = (value) => (Array.isArray(value) ? value.map((item) => (item && typeof item === "object" ? item : text(item))).filter(Boolean) : []);
@@ -27,6 +28,7 @@ export function buildLessonPlanPrompt(input, index, { previousPlan = "", instruc
       ? `O professor pediu que você escolha a metodologia mais adequada entre: ${(input.requireValidatedMethodologyReferences ? VALIDATED_METHOD_REFERENCE_PROFILES : ACTIVE_METHODS).map((item) => item.label).join("; ")}. Use somente este catálogo validado e diga qual escolheu e por quê.`
       : "O professor não escolheu metodologia ativa específica: proponha a sequência didática mais adequada aos objetivos.";
   const bloom = usesValidatedBloomReference(input) ? bloomReferenceBlock() : "";
+  const bncc = bnccReferenceBlock(input);
   const revision = previousPlan ? `
 
 PLANO ANTERIOR (o professor leu e pode ter editado):
@@ -40,6 +42,7 @@ Tema previsto: ${text(focus.theme)}
 Pergunta central: ${text(focus.centralQuestion)}
 Objetivos: ${(focus.objectives || []).join("; ")}
 ${bloom}
+${bncc}
 ${method}
 ${isNewApproach(input) ? "Abordagem: planejamento reverso (comece pela evidência de aprendizagem), objetivos observáveis e alinhamento entre objetivos, atividades e avaliação." : ""}
 ${practices.length ? `Sessões práticas nesta aula: ${JSON.stringify(practices)}` : "Não há sessão prática agendada nesta aula."}
@@ -57,6 +60,7 @@ Devolva este JSON:
   "evaluation": "como a aprendizagem será avaliada e como o professor saberá se a metodologia funcionou",
   "practice": "como a sessão prática entra no plano (vazio se não houver)",
   "risks": "o que pode dar errado e como prevenir",
+  "bnccAlignment": [ { "code": "código oficial", "description": "descrição literal", "objective": "objetivo ligado", "activity": "atividade ligada", "evidence": "evidência observável" } ],
   "questions": ["até 3 perguntas curtas para o professor decidir antes de gerar (ex.: prazo do estudo prévio, se a atividade vale nota)"]
 }
 De 3 a 6 passos em "steps" e de 2 a 4 atividades. Seja concreto: nomes de atividades, ordem e tempos.`;
@@ -67,6 +71,7 @@ export function lessonPlanToText(plan = {}) {
   const steps = list(plan.steps).map((step, position) => `${position + 1}. ${text(step.when)}: ${text(step.what)}${step.teacher ? `\n   Professor: ${text(step.teacher)}` : ""}${step.student ? `\n   Estudante: ${text(step.student)}` : ""}`).join("\n");
   const activities = list(plan.activities).map((activity) => `- ${text(activity.title)}${activity.type ? ` (${text(activity.type)})` : ""}: ${text(activity.purpose)}`).join("\n");
   const questions = list(plan.questions).map((question) => `- ${text(question)}`).join("\n");
+  const bncc = list(plan.bnccAlignment).map((item) => `- ${text(item.code)}: ${text(item.description)}\n  Objetivo: ${text(item.objective)}\n  Atividade: ${text(item.activity)}\n  Evidência: ${text(item.evidence)}`).join("\n");
   return [
     `METODOLOGIA: ${text(plan.method)}`,
     plan.why && `POR QUE: ${text(plan.why)}`,
@@ -77,6 +82,7 @@ export function lessonPlanToText(plan = {}) {
     plan.evaluation && `AVALIAÇÃO: ${text(plan.evaluation)}`,
     text(plan.practice) && `PRÁTICA: ${text(plan.practice)}`,
     plan.risks && `CUIDADOS: ${text(plan.risks)}`,
+    bncc && `ALINHAMENTO COM A BNCC:\n${bncc}`,
     questions && `PARA VOCÊ DECIDIR (responda aqui mesmo, se quiser):\n${questions}`
   ].filter(Boolean).join("\n\n");
 }

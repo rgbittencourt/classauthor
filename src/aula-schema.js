@@ -10,6 +10,7 @@ import { progressionForWeek } from "./curriculum.js";
 import { figureBlock, figuresOf } from "./figures.js";
 import { compositionPlanForWeek, materializeComposition, normalizeCompositionPlan, citationHasSource } from "./composition.js";
 import { referenceItemHtml, GENERATOR_TOOL, GENERATOR_CREDIT, GENERATOR_AI_USE } from "./student-export.js";
+import { normalizeBnccAlignment, normalizeEducationIdentity } from "./bncc.js";
 
 export const DEFAULT_LICENSE = "https://creativecommons.org/licenses/by-nc-sa/4.0/deed.pt-br";
 
@@ -593,6 +594,7 @@ export function normalizeLessonPlan(raw = {}, input = {}, index = 0) {
     notes: splitLines(plan.notes),
     pedagogicalApproach: normalizeApproach(input.pedagogicalApproach),
     activeMethodology: normalizeActiveMethodology(plan.activeMethodology, input, index),
+    bnccAlignment: normalizeBnccAlignment(plan.bnccAlignment || plan.bnccSkills, input.educationIdentity),
     approvedPlan: text(input.approvedLessonPlan) || text(plan.approvedPlan),
     sourceUsed: Array.isArray(input.sourceExcerpts) && input.sourceExcerpts.length ? sourceUsedSummary(input.sourceExcerpts) : (Array.isArray(plan.sourceUsed) ? plan.sourceUsed : [])
   };
@@ -635,6 +637,7 @@ export function normalizeCourseInput(raw = {}) {
     styleGuide: activeStyleGuide(raw.styleGuide),
     audience: text(raw.audience, "Adultos em formação"),
     level: text(raw.level, "Intermediário"),
+    educationIdentity: normalizeEducationIdentity(raw.educationIdentity, raw),
     objectives: splitLines(raw.objectives),
     content: text(raw.content),
     references: splitLines(raw.references),

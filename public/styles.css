@@ -221,6 +221,10 @@ body.welcome-active{overflow:hidden}
 .identity-session-note{display:flex;flex-direction:column;gap:3px;margin:0;padding:10px 12px;border:1px solid #dfe8e6;border-radius:9px;background:#f2f8f6;color:#275d58;font-size:11px;line-height:1.4}
 .identity-session-note strong{font-size:11px}
 .identity-session-note span{color:#52736e}
+.reader-bncc>article{margin:10px 0;padding:13px 15px;border-left:3px solid var(--teal);border-radius:0 9px 9px 0;background:var(--teal-soft)}
+.reader-bncc>article>strong{font-family:var(--mono);color:#165e55}
+.reader-bncc>article p{margin:5px 0 8px;line-height:1.5}
+.reader-bncc>article ul{margin:0;padding-left:20px;font-size:13px}
 .recovery-dock{position:fixed;top:16px;left:50%;z-index:1100;display:flex;flex-direction:column;gap:8px;width:min(1440px,calc(100% - 40px));transform:translateX(-50%);pointer-events:none}
 .recovery-dock.hidden{display:none!important}
 .recovery-dock>section{width:100%;margin:0;pointer-events:auto;box-shadow:0 10px 30px rgba(20,33,61,.1)}

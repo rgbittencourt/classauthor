@@ -234,6 +234,7 @@ function normalizeGuide(source = {}, plan = {}, input = {}, index = 0) {
     purpose: text(raw.purpose || raw.instructionalPurpose || raw.rationale) || `Orientar a aprendizagem da semana ${index + 1} com foco nos objetivos previstos.`,
     didacticArc: normalizeDidacticArc(raw.didacticArc || plan.didacticArc, practices.length > 0, index),
     objectives: list(raw.objectives || plan.learningObjectives || input.objectives),
+    bnccAlignment: Array.isArray(plan.bnccAlignment) ? plan.bnccAlignment : [],
     alignmentMatrix: Array.isArray(raw.alignmentMatrix) && raw.alignmentMatrix.length ? raw.alignmentMatrix : (plan.alignmentMatrix?.length ? plan.alignmentMatrix : buildAlignmentMatrix(plan)),
     diagnostic: object(raw.diagnostic || plan.diagnostic),
     formativeChecks: Array.isArray(raw.formativeChecks || raw.checkpoints) ? (raw.formativeChecks || raw.checkpoints) : (plan.formativeChecks || []),

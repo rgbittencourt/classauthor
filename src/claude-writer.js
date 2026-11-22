@@ -31,6 +31,7 @@ import { parseWeekMarkdown, planToMarkdown, plain } from "./writer-markdown.js";
 import { applyFactCheck } from "./fact-check.js";
 import { compactBriefingPractice, compactWeekInput, enforceWeekFocus } from "./ai.js";
 import { QUIZ_OPTION_COUNT, assessmentIssues } from "./pedagogy.js";
+import { bnccReferenceBlock } from "./bncc.js";
 
 export function writerMode() {
   const configured = String(process.env.AULA_WRITER || "").trim().toLowerCase();
@@ -87,7 +88,7 @@ Como revisar: reescreva o documento inteiro já com o pedido incorporado. O que 
     askedQuotes ? `- O professor pediu até ${askedQuotes} citação(ões) direta(s) (📜), mas SÓ com frase exata e fonte completa (autor, obra, ano e página); se não houver uma citação real e segura, não invente: deixe sem.` : "",
     figureAsk(composition.figures)
   ].filter(Boolean).join("\n");
-  const methodology = [blocksAsk ? `BLOCOS PEDIDOS PELO PROFESSOR\n${blocksAsk}` : "", styleGuideBlock(input.styleGuide), approvedPlanBlock(input), writerMethodologyBlock(input, index), sourceMaterialBlock(input, "writer")].filter(Boolean).join("\n\n");
+  const methodology = [blocksAsk ? `BLOCOS PEDIDOS PELO PROFESSOR\n${blocksAsk}` : "", styleGuideBlock(input.styleGuide), bnccReferenceBlock(input), approvedPlanBlock(input), writerMethodologyBlock(input, index), sourceMaterialBlock(input, "writer")].filter(Boolean).join("\n\n");
   return `Escreva a unidade da semana ${weekNumber} do curso "${input.title}". ${intro}
 
 PÚBLICO E NÍVEL: ${input.audience || "estudantes de pós-graduação"} (${input.level || "pós-graduação"}), em ${input.language || "português do Brasil"}.
@@ -280,7 +281,8 @@ export function derivativesPrompt(input, index, plan, scheduledPractices, part =
   const activitiesSpec = `  "diagnostic": { "prompt": "pergunta de entrada ligada ao dia a dia do estudante", "expectedEvidence": "...", "feedback": "..." },
   "formativeChecks": [ { "moment": "Depois da seção N", "prompt": "pergunta", "expectedEvidence": "...", "feedback": "...", "action": "o que fazer se errar" } ],
   "activities": [ { "type": "fórum", "title": "...", "instructions": "...", "durationMinutes": 40, "evidence": "...", "evidenceType": "...", "feedback": "...", "criteria": ["..."], "required": true } ],
-  "selfAssessment": { "title": "Autoavaliação", "prompts": ["..."], "scale": ["..."], "feedback": "..." }`;
+  "selfAssessment": { "title": "Autoavaliação", "prompts": ["..."], "scale": ["..."], "feedback": "..." },
+  "bnccAlignment": [ { "code": "código oficial", "description": "descrição oficial literal", "objective": "objetivo da semana", "activity": "atividade correspondente", "evidence": "evidência observável" } ]`;
   const mediationSpec = `  "teacherGuide": {
     "resourceNotes": ["orientação ao professor sobre os recursos desta semana"],
     "mediationStops": [ { "id": "stop-1", "title": "Abertura", "timing": "início da semana", "purpose": "..." } ],
@@ -331,6 +333,10 @@ ${scheduledPractices.length && !separateWebpractice ? `- Há webprática agendad
   const practiceInThisCall = scheduledPractices.length && ((wants.mediation && !separateWebpractice) || (part === "webpractice" && wants.webpractice));
   const sourceBlock = wants.activities || wants.methodology || wants.explain ? sourceMaterialBlock(input, "derivatives") : practiceInThisCall ? sourceMaterialBlock(input, "practice") : "";
   if (sourceBlock) rules.push(sourceBlock);
+  if (wants.activities) {
+    const bncc = bnccReferenceBlock(input);
+    if (bncc) rules.push(bncc);
+  }
   const planBlock = approvedPlanBlock(input);
   if (planBlock && (wants.activities || wants.methodology || wants.explain || wants.mediation || wants.webpractice)) rules.unshift(planBlock);
   if (scheduledPractices.length && ((wants.mediation && !separateWebpractice) || (part === "webpractice" && wants.webpractice))) rules.push(`MODALIDADE DE CADA SESSÃO PRÁTICA (respeite o campo "modality")
@@ -403,7 +409,7 @@ async function buildDerivatives(input, index, plan, only = null) {
 
 function mergeDerivatives(plan, derivatives) {
   const pick = (key) => derivatives[key] && (Array.isArray(derivatives[key]) ? derivatives[key].length : Object.keys(derivatives[key]).length) ? { [key]: derivatives[key] } : {};
-  return { ...plan, ...pick("assessment"), ...pick("diagnostic"), ...pick("formativeChecks"), ...pick("activities"), ...pick("selfAssessment"), ...pick("activeMethodology") };
+  return { ...plan, ...pick("assessment"), ...pick("diagnostic"), ...pick("formativeChecks"), ...pick("activities"), ...pick("selfAssessment"), ...pick("activeMethodology"), ...pick("bnccAlignment") };
 }
 
 async function composeWeek(input, index, markdown, options = {}) {

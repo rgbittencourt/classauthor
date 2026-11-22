@@ -12,6 +12,7 @@ import { callJson, getAIProvider } from "./ai-client.js";
 import { selectResourcesWithAI } from "./resource-curator.js";
 import { generateWeekProse, regenerateWeekProse, writerMode } from "./claude-writer.js";
 import { clip as bridgeClip, closingRequirement, formatBridgeContext, sanitizeBridges } from "./bridge.js";
+import { bnccReferenceBlock } from "./bncc.js";
 export { selectResourcesWithAI };
 
 function providerTokenSetting(name, fallback) {
@@ -136,6 +137,7 @@ export function compactBriefingInput(input = {}, missingFields = []) {
     title: clipText(input.title, 240),
     audience: clipText(input.audience, 240),
     level: clipText(input.level, 80),
+    educationIdentity: input.educationIdentity,
     weeks: Math.max(1, safeNumber(input.weeks, 1)),
     hoursPerWeek: Math.max(0, safeNumber(input.hoursPerWeek, 0)),
     calendarMode: clipText(input.calendarMode, 40),
@@ -220,6 +222,7 @@ export function compactWeekInput(input = {}, index = 0, resourcePlan = {}) {
     title: clipText(input.title, 240),
     audience: clipText(input.audience, 240),
     level: clipText(input.level, 100),
+    educationIdentity: input.educationIdentity,
     language: clipText(input.language, 20),
     weeks: Math.max(1, safeNumber(input.weeks, 1)),
     hoursPerWeek: Math.max(0, safeNumber(input.hoursPerWeek, 0)),
@@ -431,6 +434,7 @@ lessonPlan obrigatório:
 - diagnostic com pergunta/problema inicial, evidência esperada e feedback; formativeChecks com perguntas durante o texto, momento, evidência, feedback e ação de intervenção;
 - activities para fóruns, discussões, produção, estudo de caso ou encontro síncrono, com type, title, instructions, durationMinutes, evidence, evidenceType, feedback, criteria e required;
 - alignmentMatrix: uma linha por objetivo, com cognitiveLevel (lembrar, entender, aplicar, analisar, avaliar ou criar), knowledgeDimension (factual, conceitual, procedimental ou metacognitivo), contentSections, activities, evidence e assessmentQuestions. Não deixe objetivo sem atividade, evidência e avaliação; atividade, evidência e questão devem exigir demanda cognitiva compatível com o objetivo;
+- quando houver REFERENCIAL BNCC OBRIGATÓRIO, inclua bnccAlignment com code, description literal, objective, activity e evidence para cada habilidade efetivamente trabalhada; nunca use código fora da lista fornecida;
 - differentiation com trilhas support/essential, standard e extension, cada uma com instruções e recursos;
 - accessibility com alternativas para baixa conexão, linguagem clara, uso em celular, diagramas e mídias;
 - selfAssessment com perguntas de autoavaliação, escala e feedback;
@@ -470,7 +474,7 @@ ${JSON.stringify(compactInput, null, 2)}
 
 Sessões práticas independentes agendadas para esta semana (não inserir no texto-base; desenvolver somente em teacherGuide.webPracticeProjects e no DOCX separado):
 ${JSON.stringify(scheduledPractices.map((practice, practiceIndex) => compactBriefingPractice(practice, practiceIndex)), null, 2)}
-${[approvedPlanBlock(input), writerMethodologyBlock(input, weekIndex), derivativesMethodologyBlock(input, weekIndex, { assessment: true, activities: true, mediation: true, explain: true }), webPracticeMethodologyBlock(input, weekIndex, scheduledPractices), sourceMaterialBlock(input, "derivatives")].filter(Boolean).map((block) => `\n${block}`).join("\n")}
+${[bnccReferenceBlock(input), approvedPlanBlock(input), writerMethodologyBlock(input, weekIndex), derivativesMethodologyBlock(input, weekIndex, { assessment: true, activities: true, mediation: true, explain: true }), webPracticeMethodologyBlock(input, weekIndex, scheduledPractices), sourceMaterialBlock(input, "derivatives")].filter(Boolean).map((block) => `\n${block}`).join("\n")}
 Retorne JSON completo, sem omitir propriedades obrigatórias.`;
 }
 

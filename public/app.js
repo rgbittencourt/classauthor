@@ -16,6 +16,7 @@ import { ownKeys, installKeyFetch, openKeysModal } from "./own-keys.js";
 import { DRAFT_FILE, chooseProjectFolder, folderPermission, folderSupported, forgetProjectFolder, loadProjectFolder, openExistingProjectFolder, projectFolder, readFromProjectFolder, saveToProjectFolder, SUBFOLDERS } from "./project-folder.js";
 import { applyAdjustment, applyRewrite, approveWeek, bridgesBefore, canGenerateNext, dismissIssue, emptyFlow, normalizeFlow, recordGenerated, weekFlowStatus } from "./step-flow.js";
 import { methodologyDecisionGuide } from "./methodology-decision.js";
+import { BNCC_COMPONENTS, normalizeEducationIdentity } from "./bncc.js";
 
 const $ = (selector) => document.querySelector(selector);
 const isGitHubPages = window.location.hostname.endsWith(".github.io");
@@ -829,6 +830,9 @@ function applyInputToForm(input = {}) {
     const value = input[key];
     element.value = Array.isArray(value) ? value.join("\n") : (value ?? "");
   });
+  const education = normalizeEducationIdentity(input.educationIdentity, input);
+  if ($("#education-level")) $("#education-level").value = education.educationLevel;
+  toggleEducationIdentity(education);
   const profile = input.academicProfile || {};
   const profileFields = { "academic-target-words": "targetWords", "academic-min-sections": "minimumSections", "academic-min-references": "minimumReferences", "academic-primary-sources": "primarySourcesRequired", "citation-style": "citationStyle", "academic-scope": "historicalScope", "academic-authors": "requiredAuthors", "academic-frameworks": "requiredFrameworks", "academic-avoid": "avoidTopics", "academic-source-policy": "sourcePolicy" };
   Object.entries(profileFields).forEach(([elementId, key]) => { const element = $("#" + elementId); if (element) element.value = Array.isArray(profile[key]) ? profile[key].join("\n") : (profile[key] ?? element.value); });
@@ -986,6 +990,32 @@ function updateMethodologyHints() {
   if ($("#pedagogical-approach-hint")) $("#pedagogical-approach-hint").textContent = APPROACH_HINTS[approach] || "";
   const selected = $("#methodology-default")?.selectedOptions?.[0];
   if ($("#methodology-default-hint")) $("#methodology-default-hint").textContent = selected?.dataset.hint || "";
+}
+
+function toggleEducationIdentity(preferred = null) {
+  const educationLevel = preferred?.educationLevel || $("#education-level")?.value || "outro";
+  const active = ["fundamental", "medio"].includes(educationLevel);
+  document.querySelectorAll(".bncc-identity").forEach((element) => element.classList.toggle("hidden", !active));
+  if (!active) return;
+  const grade = $("#education-grade");
+  const component = $("#education-component");
+  const previousGrade = preferred?.grade || Number(grade.value) || 1;
+  const previousComponent = preferred?.component || component.value;
+  const max = educationLevel === "fundamental" ? 9 : 3;
+  grade.innerHTML = Array.from({ length: max }, (_, index) => `<option value="${index + 1}">${index + 1}º ${educationLevel === "fundamental" ? "ano" : "ano/série"}</option>`).join("");
+  grade.value = String(Math.min(max, Math.max(1, previousGrade)));
+  component.innerHTML = `<option value="">Selecione…</option>${(BNCC_COMPONENTS[educationLevel] || []).map((item) => `<option value="${item.id}">${escapeHtml(item.label)}</option>`).join("")}`;
+  if ([...component.options].some((option) => option.value === previousComponent)) component.value = previousComponent;
+  $("#education-component-label").textContent = educationLevel === "fundamental" ? "Componente curricular" : "Área/componente da BNCC";
+  $("#bncc-identity-hint").textContent = `A BNCC será aplicada automaticamente ao ${educationLevel === "fundamental" ? "Ensino Fundamental" : "Ensino Médio"}; códigos incompatíveis serão bloqueados pelo validador.`;
+}
+
+function collectEducationIdentity() {
+  return normalizeEducationIdentity({
+    educationLevel: $("#education-level")?.value,
+    grade: $("#education-grade")?.value,
+    component: $("#education-component")?.value
+  });
 }
 
 function methodologyDecisionMarkup(item) {
@@ -1689,6 +1719,7 @@ function formInput() {
     title: $("#course-title").value,
     audience: $("#audience").value,
     level: $("#level").value,
+    educationIdentity: collectEducationIdentity(),
     author: $("#author").value,
     institution: $("#institution").value,
     weeks: Math.min(52, Math.max(1, Number($("#weeks").value) || 1)),
@@ -2267,11 +2298,12 @@ function renderLessonPreview(lesson, index) {
   const usageLabel = { base: "base do conteúdo", apoio: "referência de apoio", pratica: "roteiro de prática" };
   const sourceUsed = (plan.sourceUsed || []).length ? `<section class="reader-source-used"><h3>Material do professor usado nesta semana</h3><ul>${plan.sourceUsed.map((item) => `<li><strong>${escapeHtml(item.title || "Material")}</strong> (${escapeHtml(usageLabel[item.usage] || item.usage || "")}) · ${item.unit === "parte" ? "partes" : "páginas"} ${escapeHtml((item.pages || []).join(", "))}${item.chosenByTeacher ? " · escolhidas por você" : " · escolhidas pelo app"}</li>`).join("")}</ul><small>Estes foram os trechos enviados à IA. Se não forem os certos, indique as páginas da semana no cartão do material e refaça a semana.</small></section>` : "";
   const alignment = (plan.alignmentMatrix || []).length ? `<section><h3>Alinhamento pedagógico</h3><ul>${plan.alignmentMatrix.map((row) => `<li><strong>${escapeHtml(row.objective || "Objetivo")}</strong>: ${escapeHtml(row.evidence || "evidência a definir")} · avaliação: ${escapeHtml((row.assessmentQuestions || []).join(", ") || "a definir")}</li>`).join("")}</ul></section>` : "";
+  const bncc = (plan.bnccAlignment || []).length ? `<section class="reader-bncc"><h3>Alinhamento com a BNCC</h3><p><small>Códigos e descrições da Base Nacional Comum Curricular (MEC, 2018), conferidos para a etapa, o ano/série e o componente selecionados.</small></p>${plan.bnccAlignment.map((item) => `<article><strong>${escapeHtml(item.code)}</strong><p>${escapeHtml(item.description)}</p><ul><li><b>Objetivo:</b> ${escapeHtml(item.objective || "a definir")}</li><li><b>Atividade:</b> ${escapeHtml(item.activity || "a definir")}</li><li><b>Evidência:</b> ${escapeHtml(item.evidence || "a definir")}</li></ul></article>`).join("")}</section>` : "";
   const mediation = mediationMessagesMarkup(guide.mediationMessages, plan.theme || lesson?.meta?.title || `a semana ${index + 1}`, index + 1)
     + (guide.weekSummary && guide.studentFAQ?.length ? "" : `<section class="reader-warning"><h3>Explicações para o professor</h3><p>Esta semana ainda não tem o resumo, as perguntas prováveis dos alunos, os equívocos comuns e os sinais de alerta que entram no Material de Mediação. O texto da semana não é alterado.</p><button type="button" class="secondary" id="retry-explain-button">Completar explicações do Material de Mediação</button></section>`);
   $("#lesson-modal-eyebrow").textContent = `PRÉVIA · SEMANA ${String(index + 1).padStart(2, "0")}`;
   $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${index + 1}`;
-  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${pendingFigures}${figureListMarkup(index)}${approvedPlanMarkup}${sourceUsed}${sectionsMarkup}${methodology}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}${productionMarkup(index, weekReleased(index) || manuallyApproved || ["ready", "complete"].includes(automaticStatus))}`;
+  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${bncc}${diagnostic}${pendingFigures}${figureListMarkup(index)}${approvedPlanMarkup}${sourceUsed}${sectionsMarkup}${methodology}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}${productionMarkup(index, weekReleased(index) || manuallyApproved || ["ready", "complete"].includes(automaticStatus))}`;
   renderFlowPanel(index);
   $("#retry-derivatives-button")?.addEventListener("click", () => retryDerivatives(index));
   $("#retry-figures-button")?.addEventListener("click", () => retryFigures(index));
@@ -3988,6 +4020,7 @@ async function generate() {
   const formSignature = JSON.stringify(input);
   if (!input.title.trim()) { showError("Informe o tema geral ou título do curso."); $("#course-title").focus(); return; }
   if (!input.objectives.length && !input.content.trim()) { showError("Informe ao menos um objetivo ou conteúdo-base para orientar a geração."); $("#objectives").focus(); return; }
+  if (input.educationIdentity?.bnccEnabled && !input.educationIdentity.component) { showError("Selecione o componente curricular ou a área da BNCC antes de gerar."); $("#education-component").focus(); return; }
   if (input.webPractice.enabled) {
     const incomplete = input.webPractices.find((practice) => !practice.title || (!practice.weekNumber && !practice.date));
     if (incomplete) { showError("Cada prática precisa de um título e de uma semana ou data de ocorrência. Ela não será alocada automaticamente."); return; }
@@ -4646,14 +4679,15 @@ function openPlanDialog(index, input, headers, initialText, methodLabel) {
   });
 }
 
-// Antes de gerar uma aula com metodologia ativa: plano proposto → professor ajusta → aprova.
+// Antes de gerar uma aula com metodologia ativa ou BNCC: plano proposto → professor ajusta → aprova.
 async function ensureLessonPlan(input, index, headers, button) {
   const methodLabel = methodologyForWeekLabel(index, null);
-  if (!methodLabel) return true;
+  const usesBncc = Boolean(input.educationIdentity?.bnccEnabled);
+  if (!methodLabel && !usesBncc) return true;
   if (!state.lessonPlans) state.lessonPlans = {};
   if (state.lessonPlans[index]) return true;
   setButtonLabel(button, `Montando o plano da aula ${index + 1}…`);
-  setAiActivity("Plano da aula", `Antes de escrever a aula ${index + 1}, a IA está montando o plano de como aplicar a metodologia, para você ajustar e aprovar…`, { progress: Math.round(((index + 0.1) / (input.weeks + 1)) * 100) });
+  setAiActivity("Plano da aula", `Antes de escrever a aula ${index + 1}, a IA está montando o plano${usesBncc ? " e vinculando as habilidades da BNCC" : " de como aplicar a metodologia"}, para você ajustar e aprovar…`, { progress: Math.round(((index + 0.1) / (input.weeks + 1)) * 100) });
   const proposal = await requestLessonPlan(input, index, headers);
   setAiActivity("Plano da aula", `Plano da aula ${index + 1} pronto: confira, ajuste e aprove para a aula ser gerada.`, { progress: Math.round(((index + 0.15) / (input.weeks + 1)) * 100) });
   const approved = await openPlanDialog(index, input, headers, proposal, methodLabel);
@@ -4667,6 +4701,9 @@ async function ensureLessonPlan(input, index, headers, button) {
 }
 
 $("#pedagogical-approach")?.addEventListener("change", () => { updateMethodologyHints(); scheduleSave(); });
+$("#education-level")?.addEventListener("change", () => { toggleEducationIdentity(); updateAcademicInheritance(); scheduleSave(); });
+$("#education-grade")?.addEventListener("change", scheduleSave);
+$("#education-component")?.addEventListener("change", scheduleSave);
 $("#methodology-default")?.addEventListener("change", async (event) => {
   await handleMethodologyChoice(event.target, () => { updateMethodologyHints(); renderMethodologyWeeks(collectMethodologyPlan()); scheduleSave(); });
 });
@@ -4696,5 +4733,5 @@ $("#recalculate-button").dataset.label = "Recalcular qualidade";
 if ($("#methodology-default")) $("#methodology-default").dataset.confirmedValue = $("#methodology-default").value;
 initializeWelcome();
 enhanceLayout();
-renderResourcePlanWeeks(); renderMethodologyWeeks(); updateMethodologyHints(); updateBloomMeter(); applyUnitToUi(); renderCompositionPlanWeeks(); toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();
+toggleEducationIdentity(); renderResourcePlanWeeks(); renderMethodologyWeeks(); updateMethodologyHints(); updateBloomMeter(); applyUnitToUi(); renderCompositionPlanWeeks(); toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();
 
