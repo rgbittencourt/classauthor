@@ -7,6 +7,7 @@ import { sortReferencesAbnt, normalizeAbntCitation } from "./abnt.js";
 import { measureLessonQuality } from "./content-quality.js";
 import { normalizeAcademicProfile } from "./academic.js";
 import { progressionForWeek } from "./curriculum.js";
+import { youtubeVideoId } from "./resource-identity.js";
 import { figureBlock, figuresOf } from "./figures.js";
 import { compositionPlanForWeek, materializeComposition, normalizeCompositionPlan, citationHasSource } from "./composition.js";
 import { referenceItemHtml, GENERATOR_TOOL, GENERATOR_CREDIT, GENERATOR_AI_USE } from "./student-export.js";
@@ -737,17 +738,34 @@ function resourceSectionIndex(resource, plan = {}, sectionCount = 1, fallbackInd
   return found >= 0 ? found : Math.min(Math.max(0, fallbackIndex), Math.max(0, sectionCount - 1));
 }
 
-function inlineVideoProps(resource, block = null) {
-  const source = block?.props?.inlineVideo || block?.props || {};
-  const id = youtubeId(resource?.href) || text(source.id);
+function videoBlockForResource(resource, weekNumber, resourceIndex, sourceBlock = null) {
+  const source = sourceBlock?.props?.inlineVideo || sourceBlock?.props || {};
+  const id = youtubeVideoId(resource?.href) || youtubeVideoId(source.id || source.videoId);
   if (!id) return null;
-  return { id, title: resource?.title || text(source.title, "Vídeo"), caption: resource?.pedagogicalUse || resource?.objective || text(source.caption, "Vídeo relacionado a esta seção."), credit: resource?.credit || resource?.source || text(source.credit, "YouTube"), start: text(source.start), resourceId: resource?.id || text(source.resourceId) };
+  return {
+    id: newId("c-resource-video-", weekNumber, resourceIndex),
+    type: "video",
+    props: {
+      id,
+      title: text(source.title) || resource?.title || "Vídeo",
+      caption: text(source.caption) || resource?.caption || resource?.pedagogicalUse || resource?.objective || "Vídeo relacionado a esta seção.",
+      credit: text(source.credit) || resource?.credit || resource?.source || "YouTube",
+      start: text(source.start || resource?.start),
+      captionsOk: Boolean(resource?.videoAccessibility?.hasCaptions || source.captionsOk),
+      transcript: text(source.transcript),
+      transcriptUrl: text(source.transcriptUrl),
+      transcriptCues: Array.isArray(source.transcriptCues) ? source.transcriptCues : [],
+      summaryMd: text(source.summaryMd),
+      showSubtitle: source.showSubtitle !== false,
+      showSummary: source.showSummary !== false,
+      showTranscript: source.showTranscript !== false
+    }
+  };
 }
 
 function resourceBridgeBlock(resource, weekNumber, sectionIndex, resourceIndex, sourceBlock = null) {
   const bridge = resource?.bridgeParagraph || resource?.pedagogicalUse || resource?.objective || `Use este recurso neste ponto para relacionar ${resource?.title || "o material"} ao conceito estudado nesta seção.`;
-  const inlineVideo = inlineVideoProps(resource, sourceBlock);
-  return { id: newId("c-resource-bridge-", weekNumber, sectionIndex * 10 + resourceIndex), type: "prose", props: { body: richHtml(bridge), dropcap: false, dropcapTone: "terracotta", resourceId: resource?.id || text(sourceBlock?.props?.resourceId), ...(inlineVideo ? { inlineVideo } : {}) } };
+  return { id: newId("c-resource-bridge-", weekNumber, sectionIndex * 10 + resourceIndex), type: "prose", props: { body: richHtml(bridge), dropcap: false, dropcapTone: "terracotta", resourceId: resource?.id || text(sourceBlock?.props?.resourceId) } };
 }
 
 function integrateRootResources(blocks, weekNumber, plan = {}) {
@@ -776,7 +794,11 @@ function integrateRootResources(blocks, weekNumber, plan = {}) {
     const additions = grouped.get(sectionIndex) || [];
     const bridge = resourceBridgeBlock(resource, weekNumber, sectionIndex, resourceIndex, block);
     additions.push(bridge);
-    if (!inlineVideoProps(resource, block)) additions.push(block);
+    if (block.type === "video" || (block.type === "prose" && block.props?.inlineVideo?.id)) {
+      const video = videoBlockForResource(resource, weekNumber, resourceIndex, block);
+      if (video) additions.push(video);
+      else if (block.type !== "prose") additions.push(block);
+    } else additions.push(block);
     grouped.set(sectionIndex, additions);
   });
   let offset = 0;
@@ -814,8 +836,6 @@ export function synthesisBlockBody(plan = {}) {
   if (!next) return base;
   return `${base}<p><strong>Na próxima semana:</strong> ${richHtml(next).replace(/^<p>/, "").replace(/<\/p>$/, "")}</p>`;
 }
-function youtubeId(value) { const match = text(value).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^?&#/]+)/i); return match ? match[1] : ""; }
-
 function fallbackLessonPlan(input, index) {
   const weekFocus = progressionForWeek(input, index);
   const videos = input.videoLinks.map((href, i) => normalizeResource({ id: `video-${i + 1}`, type: "video", title: `Vídeo fornecido ${i + 1}`, href, required: false, verificationStatus: "provided-needs-review" }, i, "video"));
@@ -885,12 +905,13 @@ function fallbackBlocks(input, index, plan = fallbackLessonPlan(input, index)) {
     // Modo de prosa: recurso com link vira o callout "Veja mais aqui" (parágrafo de
     // ligação + link) no ponto do texto, como nas aulas de referência. Sem link, o
     // parágrafo de ligação continua só como anotação para o professor.
-    const asCallout = (resource) => plan.writer === "prose" && resource.href && !inlineVideoProps(resource) && resource.kind !== "image";
+    const asCallout = (resource) => plan.writer === "prose" && resource.href && resource.kind !== "video" && resource.kind !== "image";
     const calloutBlocks = selected.filter(asCallout).map((resource, resourceIndex) => ({ id: newId("c-veja-mais-", week, idBase + resourceIndex), type: "destaque", props: { title: "🔎 Veja mais aqui", body: `${richHtml(resource.bridgeParagraph || resource.pedagogicalUse || resource.objective || resource.title)}<p>🔗 <a href="${html(resource.href)}" target="_blank" rel="noopener">${html(resource.title || resource.href)}</a>${resource.source ? ` — ${html(resource.source)}` : ""}</p>`, tone: "sage", icon: "", resourceId: resource.id } }));
-    const bridges = selected.filter((resource) => !asCallout(resource)).map((resource, resourceIndex) => ({ id: newId("c-resource-bridge-", week, idBase + resourceIndex), type: "prose", props: { body: richHtml(resource.bridgeParagraph || resource.pedagogicalUse || resource.objective || `Use este recurso neste ponto para relacionar ${resource.title || "o material"} ao conceito estudado nesta seção.`), dropcap: false, dropcapTone: "terracotta", resourceId: resource.id, ...(inlineVideoProps(resource) ? { inlineVideo: inlineVideoProps(resource) } : {}) } }));
+    const bridges = selected.filter((resource) => !asCallout(resource)).map((resource, resourceIndex) => ({ id: newId("c-resource-bridge-", week, idBase + resourceIndex), type: "prose", props: { body: richHtml(resource.bridgeParagraph || resource.pedagogicalUse || resource.objective || `Use este recurso neste ponto para relacionar ${resource.title || "o material"} ao conceito estudado nesta seção.`), dropcap: false, dropcapTone: "terracotta", resourceId: resource.id } }));
     const images = selected.filter((resource) => resource.kind === "image" && resource.href).slice(0, 2).map((resource, resourceIndex) => ({ id: newId("c-image-", week, idBase + resourceIndex), type: "imagem", props: { src: resource.href, slotId: "", caption: resource.caption || resource.title, credit: resource.credit || resource.source || "", ratio: "16/9", resourceId: resource.id } }));
-    const materials = selected.filter((resource) => !asCallout(resource) && !inlineVideoProps(resource) && !images.some((block) => block.props.caption === resource.title) && (resource.title || resource.href)).map((resource) => ({ type: resource.kind, title: `${resource.required ? "Leitura orientada: " : "Para aprofundar: "}${resource.title}`, source: resource.source || resource.objective || resource.pedagogicalUse, href: resource.href, resourceId: resource.id }));
-    return [...bridges, ...calloutBlocks, ...images, ...(materials.length ? [{ id: newId("c-materials-", week, idBase), type: "materiais", props: { title: "Recurso para usar nesta seção", items: materials } }] : [])];
+    const videos = selected.filter((resource) => resource.kind === "video" && resource.href).map((resource, resourceIndex) => videoBlockForResource(resource, week, idBase + resourceIndex));
+    const materials = selected.filter((resource) => !asCallout(resource) && resource.kind !== "video" && !images.some((block) => block.props.caption === resource.title) && (resource.title || resource.href)).map((resource) => ({ type: resource.kind, title: `${resource.required ? "Leitura orientada: " : "Para aprofundar: "}${resource.title}`, source: resource.source || resource.objective || resource.pedagogicalUse, href: resource.href, resourceId: resource.id }));
+    return [...bridges, ...calloutBlocks, ...images, ...videos.filter(Boolean), ...(materials.length ? [{ id: newId("c-materials-", week, idBase), type: "materiais", props: { title: "Recurso para usar nesta seção", items: materials } }] : [])];
   };
   const calloutBlock = (callout, sectionIndex, position) => {
     const id = newId(`c-${callout.kind}-`, week, sectionIndex * 100 + position);
@@ -976,7 +997,8 @@ export function normalizeLesson(raw, input, index) {
   const hasHero = sourceBlocks.some((block) => block.type === "hero" && text(block.props?.title));
   const hasTopic = sourceBlocks.some((block) => ["topic", "topic-collapsible", "topic-slider"].includes(block.type) && Array.isArray(block.props?.children) && block.props.children.length > 0);
   const hasObjectives = sourceBlocks.some((block) => block.type === "destaque" && text(block.props?.title).toLowerCase().includes("objetiv"));
-  const hasContent = sourceBlocks.some((block) => block.type === "prose" || block.type === "titulo");
+  const containsContent = (blocks) => blocks.some((block) => ["prose", "titulo"].includes(block.type) || (Array.isArray(block.props?.children) && containsContent(block.props.children)));
+  const hasContent = containsContent(sourceBlocks);
   const blocks = sourceBlocks.length && hasHero && hasTopic && hasObjectives && hasContent ? sourceBlocks : fallbackBlocks(input, index, lessonPlan);
   const baseMeta = weekMeta(input, index);
   const suppliedMeta = source.meta && typeof source.meta === "object" ? source.meta : {};

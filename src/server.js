@@ -199,6 +199,8 @@ app.post("/api/assist-briefing", async (req, res) => {
 });
 
 app.post("/api/zip", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
   try {
     const input = normalizeCourseInput(req.body?.input || {});
     const weeks = normalizeWeeklyOutput({ weeks: req.body?.weeks || [] }, input);
@@ -226,6 +228,8 @@ app.post("/api/zip", async (req, res) => {
 });
 
 app.post("/api/teacher-pdf", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
   try {
     const input = normalizeCourseInput(req.body?.input || {});
     const submittedWeeks = Array.isArray(req.body?.weeks) ? req.body.weeks : [];

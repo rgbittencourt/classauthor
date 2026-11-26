@@ -1,4 +1,5 @@
 import { withUnit } from "../src/unit.js";
+import { accessRequired, hasValidAccess } from "../src/access.js";
 import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload } from "../src/calculations.js";
 import { createWeeksZip } from "../src/zip.js";
 import { normalizeCourseInput, normalizeWeeklyOutput, slugify, validateLesson } from "../src/aula-schema.js";
@@ -7,7 +8,9 @@ import { validateCourse } from "../src/validation.js";
 import { scopeGeneralPlan, scopeMediationMaterial } from "../src/mediation-scope.js";
 
 async function handler(request, response) {
+  response.setHeader("Cache-Control", "no-store");
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });
+  if (accessRequired() && !hasValidAccess(request)) return response.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
   try {
     const input = normalizeCourseInput(request.body?.input || {});
     const weeks = normalizeWeeklyOutput({ weeks: request.body?.weeks || [] }, input);

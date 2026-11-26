@@ -1,4 +1,5 @@
 import { normalizeAbntCitation } from "./abnt.js";
+import { canonicalResourceUrl, extractHrefFromMarkup, resourceIdentity, youtubeVideoId } from "./resource-identity.js";
 const object = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 const text = (value, fallback = "") => String(value ?? "").trim() || fallback;
 
@@ -21,7 +22,8 @@ export function referenceItemHtml(item) {
   const entry = typeof item === "string" ? { citation: item } : object(item);
   const body = entry.html != null && text(entry.html) ? text(entry.html) : referenceMarkup(normalizeAbntCitation(entry.citation || entry.title || entry.href));
   const href = text(entry.href);
-  const safeHref = /^https?:\/\//i.test(href) ? href.replace(/"/g, "%22") : "";
+  const canonicalHref = canonicalResourceUrl(href);
+  const safeHref = /^https?:\/\//i.test(canonicalHref) ? canonicalHref.replace(/"/g, "%22") : "";
   const hasLink = safeHref && !body.includes(escapeHtml(href)) && !body.includes(safeHref);
   return hasLink ? `${body} <a href="${safeHref}" target="_blank" rel="noopener noreferrer">${escapeHtml(href)}</a>` : body;
 }
@@ -59,11 +61,137 @@ function studentSection(section = {}) {
   };
 }
 
-function sanitizeBlock(block = {}) {
+function referenceHref(item) {
+  if (typeof item === "string") return extractHrefFromMarkup(item);
+  const entry = object(item);
+  return text(entry.href || extractHrefFromMarkup(entry.html));
+}
+
+function referenceKey(item) {
+  const hrefIdentity = resourceIdentity(referenceHref(item), "article");
+  if (hrefIdentity) return hrefIdentity;
+  const entry = typeof item === "string" ? { citation: item } : object(item);
+  const plain = text(entry.citation || entry.title || entry.html || "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim().toLowerCase();
+  return plain ? `citation:${plain}` : "";
+}
+
+function withoutReferenceLink(item) {
+  const stripAnchors = (value) => String(value ?? "").replace(/<a\b[^>]*>([\s\S]*?)<\/a>/gi, "$1");
+  if (typeof item === "string") return stripAnchors(item);
+  const entry = { ...object(item), href: "" };
+  if (entry.html) entry.html = stripAnchors(entry.html);
+  return entry;
+}
+
+function deduplicateMarkupLinks(value, context) {
+  if (typeof value !== "string") return value;
+  return value.replace(/<a\b[^>]*>[\s\S]*?<\/a>/gi, (anchor) => {
+    const identity = resourceIdentity(extractHrefFromMarkup(anchor), "article");
+    if (!identity) return anchor;
+    const label = anchor.replace(/^<a\b[^>]*>/i, "").replace(/<\/a>$/i, "");
+    if (context.materialLinks.has(identity) || context.referenceLinks.has(identity) || context.seenMarkupLinks.has(identity)) return label;
+    context.seenMarkupLinks.add(identity);
+    return anchor;
+  });
+}
+
+function videoProps(props = {}, id, defaults = {}) {
+  const source = object(props);
+  return {
+    id,
+    title: text(source.title || defaults.title, "Vídeo"),
+    caption: text(source.caption || defaults.caption),
+    credit: text(source.credit || source.author || source.source || defaults.credit),
+    start: text(source.start || defaults.start),
+    captionsOk: Boolean(source.captionsOk),
+    transcript: text(source.transcript),
+    transcriptUrl: text(source.transcriptUrl),
+    transcriptCues: Array.isArray(source.transcriptCues) ? source.transcriptCues : [],
+    summaryMd: text(source.summaryMd),
+    showSubtitle: source.showSubtitle !== false,
+    showSummary: source.showSummary !== false,
+    showTranscript: source.showTranscript !== false
+  };
+}
+
+function nativeVideoBlock(source, props, rawId, context, defaults = {}) {
+  const id = youtubeVideoId(rawId);
+  if (!id || context.seenVideos.has(id)) return null;
+  context.seenVideos.add(id);
+  return {
+    id: text(source.id, `video-${id}`),
+    type: "video",
+    ...(source.bg ? { bg: source.bg } : {}),
+    ...(source.pad ? { pad: source.pad } : {}),
+    props: videoProps(props, id, defaults)
+  };
+}
+
+function createSanitizeContext(blocks) {
+  const context = {
+    nativeVideoIds: new Set(),
+    seenVideos: new Set(),
+    materialLinks: new Set(),
+    referenceLinks: new Set(),
+    seenMaterialLinks: new Set(),
+    seenReferenceItems: new Set(),
+    seenMarkupLinks: new Set(),
+    materialVideoIds: new Set()
+  };
+  const visit = (items = []) => (items || []).forEach((block) => {
+    const source = object(block);
+    const props = object(source.props);
+    if (source.type === "video") {
+      const id = youtubeVideoId(props.id || props.videoId);
+      if (id) {
+        context.nativeVideoIds.add(id);
+        context.materialLinks.add(`youtube:${id}`);
+      }
+    }
+    if (source.type === "prose" && props.inlineVideo?.id) {
+      const id = youtubeVideoId(props.inlineVideo.id);
+      if (id) {
+        context.nativeVideoIds.add(id);
+        context.materialLinks.add(`youtube:${id}`);
+      }
+    }
+    if (source.type === "materiais" && Array.isArray(props.items)) props.items.forEach((item) => {
+      const href = text(item?.href || item?.link || item?.url);
+      const videoId = youtubeVideoId(href);
+      const identity = resourceIdentity(href, item?.type || item?.kind || "article");
+      if (identity) context.materialLinks.add(identity);
+      if (videoId) context.materialVideoIds.add(videoId);
+    });
+    if (source.type === "referencias" && Array.isArray(props.items)) props.items.forEach((item) => {
+      const identity = resourceIdentity(referenceHref(item), "article");
+      if (identity) context.referenceLinks.add(identity);
+    });
+    visit(props.children);
+  });
+  visit(blocks);
+  return context;
+}
+
+function sanitizeBlocks(blocks = [], context) {
+  return (Array.isArray(blocks) ? blocks : []).flatMap((block) => {
+    const result = sanitizeBlock(block, context);
+    return Array.isArray(result) ? result.filter(Boolean) : result ? [result] : [];
+  });
+}
+
+function sanitizeBlock(block = {}, context) {
   const source = object(block);
   const props = object(source.props);
   if (source.type === "quiz") return null;
-  const children = Array.isArray(props.children) ? props.children.map(sanitizeBlock).filter(Boolean) : null;
+
+  // Compatibilidade: semanas já salvas com inlineVideo passam a usar a área de mídia nativa.
+  if (source.type === "prose" && props.inlineVideo?.id) {
+    return nativeVideoBlock(source, { ...props.inlineVideo, resourceId: undefined }, props.inlineVideo.id, context);
+  }
+  if (source.type === "prose" && props.resourceId) return null;
+  if (source.type === "video") return nativeVideoBlock(source, props, props.id || props.videoId, context);
+
+  const children = Array.isArray(props.children) ? sanitizeBlocks(props.children, context) : null;
   const nextProps = { ...props };
   delete nextProps.resourceId;
   delete nextProps.searchQuery;
@@ -78,46 +206,55 @@ function sanitizeBlock(block = {}) {
   delete nextProps.sectionNumber;
   delete nextProps.notes;
   if (children) nextProps.children = children;
+  if (typeof nextProps.body === "string") nextProps.body = deduplicateMarkupLinks(nextProps.body, context);
 
   // Sugestões sem URL ficam disponíveis para a mediação docente, mas não são
   // uma experiência utilizável pelo estudante no ClassAtelier.
   if (source.type === "imagem" && !text(props.src || props.href)) return null;
-  if (source.type === "video" && !text(props.id || props.videoId)) return null;
   if (source.type === "audio" && !text(props.src || props.href || props.spotify)) return null;
   if (source.type === "externalembed" && !text(props.embed || props.src || props.href)) return null;
 
-  // O parágrafo de ligação é uma anotação interna do professor. Quando ele
-  // carrega um vídeo inline, preservamos apenas o player para o estudante.
-  if (source.type === "prose" && props.resourceId) {
-    if (!props.inlineVideo?.id) return null;
-    nextProps.body = "";
-    nextProps.dropcap = false;
-    nextProps.inlineVideo = {
-      id: text(props.inlineVideo.id),
-      title: text(props.inlineVideo.title, "Vídeo"),
-      caption: text(props.inlineVideo.caption),
-      credit: text(props.inlineVideo.credit),
-      start: text(props.inlineVideo.start)
-    };
-  }
   if (source.type === "referencias" && Array.isArray(props.items)) {
-    nextProps.items = props.items.map(referenceItemHtml).filter(Boolean);
+    nextProps.items = props.items.flatMap((item) => {
+      const key = referenceKey(item);
+      if (key && context.seenReferenceItems.has(key)) return [];
+      if (key) context.seenReferenceItems.add(key);
+      const identity = resourceIdentity(referenceHref(item), "article");
+      const value = identity && context.materialLinks.has(identity) ? withoutReferenceLink(item) : item;
+      const html = referenceItemHtml(value);
+      return html ? [html] : [];
+    });
     if (!nextProps.items.length) return null;
   }
   if (source.type === "materiais" && Array.isArray(props.items)) {
-    nextProps.items = props.items.map((item) => ({
-      type: text(item?.type || item?.kind, "material"),
-      title: text(item?.title, "Material de apoio"),
-      href: text(item?.href || item?.link || item?.url)
-    })).filter((item) => item.href);
-    if (!nextProps.items.length) return null;
-  }
-  if (source.type === "video") {
-    nextProps.id = text(props.id);
-    nextProps.title = text(props.title, "Vídeo");
-    nextProps.caption = text(props.caption);
-    nextProps.credit = text(props.credit);
-    nextProps.start = text(props.start);
+    const nativeVideos = [];
+    nextProps.items = props.items.flatMap((item) => {
+      const href = text(item?.href || item?.link || item?.url);
+      const videoId = youtubeVideoId(href);
+      if (videoId) {
+        if (context.nativeVideoIds.has(videoId)) return [];
+        const videoSource = { ...source, id: `${text(source.id, "materiais")}-video-${videoId}` };
+        const video = nativeVideoBlock(videoSource, {}, videoId, context, {
+          title: text(item?.title, "Vídeo"),
+          caption: text(item?.caption),
+          credit: text(item?.credit || item?.author || item?.source)
+        });
+        if (video) nativeVideos.push(video);
+        return [];
+      }
+      const identity = resourceIdentity(href, item?.type || item?.kind || "article");
+      if (!href || (identity && context.seenMaterialLinks.has(identity))) return [];
+      if (identity) context.seenMaterialLinks.add(identity);
+      const kind = text(item?.type || item?.kind, "material");
+      return [{
+        type: kind === "reading" ? "artigo" : kind,
+        title: text(item?.title, "Material de apoio"),
+        source: text(item?.source || item?.author || item?.publisher || item?.credit),
+        href: canonicalResourceUrl(href) || href
+      }];
+    });
+    const materialBlock = nextProps.items.length ? [{ id: text(source.id), type: text(source.type), ...(source.bg ? { bg: source.bg } : {}), ...(source.pad ? { pad: source.pad } : {}), props: nextProps }] : [];
+    return [...nativeVideos, ...materialBlock];
   }
   if (source.type === "imagem") {
     nextProps.src = text(props.src);
@@ -128,7 +265,7 @@ function sanitizeBlock(block = {}) {
   return { id: text(source.id), type: text(source.type), ...(source.bg ? { bg: source.bg } : {}), ...(source.pad ? { pad: source.pad } : {}), props: nextProps };
 }
 
-function studentPlan(plan = {}) {
+function studentPlan(plan = {}, context) {
   const source = object(plan);
   const result = {};
   STUDENT_PLAN_KEYS.forEach((key) => {
@@ -163,18 +300,25 @@ function studentPlan(plan = {}) {
   } : { support: [], standard: [], extension: [], rationale: "" };
   result.diagnostic = source.diagnostic || {};
   result.selfAssessment = source.selfAssessment || {};
-  result.references = Array.isArray(source.references) ? source.references.map((reference) => {
-    if (typeof reference === "string") return { id: "", citation: text(reference), type: "", authors: [], year: "", publisher: "", doi: "", href: "" };
-    return {
-      id: text(reference?.id),
-      citation: text(reference?.citation || reference?.title),
-      type: text(reference?.type),
-      authors: Array.isArray(reference?.authors) ? reference.authors.map((author) => text(author)).filter(Boolean) : [],
-      year: text(reference?.year),
-      publisher: text(reference?.publisher),
-      doi: text(reference?.doi),
-      href: text(reference?.href)
-    };
+  const seenReferences = new Set();
+  result.references = Array.isArray(source.references) ? source.references.flatMap((reference) => {
+    const entry = typeof reference === "string" ? { citation: text(reference) } : object(reference);
+    const citation = text(entry.citation || entry.title);
+    const href = text(entry.href);
+    const identity = resourceIdentity(href, "article");
+    const key = identity || `citation:${citation.replace(/\s+/g, " ").toLowerCase()}`;
+    if (seenReferences.has(key)) return [];
+    seenReferences.add(key);
+    return [{
+      id: text(entry.id),
+      citation,
+      type: text(entry.type),
+      authors: Array.isArray(entry.authors) ? entry.authors.map((author) => text(author)).filter(Boolean) : [],
+      year: text(entry.year),
+      publisher: text(entry.publisher),
+      doi: text(entry.doi),
+      href: identity && (context.materialLinks.has(identity) || context.referenceLinks.has(identity)) ? "" : href
+    }];
   }) : [];
   return result;
 }
@@ -189,6 +333,9 @@ function studentPlan(plan = {}) {
 export function toStudentLesson(lesson = {}) {
   const source = object(lesson);
   const meta = object(source.meta);
+  const sourceBlocks = Array.isArray(source.blocks) ? source.blocks : [];
+  const sanitizeContext = createSanitizeContext(sourceBlocks);
+  const blocks = sanitizeBlocks(sourceBlocks, sanitizeContext);
   return {
     meta: {
       title: text(meta.title),
@@ -207,8 +354,8 @@ export function toStudentLesson(lesson = {}) {
       aiUse: text(meta.aiUse, GENERATOR_AI_USE),
       generatedBy: GENERATOR_CREDIT
     },
-    lessonPlan: studentPlan(source.lessonPlan),
-    blocks: [...(Array.isArray(source.blocks) ? source.blocks.map(sanitizeBlock).filter(Boolean) : []), creditBlock(meta.weekNumber)]
+    lessonPlan: studentPlan(source.lessonPlan, sanitizeContext),
+    blocks: [...blocks, creditBlock(meta.weekNumber)]
   };
 }
 

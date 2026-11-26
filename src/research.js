@@ -1,6 +1,7 @@
 import { selectResourcesWithAI } from "./resource-curator.js";
 import { searchResources } from "./resource-providers.js";
 import { resourcePlanForWeek } from "./aula-schema.js";
+import { canonicalResourceUrl, resourceIdentity, youtubeVideoId } from "./resource-identity.js";
 
 const text = (value) => String(value ?? "").trim();
 const positive = (value) => { const number = Number(value); return Number.isFinite(number) && number > 0 ? number : 0; };
@@ -22,7 +23,13 @@ function requestsFor(type, input, lesson) {
   const resources = lesson?.lessonPlan?.resources || {};
   const source = type === "video" ? resources.videos : type === "image" ? resources.images : [...(resources.readingsRequired || []), ...(resources.readingsExtra || [])];
   const fallback = baseQuery(input, lesson);
-  const items = Array.isArray(source) ? source : [];
+  const seen = new Set();
+  const items = (Array.isArray(source) ? source : []).filter((resource) => {
+    const identity = resourceIdentity(resource?.href, type) || (text(resource?.id) ? `id:${text(resource.id)}` : "");
+    if (!identity || seen.has(identity)) return !identity;
+    seen.add(identity);
+    return true;
+  });
   const targets = resourceTargetsFor(input, lesson);
   const target = type === "video" ? Number(targets.videosPerWeek || 0) : type === "reading" ? Math.max(Number(targets.articlesPerWeek || 0), Number(targets.requiredReadingsPerWeek || 0)) : 1;
   const requests = items.filter((resource) => !resource.href).map((resource, index) => ({
@@ -72,7 +79,34 @@ function flattenCandidates(research) {
 }
 
 function candidateIdentity(candidate = {}) {
-  return text(candidate.href) || text(candidate.candidateId);
+  return resourceIdentity(candidate.href, candidate.type) || text(candidate.href) || text(candidate.candidateId);
+}
+
+function resourceKey(resource = {}, type = "") {
+  return resourceIdentity(resource?.href || resource?.link || resource?.url, type || resource?.kind || resource?.type)
+    || (text(resource?.id) ? `id:${text(resource.id)}` : "");
+}
+
+function uniqueResources(items = [], type = "", { mergeRequired = false } = {}) {
+  const result = [];
+  const positions = new Map();
+  items.forEach((resource) => {
+    const identity = resourceKey(resource, type);
+    if (!identity) {
+      result.push(resource);
+      return;
+    }
+    if (!positions.has(identity)) {
+      positions.set(identity, result.length);
+      result.push(resource);
+      return;
+    }
+    if (mergeRequired) {
+      const index = positions.get(identity);
+      if (resource?.required || result[index]?.required) result[index] = { ...result[index], required: true };
+    }
+  });
+  return result;
 }
 
 function uniqueCandidateCount(results = []) {
@@ -209,7 +243,6 @@ function ensureSelectionCoverage(selection, type, results, limit) {
 }
 
 function blockKey(value) { return text(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 70) || "recurso"; }
-function youtubeId(value) { return text(value).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^?&#/]+)/i)?.[1] || ""; }
 
 function walkBlocks(blocks, callback) {
   (blocks || []).forEach((block) => {
@@ -224,15 +257,20 @@ function attachResourcesToSections(lesson, selectedResources) {
   const all = [...selectedResources.videos, ...selectedResources.images, ...selectedResources.readings];
   const used = new Set();
   const nextSections = sections.map((section) => ({ ...section, resources: Array.isArray(section.resources) ? [...section.resources] : [] }));
+  nextSections.forEach((section) => section.resources.forEach((resource) => {
+    const identity = resourceKey(resource, resource?.kind || resource?.type);
+    if (identity) used.add(identity);
+  }));
   all.forEach((resource, index) => {
     const explicit = Number.parseInt(resource.sectionNumber, 10);
     let sectionIndex = Number.isInteger(explicit) && explicit >= 1 && explicit <= nextSections.length ? explicit - 1 : -1;
     if (sectionIndex < 0) sectionIndex = nextSections.findIndex((section) => section.resources.some((item) => item.id === resource.researchRequestId || item.id === resource.id || (resource.searchQuery && item.searchQuery === resource.searchQuery)));
     if (sectionIndex < 0) sectionIndex = index % nextSections.length;
     const section = nextSections[sectionIndex];
-    if (used.has(resource.id) || section.resources.some((item) => item.id === resource.id || (resource.href && item.href === resource.href))) return;
+    const identity = resourceKey(resource, resource.kind || resource.type) || `id:${text(resource.id)}`;
+    if (used.has(identity)) return;
     section.resources.push(resource);
-    used.add(resource.id);
+    used.add(identity);
   });
   return { ...lesson, lessonPlan: { ...lesson.lessonPlan, contentSections: nextSections } };
 }
@@ -252,10 +290,21 @@ function syncResourceBlocks(lesson, selectedResources) {
   const blocks = removeSelectedPlaceholders(Array.isArray(lesson.blocks) ? lesson.blocks : [], selectedResources);
   const existingVideoIds = new Set();
   const existingImages = new Set();
+  const existingMaterialLinks = new Set();
   walkBlocks(blocks, (block) => {
-    if (block.type === "video" && block.props?.id) existingVideoIds.add(text(block.props.id));
-    if (block.type === "prose" && block.props?.inlineVideo?.id) existingVideoIds.add(text(block.props.inlineVideo.id));
-    if (block.type === "imagem" && block.props?.src) existingImages.add(text(block.props.src));
+    if (block.type === "video" && block.props?.id) {
+      const id = youtubeVideoId(block.props.id);
+      if (id) existingVideoIds.add(id);
+    }
+    if (block.type === "prose" && block.props?.inlineVideo?.id) {
+      const id = youtubeVideoId(block.props.inlineVideo.id);
+      if (id) existingVideoIds.add(id);
+    }
+    if (block.type === "imagem" && block.props?.src) existingImages.add(canonicalResourceUrl(block.props.src) || text(block.props.src));
+    if (block.type === "materiais" && Array.isArray(block.props?.items)) block.props.items.forEach((item) => {
+      const identity = resourceIdentity(item?.href || item?.link || item?.url, item?.type || item?.kind || "article");
+      if (identity) existingMaterialLinks.add(identity);
+    });
   });
   const sections = Array.isArray(lesson.lessonPlan?.contentSections) ? lesson.lessonPlan.contentSections : [];
   const additionsBySection = new Map();
@@ -264,21 +313,29 @@ function syncResourceBlocks(lesson, selectedResources) {
     const sectionIndex = Number.isInteger(explicit) && explicit >= 1 && explicit <= Math.max(1, sections.length) ? explicit - 1 : index % Math.max(1, sections.length);
     const additions = additionsBySection.get(sectionIndex) || [];
     const bridge = resource.bridgeParagraph || resource.pedagogicalUse || resource.objective || `Use este recurso neste ponto para relacionar ${resource.title || "o material"} ao conceito estudado na seção.`;
-    if (block.type === "prose" && block.props?.inlineVideo?.id) additions.push(block);
-    else additions.push({ id: `resource-bridge-${blockKey(resource.id)}-${index}`, type: "prose", bg: "neutral-default", pad: "normal", props: { body: `<p>${html(bridge)}</p>`, dropcap: false, dropcapTone: "terracotta", resourceId: resource.id } }, block);
+    additions.push({ id: `resource-bridge-${blockKey(resource.id)}-${index}`, type: "prose", bg: "neutral-default", pad: "normal", props: { body: `<p>${html(bridge)}</p>`, dropcap: false, dropcapTone: "terracotta", resourceId: resource.id } }, block);
     additionsBySection.set(sectionIndex, additions);
   };
   selectedResources.videos.forEach((resource, index) => {
-    const id = youtubeId(resource.href);
+    const id = youtubeVideoId(resource.href);
     if (!id || existingVideoIds.has(id)) return;
+    existingVideoIds.add(id);
     const bridge = resource.bridgeParagraph || resource.pedagogicalUse || resource.objective || `Use este vídeo neste ponto para relacionar ${resource.title || "o material"} ao conceito estudado nesta seção.`;
-    queue(resource, { id: `resource-video-inline-${blockKey(resource.id)}-${index}`, type: "prose", bg: "neutral-default", pad: "normal", props: { body: `<p>${html(bridge)}</p>`, dropcap: false, dropcapTone: "terracotta", resourceId: resource.id, inlineVideo: { id, title: resource.title, caption: resource.objective || resource.pedagogicalUse || "Vídeo selecionado para esta semana.", credit: resource.credit || resource.source || "YouTube", start: "", resourceId: resource.id } } }, index);
+    queue(resource, { id: `resource-video-${blockKey(resource.id)}-${index}`, type: "video", props: { id, title: resource.title, caption: resource.caption || resource.pedagogicalUse || resource.objective || "Vídeo selecionado para esta semana.", credit: resource.credit || resource.source || "YouTube", start: "", captionsOk: Boolean(resource.videoAccessibility?.hasCaptions), transcript: "", transcriptUrl: "", transcriptCues: [], summaryMd: "", showSubtitle: true, showSummary: true, showTranscript: true } }, index);
   });
   selectedResources.images.forEach((resource, index) => {
-    if (!resource.href || existingImages.has(resource.href)) return;
+    const identity = canonicalResourceUrl(resource.href) || text(resource.href);
+    if (!identity || existingImages.has(identity)) return;
+    existingImages.add(identity);
     queue(resource, { id: `resource-image-${blockKey(resource.id)}-${index}`, type: "imagem", bg: "neutral-default", pad: "normal", props: { src: resource.href, slotId: "", caption: resource.caption || resource.title, credit: resource.credit || resource.source || "Wikimedia Commons", ratio: "16/9", resourceId: resource.id } }, index);
   });
-  selectedResources.readings.forEach((resource, index) => queue(resource, { id: `resource-material-${blockKey(resource.id)}-${index}`, type: "materiais", bg: "neutral-default", pad: "normal", props: { title: resource.required ? "Leitura obrigatória neste ponto" : "Leitura complementar neste ponto", items: [{ type: resource.type || "artigo", title: resource.title, source: [resource.author, resource.source, resource.year].filter(Boolean).join(" · "), href: resource.href, resourceId: resource.id, required: resource.required }], resourceId: resource.id } }, index));
+  selectedResources.readings.forEach((resource, index) => {
+    const identity = resourceIdentity(resource.href, "reading");
+    if (!identity || existingMaterialLinks.has(identity)) return;
+    existingMaterialLinks.add(identity);
+    const type = resource.kind || (resource.type === "reading" ? "artigo" : resource.type || "artigo");
+    queue(resource, { id: `resource-material-${blockKey(resource.id)}-${index}`, type: "materiais", bg: "neutral-default", pad: "normal", props: { title: resource.required ? "Leitura obrigatória neste ponto" : "Leitura complementar neste ponto", items: [{ type, title: resource.title, source: [resource.author, resource.source, resource.year].filter(Boolean).join(" · "), href: resource.href, resourceId: resource.id, required: resource.required }], resourceId: resource.id } }, index);
+  });
   const additions = [...additionsBySection.values()].flat();
   if (!additions.length) return blocks;
   const topic = blocks.find((block) => ["topic", "topic-collapsible", "topic-slider"].includes(block.type));
@@ -316,21 +373,27 @@ export async function enrichLessonsWithResources(input, lessons) {
     const research = { status: "searched", searchedAt: new Date().toISOString(), targets, providers: { youtube: videos.map((result) => result.status), wikimediaCommons: images.map((result) => result.status), crossref: readings.map((result) => result.providers?.crossref || (result.provider === "crossref" ? result.status : "not-used")), openAlex: readings.map((result) => result.providers?.openalex || "not-used") }, queries: { videos: videoRequests, images: imageRequests, readings: readingRequests }, videos, images, readings };
     const candidateCount = flattenCandidates(research).length;
     const existingResources = lesson.lessonPlan.resources || {};
-    const countWithHref = (items) => new Set((Array.isArray(items) ? items : []).map((item) => text(item?.href)).filter(Boolean)).size;
+    const countWithHref = (items, type) => uniqueResources((Array.isArray(items) ? items : []).filter((item) => text(item?.href)), type).length;
     const countVideoBlocks = (blocks) => {
       const ids = new Set();
       const visit = (items) => (items || []).forEach((block) => {
-        if (block?.type === "video" && text(block.props?.id)) ids.add(text(block.props.id));
-        if (block?.type === "prose" && text(block.props?.inlineVideo?.id)) ids.add(text(block.props.inlineVideo.id));
+        if (block?.type === "video") {
+          const id = youtubeVideoId(block.props?.id || block.props?.videoId);
+          if (id) ids.add(id);
+        }
+        if (block?.type === "prose" && block.props?.inlineVideo?.id) {
+          const id = youtubeVideoId(block.props.inlineVideo.id);
+          if (id) ids.add(id);
+        }
         visit(block?.props?.children);
       });
       visit(blocks);
       return ids.size;
     };
     const coverage = {
-      videos: { requested: Number(targets.videosPerWeek || 0), candidates: uniqueCandidateCount(videos), selected: countWithHref(existingResources.videos) },
-      images: { requested: 1, candidates: uniqueCandidateCount(images), selected: countWithHref(existingResources.images) },
-      readings: { requested: Math.max(Number(targets.articlesPerWeek || 0), Number(targets.requiredReadingsPerWeek || 0)), candidates: uniqueCandidateCount(readings), selected: countWithHref([...(existingResources.readingsRequired || []), ...(existingResources.readingsExtra || [])]) }
+      videos: { requested: Number(targets.videosPerWeek || 0), candidates: uniqueCandidateCount(videos), selected: countWithHref(existingResources.videos, "video") },
+      images: { requested: 1, candidates: uniqueCandidateCount(images), selected: countWithHref(existingResources.images, "image") },
+      readings: { requested: Math.max(Number(targets.articlesPerWeek || 0), Number(targets.requiredReadingsPerWeek || 0)), candidates: uniqueCandidateCount(readings), selected: countWithHref([...(existingResources.readingsRequired || []), ...(existingResources.readingsExtra || [])], "reading") }
     };
     if (!candidateCount) return { ...lesson, lessonPlan: { ...lesson.lessonPlan, resourceResearch: { ...compactResearch({ ...research, status: "no-candidates" }), coverage, note: "Não foram encontrados candidatos reais. Para vídeos, confira YOUTUBE_API_KEY; imagens e leituras usam provedores públicos. Sugestões sem URL permanecem somente no Material de Mediação." } } };
     let selection;
@@ -358,27 +421,23 @@ export async function enrichLessonsWithResources(input, lessons) {
     };
     const selectedRequests = new Set([...selectedResources.videos, ...selectedResources.images, ...selectedResources.readings].map((resource) => resource.researchRequestId));
     const withoutPlaceholders = (resources = []) => resources.filter((resource) => resource.href || !selectedRequests.has(resource.id));
-    const uniqueResources = (items = []) => {
-      const seen = new Set();
-      return items.filter((resource) => {
-        const identity = text(resource?.href) || text(resource?.id);
-        if (!identity || seen.has(identity)) return false;
-        seen.add(identity);
-        return true;
-      });
-    };
+    const combinedReadings = uniqueResources([
+      ...withoutPlaceholders(existingResources.readingsRequired).map((resource) => ({ ...resource, required: true })),
+      ...withoutPlaceholders(existingResources.readingsExtra).map((resource) => ({ ...resource, required: Boolean(resource.required) })),
+      ...selectedResources.readings
+    ], "reading", { mergeRequired: true });
     const resources = {
       ...existingResources,
-      videos: uniqueResources([...withoutPlaceholders(existingResources.videos), ...selectedResources.videos]),
-      images: uniqueResources([...withoutPlaceholders(existingResources.images), ...selectedResources.images]),
-      readingsRequired: uniqueResources([...withoutPlaceholders(existingResources.readingsRequired), ...selectedResources.readings.filter((resource) => resource.required)]),
-      readingsExtra: uniqueResources([...withoutPlaceholders(existingResources.readingsExtra), ...selectedResources.readings.filter((resource) => !resource.required)])
+      videos: uniqueResources([...withoutPlaceholders(existingResources.videos), ...selectedResources.videos], "video"),
+      images: uniqueResources([...withoutPlaceholders(existingResources.images), ...selectedResources.images], "image"),
+      readingsRequired: combinedReadings.filter((resource) => resource.required),
+      readingsExtra: combinedReadings.filter((resource) => !resource.required)
     };
     const alternatives = flattenCandidates(research).filter((candidate) => !selectedResources.videos.concat(selectedResources.images, selectedResources.readings).some((resource) => resource.candidateId === candidate.candidateId)).slice(0, 30);
     const resourceResearch = { ...compactResearch({ ...research, status: selectionStatus, selections: selection, selectionFallbacks, alternatives }), coverage: {
-      videos: { requested: Number(targets.videosPerWeek || 0), candidates: uniqueCandidateCount(videos), selected: countWithHref(resources.videos), materialized: 0 },
-      images: { requested: 1, candidates: uniqueCandidateCount(images), selected: countWithHref(resources.images), materialized: countWithHref(resources.images) },
-      readings: { requested: Math.max(Number(targets.articlesPerWeek || 0), Number(targets.requiredReadingsPerWeek || 0)), candidates: uniqueCandidateCount(readings), selected: countWithHref([...(resources.readingsRequired || []), ...(resources.readingsExtra || [])]), materialized: countWithHref([...(resources.readingsRequired || []), ...(resources.readingsExtra || [])]) }
+      videos: { requested: Number(targets.videosPerWeek || 0), candidates: uniqueCandidateCount(videos), selected: countWithHref(resources.videos, "video"), materialized: 0 },
+      images: { requested: 1, candidates: uniqueCandidateCount(images), selected: countWithHref(resources.images, "image"), materialized: countWithHref(resources.images, "image") },
+      readings: { requested: Math.max(Number(targets.articlesPerWeek || 0), Number(targets.requiredReadingsPerWeek || 0)), candidates: uniqueCandidateCount(readings), selected: countWithHref([...(resources.readingsRequired || []), ...(resources.readingsExtra || [])], "reading"), materialized: countWithHref([...(resources.readingsRequired || []), ...(resources.readingsExtra || [])], "reading") }
     } };
     const enriched = attachResourcesToSections({ ...lesson, lessonPlan: { ...lesson.lessonPlan, resources, resourceResearch } }, selectedResources);
     enriched.blocks = syncResourceBlocks(enriched, selectedResources);

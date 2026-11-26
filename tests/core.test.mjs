@@ -253,14 +253,14 @@ test("normaliza aula rica sem perder recursos, avaliação e metadados", () => {
       welcome: "Uma abertura contextualizada.",
       learningObjectives: ["Analisar indicadores"],
       contentSections: [{ number: "1", title: "Base conceitual", body: "Texto desenvolvido", reflection: { question: "O que muda no seu contexto?" }, resources: [{ type: "artigo", title: "Leitura extra", searchQuery: "indicadores educação artigo", required: false }] }],
-      resources: { videos: [{ title: "Vídeo conferido", href: "https://youtu.be/abc123", verificationStatus: "provided-needs-review" }], images: [{ title: "Diagrama selecionado", href: "https://upload.wikimedia.org/example.png", provider: "wikimedia-commons", sourcePage: "https://commons.wikimedia.org/wiki/File:Example.png", license: "CC BY-SA", altText: "Diagrama do fluxo" }] },
+      resources: { videos: [{ title: "Vídeo conferido", href: "https://youtu.be/dQw4w9WgXcQ", verificationStatus: "provided-needs-review" }], images: [{ title: "Diagrama selecionado", href: "https://upload.wikimedia.org/example.png", provider: "wikimedia-commons", sourcePage: "https://commons.wikimedia.org/wiki/File:Example.png", license: "CC BY-SA", altText: "Diagrama do fluxo" }] },
       resourceResearch: { status: "ai-selected", alternatives: [{ candidateId: "commons:1" }] },
       assessment: { questions: [{ q: "O que é um indicador?", options: ["A", "B", "C", "D"], answer: 1, explanation: "Explicação." }] }
     },
     blocks: [{ type: "hero", props: { eyebrow: "Semana 1", title: "Indicadores", lead: "Começo" } }]
   }, input, 0);
   assert.equal(lesson.lessonPlan.contentSections[0].reflection.question, "O que muda no seu contexto?");
-  assert.equal(lesson.lessonPlan.resources.videos[0].href, "https://youtu.be/abc123");
+  assert.equal(lesson.lessonPlan.resources.videos[0].href, "https://youtu.be/dQw4w9WgXcQ");
   assert.equal(lesson.lessonPlan.resources.images[0].provider, "wikimedia-commons");
   assert.equal(lesson.lessonPlan.resources.images[0].sourcePage, "https://commons.wikimedia.org/wiki/File:Example.png");
   assert.equal(lesson.lessonPlan.resourceResearch.status, "ai-selected");
@@ -279,7 +279,7 @@ test("posiciona vídeo raiz depois do texto da seção indicada", () => {
         { number: "2", title: "Arquitetura", body: "Texto da seção em que o vídeo será usado." },
         { number: "3", title: "Aplicação", body: "Texto da terceira seção." }
       ],
-      resources: { videos: [{ id: "video-arquitetura", title: "Vídeo de arquitetura", href: "https://youtu.be/abc123", sectionNumber: 2, bridgeParagraph: "Observe no vídeo como a arquitetura organiza os fluxos apresentados nesta seção." }] }
+      resources: { videos: [{ id: "video-arquitetura", title: "Vídeo de arquitetura", href: "https://youtu.be/dQw4w9WgXcQ", sectionNumber: 2, bridgeParagraph: "Observe no vídeo como a arquitetura organiza os fluxos apresentados nesta seção." }] }
     },
     blocks: [
       { type: "hero", props: { title: "Sistemas", lead: "Analisar sistemas" } },
@@ -292,7 +292,7 @@ test("posiciona vídeo raiz depois do texto da seção indicada", () => {
         { type: "prose", props: { body: "Texto da seção em que o vídeo será usado." } },
         { type: "titulo", props: { text: "3 Aplicação", level: "h2" } },
         { type: "prose", props: { body: "Texto da terceira seção." } },
-        { type: "video", props: { resourceId: "video-arquitetura", id: "abc123", title: "Vídeo de arquitetura" } }
+        { type: "video", props: { resourceId: "video-arquitetura", id: "dQw4w9WgXcQ", title: "Vídeo de arquitetura" } }
       ] } },
     ]
   }, input, 0);
@@ -300,22 +300,21 @@ test("posiciona vídeo raiz depois do texto da seção indicada", () => {
   const children = topic.props.children;
   const sectionTwo = children.findIndex((block) => block.props?.text === "2 Arquitetura");
   const sectionThree = children.findIndex((block) => block.props?.text === "3 Aplicação");
-  const videoParagraph = children.findIndex((block) => block.type === "prose" && block.props?.inlineVideo?.resourceId === "video-arquitetura");
+  const videoBlock = children.findIndex((block) => block.type === "video" && block.props?.id === "dQw4w9WgXcQ");
   assert.ok(sectionTwo >= 0 && sectionThree > sectionTwo);
-  assert.ok(videoParagraph > sectionTwo && videoParagraph < sectionThree);
-  assert.match(children[videoParagraph].props.body, /Observe no vídeo/);
-  assert.equal(children[videoParagraph].props.inlineVideo.id, "abc123");
+  assert.ok(videoBlock > sectionTwo && videoBlock < sectionThree);
+  assert.ok(children.some((block) => block.type === "prose" && block.props?.resourceId === "video-arquitetura" && /Observe no vídeo/.test(block.props.body)));
 });
 
 test("fallback gera uma aula válida para cada semana", () => {
-  const input = normalizeCourseInput({ title: "História da ciência", weeks: 2, hoursPerWeek: 4, objectives: ["Comparar teorias"], webPracticeEnabled: true, practiceInstructions: "Faça uma pesquisa orientada.", videoLinks: "https://www.youtube.com/watch?v=abc123" });
+  const input = normalizeCourseInput({ title: "História da ciência", weeks: 2, hoursPerWeek: 4, objectives: ["Comparar teorias"], webPracticeEnabled: true, practiceInstructions: "Faça uma pesquisa orientada.", videoLinks: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" });
   const weeks = normalizeWeeklyOutput({ weeks: [buildFallbackLesson(input, 0), buildFallbackLesson(input, 1)] }, input);
   assert.equal(weeks.length, 2);
   assert.equal(validateLesson(weeks[0]), true);
   assert.ok(weeks[0].lessonPlan.contentSections.length >= 1);
   assert.ok(weeks[0].blocks.some((block) => block.type === "hero"));
   assert.ok(hasBlock(weeks[0], "destaque"));
-  assert.ok(weeks[0].blocks.some((block) => block.type === "topic" && block.props.children.some((child) => child.props?.inlineVideo?.id === "abc123")));
+  assert.ok(weeks[0].blocks.some((block) => block.type === "topic" && block.props.children.some((child) => child.type === "video" && child.props?.id === "dQw4w9WgXcQ")));
   assert.ok(weeks[0].lessonPlan.didacticArc.id);
 });
 
@@ -336,7 +335,7 @@ test("exportação do ClassAtelier remove mediação, alinhamento, tempo e curad
       welcome: "Abertura para o estudante.",
       learningObjectives: ["Analisar"],
       contentSections: [{ number: "1", title: "Conceito", body: "Texto do estudante.", resources: [{ id: "video-1", title: "Vídeo", bridgeParagraph: "Ligação interna do professor." }] }],
-      resources: { videos: [{ id: "video-1", title: "Vídeo", href: "https://youtu.be/abc123", bridgeParagraph: "Ligação interna do professor.", pedagogicalUse: "Uso interno", sectionNumber: 1 }] },
+      resources: { videos: [{ id: "video-1", title: "Vídeo", href: "https://youtu.be/dQw4w9WgXcQ", bridgeParagraph: "Ligação interna do professor.", pedagogicalUse: "Uso interno", sectionNumber: 1 }] },
       alignmentMatrix: [{ objective: "Analisar", evidence: "Registro" }],
       timePlan: { items: [{ title: "Texto-base", minutes: 60 }], workloadAdjustment: { suggestions: [{ title: "Ajuste interno" }] } }
     },
@@ -345,19 +344,21 @@ test("exportação do ClassAtelier remove mediação, alinhamento, tempo e curad
       { type: "destaque", props: { title: "Objetivos", body: "Analisar" } },
       { type: "topic", props: { children: [
         { type: "titulo", props: { text: "1 Conceito" } },
-        { type: "prose", props: { resourceId: "video-1", body: "Ligação interna do professor.", inlineVideo: { id: "abc123", title: "Vídeo", caption: "Vídeo para a aula" } } }
+        { type: "prose", props: { resourceId: "video-1", body: "Ligação interna do professor.", inlineVideo: { id: "dQw4w9WgXcQ", title: "Vídeo", caption: "Vídeo para a aula", credit: "Canal de origem" } } }
       ] } }
     ]
   }, input, 0);
   const exported = toStudentLesson({ ...lesson, teacherGuide: { mediationMessages: { whatsapp: [{ text: "não exportar" }] } } });
   const serialized = JSON.stringify(exported);
   assert.doesNotMatch(serialized, /teacherGuide|mediationMessages|alignmentMatrix|timePlan|workloadAdjustment|bridgeParagraph|pedagogicalUse|Ligação interna do professor/);
-  assert.match(serialized, /abc123/);
+  assert.match(serialized, /dQw4w9WgXcQ/);
   const topic = exported.blocks.find((block) => block.type === "topic");
-  const videoBridge = topic?.props?.children?.find((block) => block.props?.inlineVideo?.id === "abc123");
+  const videoBlock = topic?.props?.children?.find((block) => block.type === "video" && block.props?.id === "dQw4w9WgXcQ");
   assert.ok(topic);
-  assert.ok(videoBridge);
-  assert.equal(videoBridge.props.body, "");
+  assert.ok(videoBlock);
+  assert.equal(videoBlock.props.caption, "Vídeo para a aula");
+  assert.equal(videoBlock.props.credit, "Canal de origem");
+  assert.equal(topic.props.children.some((block) => block.props?.inlineVideo), false);
 });
 
 test("JSON do ClassAtelier não leva sugestões de recurso sem URL nem blocos de mídia vazios", () => {
@@ -375,6 +376,71 @@ test("JSON do ClassAtelier não leva sugestões de recurso sem URL nem blocos de
   assert.doesNotMatch(serialized, /Busca sugerida|Imagem a confirmar|Vídeo a confirmar/);
   assert.equal(exported.blocks.filter((block) => block.type === "materiais").length, 1);
   assert.equal(exported.blocks.find((block) => block.type === "materiais").props.items[0].href, "https://doi.org/10.1234/exemplo");
+});
+
+test("exportação promove vídeos antigos de materiais e deduplica artigo por URL canônica", () => {
+  const articleUrl = "https://www.example.org/artigo/?utm_source=classauthor#secao";
+  const equivalentUrl = "https://example.org/artigo?fbclid=rastreamento";
+  const exported = toStudentLesson({
+    meta: { title: "Aula com recursos", courseTitle: "Curso", weekNumber: 1 },
+    lessonPlan: {
+      theme: "Tema",
+      contentSections: [],
+      activities: [],
+      assessment: { questions: [] },
+      references: [
+        { citation: "SILVA. Artigo repetido.", href: equivalentUrl },
+        { citation: "SILVA. Artigo repetido.", href: articleUrl }
+      ]
+    },
+    blocks: [{ id: "topic-1", type: "topic", props: { children: [
+      { id: "legacy-video", type: "prose", props: { resourceId: "legacy-video", body: "Ligação interna.", inlineVideo: { id: "dQw4w9WgXcQ", title: "Vídeo único", caption: "Legenda mantida", credit: "Canal de origem" } } },
+      { id: "link-callout", type: "destaque", props: { title: "Acesse o artigo", body: `<p><a href="${equivalentUrl}">Abrir leitura</a></p>` } },
+      { id: "material-1", type: "materiais", props: { items: [
+        { type: "video", title: "Vídeo duplicado", href: "https://youtu.be/dQw4w9WgXcQ?si=compartilhamento" },
+        { type: "artigo", title: "Artigo", source: "Revista Exemplo", href: articleUrl },
+        { type: "artigo", title: "Mesmo artigo", source: "Outro rótulo", href: equivalentUrl }
+      ] } },
+      { id: "references-1", type: "referencias", props: { items: [
+        { citation: "SILVA. Artigo repetido.", href: equivalentUrl },
+        { citation: "SILVA. Artigo repetido.", href: articleUrl }
+      ] } }
+    ] } }]
+  });
+  const topic = exported.blocks.find((block) => block.type === "topic");
+  const children = topic.props.children;
+  const videos = children.filter((block) => block.type === "video");
+  const materials = children.find((block) => block.type === "materiais");
+  const references = children.find((block) => block.type === "referencias");
+  assert.equal(videos.length, 1);
+  assert.equal(videos[0].props.id, "dQw4w9WgXcQ");
+  assert.equal(videos[0].props.credit, "Canal de origem");
+  assert.equal(materials.props.items.length, 1);
+  assert.equal(materials.props.items[0].source, "Revista Exemplo");
+  assert.equal(references.props.items.length, 1);
+  assert.doesNotMatch(references.props.items[0], /href=/);
+  assert.equal(exported.lessonPlan.references.length, 1);
+  assert.equal(exported.lessonPlan.references[0].href, "");
+  const serialized = JSON.stringify(exported);
+  assert.equal((serialized.match(/https:\/\/example\.org\/artigo/g) || []).length, 1);
+  assert.doesNotMatch(serialized, /inlineVideo|utm_source|fbclid|compartilhamento|Ligação interna/);
+});
+
+test("vídeo do YouTube em materiais sem bloco dedicado é convertido para a área de mídia", () => {
+  const exported = toStudentLesson({
+    meta: { title: "Aula", courseTitle: "Curso", weekNumber: 1 },
+    lessonPlan: { theme: "Tema", contentSections: [], activities: [], assessment: { questions: [] } },
+    blocks: [{ id: "topic-1", type: "topic", props: { children: [
+      { id: "materials-1", type: "materiais", props: { items: [{ type: "video", title: "Vídeo do curso", source: "Canal Exemplo", href: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" }] } }
+    ] } }]
+  });
+  const topic = exported.blocks.find((block) => block.type === "topic");
+  const videos = topic.props.children.filter((block) => block.type === "video");
+  assert.equal(videos.length, 1);
+  assert.equal(videos[0].props.id, "dQw4w9WgXcQ");
+  assert.equal(videos[0].props.title, "Vídeo do curso");
+  assert.equal(videos[0].props.credit, "Canal Exemplo");
+  assert.equal(topic.props.children.some((block) => block.type === "materiais"), false);
 });
 
 test("Material de Mediação em PDF é gerado separadamente", async () => {

@@ -87,7 +87,7 @@ test("cobertura de recursos ignora keep:false e completa as metas com candidatos
   globalThis.fetch = async (url) => {
     const value = String(url);
     if (value.includes("youtube/v3/search")) {
-      return new Response(JSON.stringify({ items: [1, 2, 3].map((index) => ({ id: { videoId: `video-candidate-${index}` }, snippet: { title: `Vídeo real ${index}`, channelTitle: "Canal acadêmico", description: "Descrição contextualizada", publishedAt: "2024-01-01", thumbnails: {} } })) }), { status: 200 });
+      return new Response(JSON.stringify({ items: [1, 2, 3].map((index) => ({ id: { videoId: `vid0000000${index}` }, snippet: { title: `Vídeo real ${index}`, channelTitle: "Canal acadêmico", description: "Descrição contextualizada", publishedAt: "2024-01-01", thumbnails: {} } })) }), { status: 200 });
     }
     if (value.includes("youtube/v3/videos")) {
       const ids = new URL(value).searchParams.get("id")?.split(",") || [];
@@ -112,8 +112,9 @@ test("cobertura de recursos ignora keep:false e completa as metas com candidatos
     assert.equal(result.lessonPlan.resourceResearch.coverage.videos.selected, 3);
     assert.equal(result.lessonPlan.resourceResearch.coverage.videos.materialized, 3);
     const topic = result.blocks.find((block) => block.type === "topic");
-    const inlineVideos = topic?.props?.children?.filter((block) => block.type === "prose" && block.props?.inlineVideo?.id) || [];
-    assert.equal(new Set(inlineVideos.map((block) => block.props.inlineVideo.id)).size, 3);
+    const videos = topic?.props?.children?.filter((block) => block.type === "video" && block.props?.id) || [];
+    assert.equal(new Set(videos.map((block) => block.props.id)).size, 3);
+    assert.ok(videos.every((block) => /^[A-Za-z0-9_-]{11}$/.test(block.props.id)));
   } finally {
     globalThis.fetch = previousFetch;
     if (previousKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = previousKey;

@@ -1,4 +1,5 @@
 import { withUnit } from "../src/unit.js";
+import { accessRequired, hasValidAccess } from "../src/access.js";
 import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload } from "../src/calculations.js";
 import { normalizeCourseInput, normalizeLesson, slugify } from "../src/aula-schema.js";
 import { buildTeacherGuides } from "../src/teacher-guide.js";
@@ -6,7 +7,9 @@ import { createMediationMaterialPdf } from "../src/pdf.js";
 import { scopeMediationMaterial } from "../src/mediation-scope.js";
 
 async function handler(request, response) {
+  response.setHeader("Cache-Control", "no-store");
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });
+  if (accessRequired() && !hasValidAccess(request)) return response.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
   try {
     const input = normalizeCourseInput(request.body?.input || {});
     const submittedWeeks = Array.isArray(request.body?.weeks) ? request.body.weeks : [];

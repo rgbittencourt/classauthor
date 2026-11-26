@@ -62,9 +62,9 @@ test("ZIP separa o quiz Moodle XML do .aula.json", async () => {
   await wellFormed(await zip.files["moodle/todas-as-semanas-quiz.xml"].async("string"));
 });
 
-test("public/moodle-xml.js e public/student-export.js são cópias dos arquivos de src", async () => {
+test("módulos de exportação e identidade públicos são cópias dos arquivos de src", async () => {
   const fs = await import("node:fs");
-  for (const name of ["moodle-xml.js", "student-export.js"]) {
+  for (const name of ["moodle-xml.js", "student-export.js", "resource-identity.js"]) {
     assert.equal(fs.readFileSync(new URL(`../public/${name}`, import.meta.url), "utf8"), fs.readFileSync(new URL(`../src/${name}`, import.meta.url), "utf8"));
   }
 });
