@@ -236,7 +236,7 @@ body.studio-ready .studio-journey-bar { display: flex; align-items: stretch; gap
 .studio-stage.is-active .stage-number { border-color: #d8c49f; background: #f8f1e4; color: #997430; }
 .studio-stage:hover { color: var(--navy); background: #fafbfc; }
 .studio-step-status { align-self: center; margin-left: auto; font-size: 10px; color: #8893a0; }
-body.studio-ready .workspace-grid { display: grid; grid-template-columns: 220px minmax(0,1fr) 260px; grid-template-areas: "navigation main summary"; gap: 0; height: calc(100svh - var(--site-header-height,68px) - 80px); min-height: 0; max-height: none; overflow: hidden; align-items: stretch; }
+body.studio-ready .workspace-grid { display: grid; grid-template-columns: 220px minmax(0,1fr) 260px !important; grid-template-areas: "navigation main summary" !important; gap: 0; height: calc(100svh - var(--site-header-height,68px) - 80px); min-height: 0; max-height: none; overflow: hidden; align-items: stretch; }
 body.studio-ready .navigation-column { grid-area: navigation; display: flex; flex-direction: column; gap: 0; width: auto; min-width: 0; min-height: 0; height: 100%; max-height: none; padding: 22px 15px; border-right: 1px solid var(--line); background: #f9fafb; overflow-x: hidden; overflow-y: auto; position: relative; }
 body.studio-ready .form-column { grid-area: main; display: block; min-width: 0; min-height: 0; height: 100%; max-height: none; padding: 30px clamp(22px,3vw,50px) 40px; overflow-x: hidden; overflow-y: auto; background: #f4f5f6; scrollbar-gutter: stable; }
 body.studio-ready .summary-column { grid-area: summary; display: block; position: static; min-width: 0; min-height: 0; height: 100%; max-height: none; padding: 28px 20px; border-left: 1px solid var(--line); background: #fff; overflow-x: hidden; overflow-y: auto; }
@@ -255,7 +255,7 @@ body.studio-ready .sidebar-navigation a:hover { background: #eceff2; }
 body.studio-ready .navigation-drawer-toggle { position: absolute; top: 20px; right: 10px; width: 22px; min-height: 22px; padding: 3px; background: none; color: #aab2bd; border: 0; border-radius: 4px; opacity: 1; }
 body.studio-ready .navigation-drawer-toggle .drawer-toggle-label { display: none; }
 body.studio-ready .navigation-drawer-toggle .drawer-toggle-icon { font-size: 13px; }
-body.studio-ready .workspace-grid.right-nav-collapsed { grid-template-columns: 48px minmax(0,1fr) 260px; }
+body.studio-ready .workspace-grid.right-nav-collapsed { grid-template-columns: 48px minmax(0,1fr) 260px !important; }
 body.studio-ready .navigation-column.is-collapsed { padding: 16px 4px; }
 body.studio-ready .navigation-column.is-collapsed > :not(.navigation-drawer-toggle) { display: none; }
 body.studio-ready .navigation-column.is-collapsed .navigation-drawer-toggle { position: static; width: 38px; min-height: 36px; flex-direction: row; justify-content: center; background: #f3ead8; color: #8c692d; box-shadow: none; }
@@ -349,16 +349,16 @@ body.studio-ready #result-alert:not(.hidden) { margin: 0 0 18px; padding: 12px 1
   body.studio-ready:not(.welcome-active) .page-shell { height: 100svh; overflow: hidden; }
 }
 @media (min-width: 1600px) {
-  body.studio-ready .workspace-grid { grid-template-columns: 245px minmax(0,1fr) 290px; }
-  body.studio-ready .workspace-grid.right-nav-collapsed { grid-template-columns: 48px minmax(0,1fr) 290px; }
+  body.studio-ready .workspace-grid { grid-template-columns: 245px minmax(0,1fr) 290px !important; }
+  body.studio-ready .workspace-grid.right-nav-collapsed { grid-template-columns: 48px minmax(0,1fr) 290px !important; }
   body.studio-ready .form-column { padding-left: 64px; padding-right: 64px; }
 }
 @media (max-width: 1100px) and (min-width: 901px) {
   .welcome-shell { gap: 36px; grid-template-columns: minmax(0,1fr) 350px; }
   .welcome-screen { padding: 28px; }
   .welcome-editorial h1 { font-size: 45px; }
-  body.studio-ready .workspace-grid { grid-template-columns: 190px minmax(0,1fr) 225px; }
-  body.studio-ready .workspace-grid.right-nav-collapsed { grid-template-columns: 48px minmax(0,1fr) 225px; }
+  body.studio-ready .workspace-grid { grid-template-columns: 190px minmax(0,1fr) 225px !important; }
+  body.studio-ready .workspace-grid.right-nav-collapsed { grid-template-columns: 48px minmax(0,1fr) 225px !important; }
   body.studio-ready .form-column { padding: 26px 18px; }
   body.studio-ready .header-status { max-width: 170px; }
   .studio-stage { min-width: 175px; }
