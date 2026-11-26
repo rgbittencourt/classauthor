@@ -15,23 +15,28 @@ export function initializeStudio() {
   let allSectors = false;
   let hadResults = false;
 
-  const journey = document.createElement("nav");
+  const journey = document.createElement("div");
   journey.className = "studio-journey-bar";
-  journey.setAttribute("aria-label", "Etapas da autoria");
-  journey.innerHTML = `<button type="button" class="studio-stage" data-studio-stage="plan"><span class="stage-number">01</span><span><strong>Planejar</strong><small>13 passos guiados</small></span></button><button type="button" class="studio-stage" data-studio-stage="review"><span class="stage-number">02</span><span><strong>Revisar</strong><small>Aulas e aprovação</small></span></button><button type="button" class="studio-stage" data-studio-stage="export"><span class="stage-number">03</span><span><strong>Exportar</strong><small>Materiais e entrega</small></span></button><span class="studio-step-status" id="studio-step-status"></span>`;
+  journey.innerHTML = `<nav class="studio-stage-track" aria-label="Etapas da autoria"><button type="button" class="studio-stage" data-studio-stage="plan" aria-controls="studio-plan-substeps"><span class="stage-number">01</span><span><strong>Planejar</strong><small>4 etapas · 13 passos</small></span></button><button type="button" class="studio-stage" data-studio-stage="review"><span class="stage-number">02</span><span><strong>Revisar</strong><small>Aulas · alinhamento · rubricas</small></span></button><button type="button" class="studio-stage" data-studio-stage="export"><span class="stage-number">03</span><span><strong>Exportar</strong><small>Plano de Ensino · materiais</small></span></button><button type="button" class="studio-stage" data-studio-stage="import" aria-controls="studio-import-tools"><span class="stage-number">04</span><span><strong>Importar</strong><small>Backups · aulas salvas</small></span></button><span class="studio-step-status" id="studio-step-status"></span></nav>`;
   $(".workspace-grid").before(journey);
 
   const intro = $(".intro");
   intro.innerHTML = `<div class="studio-task-meta"><p class="eyebrow">ESTÚDIO DE AUTORIA</p><span id="studio-sector-position"></span></div><h1 id="studio-task-title" tabindex="-1"></h1><p class="intro-copy" id="studio-task-description"></p>`;
   const planProgress = document.createElement("nav");
   planProgress.className = "studio-plan-progress";
-  planProgress.setAttribute("aria-label", "Momentos do planejamento");
-  planProgress.innerHTML = `<div class="studio-plan-group-track">${PLAN_GROUPS.map((group, index) => `<button type="button" data-plan-group="${group.id}"><span>${String(index + 1).padStart(2, "0")}</span><strong>${group.label}</strong></button>`).join("")}</div><div class="studio-plan-progress-track" aria-hidden="true"><span id="studio-plan-fill"></span></div>`;
-  intro.after(planProgress);
+  planProgress.id = "studio-plan-substeps";
+  planProgress.setAttribute("aria-label", "Etapas de Planejar");
+  planProgress.innerHTML = `<div class="studio-plan-parent"><span>DENTRO DE PLANEJAR</span><small id="studio-plan-position" aria-live="polite"></small></div><ol class="studio-plan-group-track">${PLAN_GROUPS.map((group, index) => {
+    const positions = PLAN_STEPS.map((step, stepIndex) => step.group === group.id ? stepIndex + 1 : null).filter(Boolean);
+    const range = positions.length === 1 ? `Passo ${String(positions[0]).padStart(2, "0")}` : `Passos ${String(positions[0]).padStart(2, "0")}–${String(positions.at(-1)).padStart(2, "0")}`;
+    const hint = group.id === "pedagogy" ? "<small class=\"studio-plan-group-hint\">Inclui IA nos objetivos</small>" : "";
+    return `<li><button type="button" data-plan-group="${group.id}" aria-label="${group.label}. ${range}${group.id === "pedagogy" ? ". Inclui preenchimento assistido por IA nos objetivos" : ""}."><span class="studio-plan-marker" aria-hidden="true">${String(index + 1).padStart(2, "0")}</span><span class="studio-plan-group-copy"><strong>${group.label}</strong><small>${range}</small>${hint}</span></button></li>`;
+  }).join("")}</ol>`;
+  journey.querySelector('[data-studio-stage="plan"]').after(planProgress);
   const planToolbar = document.createElement("div");
   planToolbar.className = "studio-plan-toolbar";
   planToolbar.innerHTML = `<span>Um passo por vez. Você pode voltar e ajustar qualquer escolha.</span><button type="button" id="studio-all-sectors">Ver briefing completo</button>`;
-  planProgress.after(planToolbar);
+  intro.after(planToolbar);
   const resultAlert = $("#result-alert");
   planToolbar.after(resultAlert);
 
@@ -39,9 +44,6 @@ export function initializeStudio() {
   const assistRow = document.createElement("div");
   assistRow.className = "studio-assist-row";
   if ($("#assist-button")) assistRow.append($("#assist-button"));
-  const assistNote = document.createElement("small");
-  assistNote.textContent = "Preencher vazios com IA completa os campos ainda não preenchidos. Se estiver desabilitado, configure o acesso à IA em Minhas chaves; navegar não inicia a IA.";
-  assistRow.append(assistNote);
   sectors[4].querySelector(".sector-body").prepend(assistRow);
   const chunks = partitionPlanningSectors(sectors);
 
@@ -72,14 +74,16 @@ export function initializeStudio() {
     section.append(heading, paragraph, grid);
     return section;
   }
-  const reviewTools = makeTools("studio-review-tools", "Mapa de Alinhamento e Rubricas de Avaliação", "As ferramentas de revisão estão aqui. Gere ou abra aulas salvas para analisar o alinhamento e criar as rubricas; suas condições originais de uso continuam preservadas.", ["recalculate-button", "alignment-map-button", "rubrics-button"]);
-  const exportTools = makeTools("studio-export-tools", "Plano de Ensino e arquivos de entrega", "O antigo botão Ficha da Disciplina agora se chama Plano de Ensino. Baixe também o pacote do curso, os materiais docentes e a planilha audiovisual. Os arquivos de cada aula continuam nos cartões abaixo.", ["zip-button", "teacher-pdf-button", "ficha-button", "production-sheet-button"]);
-  footer.after(reviewTools, exportTools);
+  const reviewTools = makeTools("studio-review-tools", "Ferramentas de revisão", "Acesse aqui o Mapa de Alinhamento, as Rubricas de Avaliação e as ações de revisão, conforme o conteúdo fica disponível.", ["recalculate-button", "alignment-map-button", "rubrics-button"]);
+  const exportTools = makeTools("studio-export-tools", "Central de entrega", "Baixe o Plano de Ensino, o pacote do curso, os materiais docentes e a planilha audiovisual. Os arquivos de cada aula continuam nos cartões abaixo.", ["zip-button", "teacher-pdf-button", "ficha-button", "production-sheet-button"]);
+  const importTools = makeTools("studio-import-tools", "Importar um backup ou uma aula", "Restaure um backup do ClassAuthor ou abra uma semana já salva. Os controles originais e seus formatos foram mantidos.", ["restore-backup-button", "open-week-button"]);
+  importTools.id = "studio-import-tools";
+  footer.after(reviewTools, exportTools, importTools);
   const empty = document.createElement("section");
   empty.className = "studio-empty-view";
   empty.setAttribute("aria-live", "polite");
   empty.innerHTML = `<span class="studio-empty-index" aria-hidden="true">—</span><h2 id="studio-empty-title"></h2><p id="studio-empty-copy"></p><button type="button" class="button button-secondary" id="studio-return-plan">Voltar ao planejamento →</button>`;
-  exportTools.after(empty);
+  importTools.after(empty);
 
   const navHeading = document.createElement("div");
   navHeading.className = "studio-nav-heading";
@@ -209,21 +213,25 @@ export function initializeStudio() {
     chunks.forEach((chunk, id) => hide(chunk, !planning || (!allSectors && id !== step.id)));
     hide(planToolbar, !planning);
     hide(planProgress, !planning);
+    planProgress.hidden = !planning;
+    journey.querySelector('[data-studio-stage="plan"]').setAttribute("aria-expanded", String(planning));
     hide(footer, !planning);
     hide(reviewTools, view !== "review");
     hide(exportTools, view !== "export");
-    hide(results, planning || !hasResults());
-    hide(empty, planning || hasResults());
+    hide(importTools, view !== "import");
+    hide(results, planning || view === "import" || !hasResults());
+    hide(empty, planning || view === "import" || hasResults());
     if (!planning && hasResults()) { results.open = true; $("#results-weeks").open = true; }
-    $("#studio-task-title").textContent = planning ? allSectors ? "Seu briefing completo." : step.title : view === "review" ? "Revise antes de liberar." : "Do seu curso à sala de aula.";
-    $("#studio-task-description").textContent = planning ? allSectors ? "Todos os campos e escolhas, preservados. Volte ao foco por passo quando quiser." : step.description : view === "review" ? "Leia as aulas, confira os recursos e aprove o conteúdo com os critérios do seu curso." : "Escolha o formato de entrega. O ClassAtelier recebe as aulas; você mantém os materiais de mediação.";
-    $("#studio-sector-position").textContent = planning ? `PASSO ${String(activeStep + 1).padStart(2, "0")} / ${PLAN_STEPS.length}` : view === "review" ? "REVISÃO HUMANA" : "ARQUIVOS E FORMATOS";
+    $("#studio-task-title").textContent = planning ? allSectors ? "Seu briefing completo." : step.title : view === "review" ? "Revise antes de liberar." : view === "export" ? "Do seu curso à sala de aula." : "Traga um projeto ou uma aula salva.";
+    $("#studio-task-description").textContent = planning ? allSectors ? "Todos os campos e escolhas, preservados. Volte ao foco por passo quando quiser." : step.description : view === "review" ? "Leia as aulas, confira os recursos e aprove o conteúdo com os critérios do seu curso." : view === "export" ? "Escolha o formato de entrega. O ClassAtelier recebe as aulas; você mantém os materiais de mediação." : "Restaure um backup do ClassAuthor ou abra um arquivo de semana salvo neste computador.";
+    $("#studio-sector-position").textContent = planning ? `PASSO ${String(activeStep + 1).padStart(2, "0")} / ${PLAN_STEPS.length}` : view === "review" ? "REVISÃO HUMANA" : view === "export" ? "ARQUIVOS E FORMATOS" : "IMPORTAÇÃO DE ARQUIVOS";
     $("#studio-current-area").textContent = `${activeStep + 1} de ${PLAN_STEPS.length}`;
     $("#studio-prev").disabled = activeStep === 0;
     $("#studio-next").disabled = activeStep === PLAN_STEPS.length - 1;
     $("#studio-next").textContent = activeStep === PLAN_STEPS.length - 2 ? "Conferir planejamento →" : "Próximo passo →";
     $("#studio-all-sectors").textContent = allSectors ? "Voltar ao foco por passo" : "Ver briefing completo";
-    $("#studio-plan-fill").style.width = `${(activeStep + 1) / PLAN_STEPS.length * 100}%`;
+    const groupIndex = PLAN_GROUPS.findIndex((group) => group.id === step.group);
+    $("#studio-plan-position").textContent = `Etapa ${String(groupIndex + 1).padStart(2, "0")} de 04`;
     planProgress.querySelectorAll("[data-plan-group]").forEach((button) => {
       const current = button.dataset.planGroup === step.group;
       button.classList.toggle("is-active", current);
@@ -309,7 +317,10 @@ export function initializeStudio() {
     requestAnimationFrame(() => {
       scheduled = false;
       const available = hasResults();
-      if (available !== hadResults) { hadResults = available; select(available ? "review" : "plan", available ? activeStep : 0); }
+      const firstResults = available && !hadResults;
+      hadResults = available;
+      // Uma atualização dos resultados não desfaz a área escolhida pelo usuário.
+      if (firstResults && view === "plan") select("review");
       else sync();
     });
   };

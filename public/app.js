@@ -1,4 +1,4 @@
-import { initializeStudio } from "./studio-ui.js?v=20261126-visible-tools";
+import { initializeStudio } from "./studio-ui.js?v=20261126-inline-import";
 import { toStudentLesson, toGeneratorWeek } from "./student-export.js";
 import { normalizeAbntCitation, sortReferencesAbnt, abntIssues } from "./abnt.js";
 import { parseSavedWeek, planPlacement } from "./week-import.js";
@@ -1850,13 +1850,7 @@ function refreshAiButtonAvailability() {
   const assist = $("#assist-button");
   const generateButton = $("#generate-button");
   const recalculate = $("#recalculate-button");
-  if (assist) {
-    assist.disabled = isGitHubPages || !aiConfigured;
-    if (assist.disabled) setButtonLabel(assist, "Preencher vazios com IA");
-    assist.title = assist.disabled
-      ? "Preencher vazios com IA: configure o acesso à IA em Minhas chaves. Nenhuma chamada é feita ao navegar."
-      : "Preencher com IA os campos ainda vazios do planejamento";
-  }
+  if (assist) assist.disabled = isGitHubPages || !aiConfigured;
   if (generateButton) generateButton.disabled = isGitHubPages || !aiConfigured;
   if (recalculate) {
     recalculate.disabled = isGitHubPages || !aiConfigured || !state.weeks.length;
@@ -4377,7 +4371,7 @@ async function loadHealth() {
     aiConfigured = false;
     status.innerHTML = '<span class="status-dot warning"></span>modo público · sem IA';
     document.querySelectorAll(".vercel-access").forEach((item) => item.classList.add("hidden"));
-    setButtonLabel($("#assist-button"), "Preencher vazios com IA");
+    setButtonLabel($("#assist-button"), "IA indisponível nesta URL");
     setButtonLabel($("#generate-button"), "IA indisponível nesta URL");
     refreshAiButtonAvailability();
     return;
@@ -4396,7 +4390,7 @@ async function loadHealth() {
       status.innerHTML = `<span class="status-dot ${data.aiConfigured ? "online" : "warning"}"></span>${data.aiConfigured ? (data.accessRequired ? "IA configurada · acesso protegido" : "IA configurada") : `modo exemplo · chave pendente${data.missingKey ? ` (${data.missingKey}${data.environment ? ` não definida no ambiente ${data.environment}` : ""})` : ""}`}${data.aiConfigured && data.resourceResearch && !data.youtubeConfigured ? " · vídeos aguardando chave" : ""}`;
       if (ownKeys.has()) applyOwnKeyState();
       else if (!data.aiConfigured) {
-        setButtonLabel($("#assist-button"), "Preencher vazios com IA");
+        setButtonLabel($("#assist-button"), "IA pendente");
         setButtonLabel($("#generate-button"), "IA pendente");
       }
       refreshAiButtonAvailability();
