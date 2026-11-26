@@ -1,3 +1,4 @@
+import { initializeStudio } from "./studio-ui.js";
 import { toStudentLesson, toGeneratorWeek } from "./student-export.js";
 import { normalizeAbntCitation, sortReferencesAbnt, abntIssues } from "./abnt.js";
 import { parseSavedWeek, planPlacement } from "./week-import.js";
@@ -145,6 +146,7 @@ let saveTimer = null;
 let aiActivityHideTimer = null;
 let aiActionBusy = false;
 let aiConfigured = !isGitHubPages;
+let planningOnlySession = false;
 const AI_ACTION_IDS = ["assist-button", "generate-button", "recalculate-button", "regenerate-week-button"];
 
 function syncRecoveryLayout() {
@@ -242,7 +244,7 @@ function enhanceLayout() {
   const actions = document.createElement("section");
   actions.className = "sidebar-actions";
   actions.innerHTML = '<p class="sidebar-label">AÇÕES DO PROJETO</p>';
-  ["assist-button", "generate-button", "recalculate-button", "alignment-map-button", "rubrics-button", "style-button", "ficha-button", "teacher-pdf-button", "zip-button"].forEach((id) => {
+  ["assist-button", "generate-button", "recalculate-button", "alignment-map-button", "rubrics-button", "style-button", "ficha-button", "production-sheet-button", "teacher-pdf-button", "zip-button"].forEach((id) => {
     const button = $("#" + id);
     if (!button) return;
     // O seletor do fluxo semana a semana fica logo acima do botão de gerar.
@@ -572,7 +574,7 @@ function initializeWelcome() {
   hideRecoveryDock();
 }
 
-async function enterFromWelcome(event) {
+async function enterFromWelcome(event, { planningOnly = false } = {}) {
   event.preventDefault();
   const author = $("#welcome-author")?.value.trim() || "";
   const institution = $("#welcome-institution")?.value.trim() || "";
@@ -584,19 +586,25 @@ async function enterFromWelcome(event) {
     return;
   }
   // Sem o código de acesso: a pessoa usa as próprias chaves de API (IA e YouTube).
-  if (!accessCode.trim() && !ownKeys.has() && !isGitHubPages && (serverHealth.accessRequired || !serverHealth.aiConfigured)) {
+  if (!planningOnly && !accessCode.trim() && !ownKeys.has() && !isGitHubPages && (serverHealth.accessRequired || !serverHealth.aiConfigured)) {
     const saved = await openKeysModal({ required: true });
     if (!saved) return;
   }
   $("#author").value = author;
   $("#institution").value = institution;
-  $("#access-code").value = accessCode;
+  $("#access-code").value = planningOnly ? "" : accessCode;
+  planningOnlySession = planningOnly && !ownKeys.has();
+  if (planningOnly && !ownKeys.has()) {
+    aiConfigured = false;
+    refreshAiButtonAvailability();
+  }
   enterWorkspace();
 }
 
 // Estado do app quando a pessoa usa a própria chave: IA liberada, preço do modelo dela e aviso no cabeçalho.
 function applyOwnKeyState() {
   if (!ownKeys.has()) return;
+  planningOnlySession = false;
   aiConfigured = true;
   if (ownKeys.pricing()) aiPricing = ownKeys.pricing();
   updateCostChip();
@@ -1838,6 +1846,7 @@ function setBusy(button, busy, label) {
 
 function refreshAiButtonAvailability() {
   if (aiActionBusy) return;
+  if (planningOnlySession && !ownKeys.has()) aiConfigured = false;
   const assist = $("#assist-button");
   const generateButton = $("#generate-button");
   const recalculate = $("#recalculate-button");
@@ -4375,7 +4384,7 @@ async function loadHealth() {
       const data = await response.json();
       if (!data || data.ok === false) throw new Error("health inválido");
       serverHealth = { accessRequired: Boolean(data.accessRequired), aiConfigured: Boolean(data.aiConfigured) };
-      aiConfigured = Boolean(data.aiConfigured);
+      aiConfigured = Boolean(data.aiConfigured) && !planningOnlySession;
       aiPricing = data.pricing || null;
       updateCostChip();
       status.innerHTML = `<span class="status-dot ${data.aiConfigured ? "online" : "warning"}"></span>${data.aiConfigured ? (data.accessRequired ? "IA configurada · acesso protegido" : "IA configurada") : `modo exemplo · chave pendente${data.missingKey ? ` (${data.missingKey}${data.environment ? ` não definida no ambiente ${data.environment}` : ""})` : ""}`}${data.aiConfigured && data.resourceResearch && !data.youtubeConfigured ? " · vídeos aguardando chave" : ""}`;
@@ -4747,3 +4756,7 @@ initializeWelcome();
 enhanceLayout();
 toggleEducationIdentity(); renderResourcePlanWeeks(); renderMethodologyWeeks(); updateMethodologyHints(); updateBloomMeter(); applyUnitToUi(); renderCompositionPlanWeeks(); toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();
 
+
+// O estúdio reorganiza os próprios nós só depois que todos os handlers estão ligados.
+initializeStudio();
+$("#welcome-explore-button")?.addEventListener("click", (event) => enterFromWelcome(event, { planningOnly: true }));
