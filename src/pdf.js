@@ -1,4 +1,4 @@
-import { localizeUnit } from "./unit.js";
+import { localizeForOutput as localizeUnit } from "./unit.js";
 // Material de Mediação (PDF do professor).
 //
 // Pensado como um guia de acompanhamento que CRESCE a cada semana gerada: o mesmo arquivo é

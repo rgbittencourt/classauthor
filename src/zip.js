@@ -1,4 +1,4 @@
-import { localizeUnit } from "./unit.js";
+import { localizeForOutput as localizeUnit } from "./unit.js";
 import JSZip from "jszip";
 import { weekFileName } from "./aula-schema.js";
 import { createWebPracticeDocxFiles, createWebPracticeFiles } from "./webpractice.js";
