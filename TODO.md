@@ -1,0 +1,33 @@
+# Redesenho estrutural do ClassAuthor — versão de teste
+
+## Interface e jornada
+- [x] Nova tela de entrada centrada no percurso **Planejar → Revisar → Exportar**, preservando autoria, instituição, acesso, marcas e créditos existentes.
+- [x] O redesenho deve ser estruturalmente mais ousado, com mudanças visíveis de hierarquia, composição e navegação; não pode se limitar a trocar a paleta de cores. Usar como referência os padrões de navegação e percurso por etapas do AcademiaOS, sem alterar o AcademiaOS.
+- [x] Interface responsiva e prévia navegável para teste antes do veredito do usuário, com progresso e estados vazios honestos, sem dados ou resultados simulados como reais.
+- [x] Quebrar mais a etapa PLANEJAR em 13 passos menores: curso e turma, contexto de ensino, tempo e calendário, objetivos e conteúdos, abordagem e metodologias, perfil acadêmico, práticas e laboratório, recursos e leituras, composição ClassAtelier, materiais de apoio, referências e vídeos, imagens e diagramas, conferir e gerar. Permitir revisitar qualquer passo e abrir o briefing completo, sem perda de campos, opções ou dados.
+- [x] TEM QUE TER A BARRA INFERIOR COM OS CRÉDITOS: mostrar no workspace os créditos de desenvolvimento de Prof. Rogério Bittencourt, INOVALAB e IFSC, com identificação e marcas institucionais, incluindo Planejar, Revisar, Exportar e Importar. Reduzir discretamente a altura sem perder legibilidade ou contraste; medir a altura real para reservar o espaço necessário sem cobrir controles, inclusive no celular. Preservar os créditos completos da capa.
+- [x] As quatro etapas ficam dentro do contexto de **Planejar**, não como cartões avulsos no formulário. Exibir os quatro marcadores compactos dentro da mesma faixa horizontal de Planejar/Revisar/Exportar/Importar, somente quando Planejar estiver ativo; manter nomes completos em tooltip/acessibilidade (**O curso**, **Escolhas pedagógicas**, **Materiais da aula**, **Conferir e gerar**), acesso aos 13 passos e ao briefing completo. Em telas estreitas, a faixa pode rolar sem quebrar linha nem criar outra faixa.
+- [x] Deixar as ferramentas existentes fáceis de localizar: Mapa de Alinhamento e Rubricas de Avaliação em Revisar; Plano de Ensino em Exportar; Preencher vazios com IA no passo Objetivos e conteúdos, dentro de Escolhas pedagógicas. Renomear o rótulo visível da Ficha da Disciplina para Plano de Ensino, sem mudar ID, handler, estrutura ou compatibilidade dos arquivos.
+- [x] Criar **Importar** como quarto estágio top-level independente, na mesma faixa horizontal e sem aumentar sua altura. Mover para sua vista central os detalhes de Arquivos e recuperação (com os controles originais) e Meu estilo de escrita, sem duplicar handlers nem iniciar IA ao navegar; remover esses itens do rodapé da navegação esquerda.
+
+## Workspace e recursos existentes
+- [x] Workspace com navegação de produto à esquerda, área central dedicada à tarefa atual e resumo factual do curso à direita, substituindo a hierarquia visual anterior em vez de apenas mudar a paleta.
+- [x] Preservação integral dos campos e opções atuais de planejamento pedagógico, com navegação clara entre suas sete áreas e sem perda de configurações.
+- [x] Manutenção dos controles de composição das aulas para o ClassAtelier, incluindo mídia e componentes interativos já suportados.
+- [x] Preservação dos fluxos existentes de geração com IA, revisão humana, ajustes pontuais, aprovação por aula e retomada do planejamento.
+- [x] Manutenção das práticas e laboratórios, materiais de apoio, recursos e leituras já disponíveis no app.
+- [x] Preservação da produção audiovisual existente e de seus roteiros, slides, narração e planilha de produção.
+- [x] Manutenção das exportações e ferramentas docentes existentes; vídeos do YouTube devem continuar saindo como blocos nativos de vídeo no ClassAtelier, com eliminação de vídeos e links de artigos repetidos.
+- [x] Preservação de backup, restauração, pasta do projeto, abertura de aulas salvas e configuração de chaves próprias, sem expor credenciais.
+
+## Isolamento e entrega
+- [x] As alterações oficiais ficam exclusivamente na branch de teste `test/classauthor-ui-export-fixes`; não fazer merge, publicação nem alteração em `main` ou no site principal.
+- [ ] A prévia disponibilizada pelo projeto de teste permanece separada do site principal; o veredito final só vem depois que o usuário puder testar e dar retorno.
+
+## Estado da prévia
+Na versão anterior, a estrutura foi capturada em desktop e celular. Esta alteração acrescenta Importar à faixa superior única, compacta os marcadores de Planejar nessa mesma faixa e reposiciona os controles originais no centro; em telas estreitas a faixa pode rolar horizontalmente, sem quebra de linha. O rodapé de créditos ficou ligeiramente mais baixo e mantém a altura medida dinamicamente para não cobrir controles. Após a correção de descoberta de rascunho, a suíte completa passou (344/344), incluindo oito regressões de interface para navegação, faixa compacta, vista Importar, estados vazios, identidade dos nós, controles, handlers, recuperação, créditos e medição de altura; as verificações de sintaxe também passaram. A prévia ainda aguarda teste do usuário e retorno antes de qualquer veredito final.
+
+### Conferência final da prévia — 26/11/2026
+A faixa única e os estados Planejar/Importar foram inspecionados no navegador público da prévia e em capturas de 1280 px e 375 px. Em Planejar, os quatro marcadores têm a mesma posição vertical e mantêm nomes completos acessíveis; em Importar, ficam ocultos e cada controle original verificado permanece com um único ID dentro da vista central. O rodapé mediu 58 px em desktop, com reserva correspondente, e preservou os créditos no celular; o controle Navegar permite recolher a navegação móvel para acessar a área central. As capturas móveis usaram o HTML real com entrada fictícia e sem IA, em arquivo transitório removido antes do checkpoint. A suíte final passou novamente (343/343), junto com sintaxe e `git diff --check`. Não houve teste end-to-end de geração paga, restauração de arquivos reais ou aprovação do usuário, nem publicação ou merge na main externa.
+
+A revisão independente encontrou o caso de rascunho já disponível antes do observer. A inicialização agora reconhece esse estado e mantém Arquivos e recuperação aberto ao entrar em Importar, sem restaurar arquivos nem chamar IA. A regressão acrescentada cobre o estado inicial e as mutações posteriores; após esse ajuste, a suíte final passou em **344/344 testes**, incluindo oito testes de interface. Sintaxe e `git diff --check` também passaram. O veredito do usuário continua pendente.

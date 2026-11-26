@@ -339,8 +339,11 @@ export function initializeStudio() {
   resultObserver.observe(results, { attributes: true, attributeFilter: ["class"] });
   resultObserver.observe($("#week-grid"), { childList: true });
   resultObserver.observe($("#result-alert"), { attributes: true, attributeFilter: ["class"], childList: true, characterData: true, subtree: true });
-  const recoveryObserver = new MutationObserver(() => { if (!$("#draft-recovery").classList.contains("hidden")) storage.open = true; });
+  const syncDraftRecovery = () => { if (!$("#draft-recovery").classList.contains("hidden")) storage.open = true; };
+  const recoveryObserver = new MutationObserver(syncDraftRecovery);
   recoveryObserver.observe($("#draft-recovery"), { attributes: true, attributeFilter: ["class"] });
+  // O app pode oferecer um rascunho antes de o estúdio registrar o observer.
+  syncDraftRecovery();
   $("#course-unit").addEventListener("change", refresh);
   $("#new-project-link").addEventListener("click", () => { if (!hasResults()) goToStep(0); });
 

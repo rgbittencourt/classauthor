@@ -265,7 +265,7 @@ function fixture() {
   return { document, window, center, navigation, summary, workspace, sectors, assistButton, generate, actionIds, alert, weekGrid, intro };
 }
 
-function installBrowserStubs(t) {
+function installBrowserStubs(t, { draftAvailable = false } = {}) {
   const previous = new Map();
   const remember = (key) => previous.set(key, Object.prototype.hasOwnProperty.call(globalThis, key) ? globalThis[key] : undefined);
   const restore = (key) => {
@@ -274,6 +274,7 @@ function installBrowserStubs(t) {
   };
   ["document", "window", "MutationObserver", "ResizeObserver", "requestAnimationFrame"].forEach(remember);
   const env = fixture();
+  if (draftAvailable) env.document.getElementById("draft-recovery").classList.remove("hidden");
   const frames = [];
   const observed = [];
   const resizeObserved = [];
@@ -410,6 +411,7 @@ test("Importar tem vista própria, reusa controles originais e não mostra área
   assert.equal(document.querySelectorAll("#recovery-dock").length, 1);
   assert.equal(document.querySelectorAll("#style-button").length, 1);
 
+  assert.equal(Boolean(storage.open), false, "sem rascunho disponível, Arquivos e recuperação começa recolhido");
   click(window, document.querySelector('[data-studio-stage="import"]'));
   assert.equal(document.body.dataset.studioView, "import");
   assert.equal(document.getElementById("studio-task-title").textContent, "Traga seu trabalho para cá.");
@@ -428,6 +430,23 @@ test("Importar tem vista própria, reusa controles originais e não mostra área
   click(window, document.querySelector('[data-studio-stage="plan"]'));
   assert.equal(document.body.dataset.studioView, "plan", "a navegação de volta a Planejar continua funcionando");
   assert.ok(importView.classList.contains("studio-hidden"));
+});
+
+test("Importar reconhece rascunho disponível antes da inicialização e mantém a abertura por mutação", (t) => {
+  const env = installBrowserStubs(t, { draftAvailable: true });
+  const { document, window, observed } = env;
+  const storage = document.querySelector(".studio-storage");
+  const draft = document.getElementById("draft-recovery");
+  assert.equal(storage.open, true, "o estado inicial é reconhecido mesmo sem nova mutação de classe");
+  click(window, document.querySelector('[data-studio-stage="import"]'));
+  assert.ok(!document.getElementById("studio-import-view").classList.contains("studio-hidden"));
+  assert.ok(!draft.classList.contains("hidden"));
+  storage.open = false;
+  const recoveryObserver = observed.find((observer) => observer.targets.some(({ target }) => target === draft));
+  assert.ok(recoveryObserver, "a recuperação continua observando mudanças posteriores");
+  recoveryObserver.callback([{ target: draft, attributeName: "class" }]);
+  assert.equal(storage.open, true, "um aviso posterior também abre Arquivos e recuperação");
+  assert.equal(env.fetchCalls, 0, "reconhecer o rascunho não chama IA nem restaura dados");
 });
 
 test("Revisar e Exportar ocultam subetapas; voltar a Planejar conserva o passo atual", (t) => {
