@@ -1,4 +1,4 @@
-import { initializeStudio } from "./studio-ui.js";
+import { initializeStudio } from "./studio-ui.js?v=20261126-planning-steps";
 import { toStudentLesson, toGeneratorWeek } from "./student-export.js";
 import { normalizeAbntCitation, sortReferencesAbnt, abntIssues } from "./abnt.js";
 import { parseSavedWeek, planPlacement } from "./week-import.js";

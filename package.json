@@ -19,5 +19,8 @@
     "express": "^4.21.2",
     "jszip": "^3.10.1",
     "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "linkedom": "^0.18.15"
   }
 }
