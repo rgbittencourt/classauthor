@@ -44,7 +44,7 @@
               <strong>Prof. Rogério Bittencourt</strong>
               <div class="welcome-inovalab-credit"><img src="./brand/inovalab-signature.png" alt="Logotipo completo do INOVALAB" /></div>
             </aside>
-            <div class="welcome-footer-meta"><span class="welcome-footer-description">Laboratório de Inovação e Tecnologia Educacional</span><span class="welcome-footer-separator" aria-hidden="true">•</span><a href="https://github.com/rgbittencourt" target="_blank" rel="noreferrer">github.com/rgbittencourt</a><span class="welcome-footer-separator" aria-hidden="true">•</span><em class="semver" title="Versionamento Semântico: MAIOR.MENOR.CORREÇÃO">v1.21.0</em></div>
+            <div class="welcome-footer-meta"><span class="welcome-footer-description">Laboratório de Inovação e Tecnologia Educacional</span><span class="welcome-footer-separator" aria-hidden="true">•</span><a href="https://github.com/rgbittencourt" target="_blank" rel="noreferrer">github.com/rgbittencourt</a><span class="welcome-footer-separator" aria-hidden="true">•</span><em class="semver" title="Versionamento Semântico: MAIOR.MENOR.CORREÇÃO">v1.22.0</em></div>
           </div>
         </div>
       </div>
@@ -122,6 +122,7 @@
             <div class="field-grid three">
               <label class="field"><span>Número de semanas <b>*</b></span><input id="weeks" name="weeks" type="number" min="1" max="52" value="4" required /></label>
               <label class="field"><span>Horas por semana <b>*</b></span><input id="hours" name="hoursPerWeek" type="number" min="0" max="80" step="0.25" value="4" required /></label>
+              <label class="field" title="Use quando este planejamento continua um curso que já tem semanas prontas. Ex.: 3, se as semanas 1 e 2 já foram geradas em outro planejamento. Defina antes de gerar."><span>Número da primeira semana</span><input id="first-number" name="firstNumber" type="number" min="1" max="99" step="1" value="1" /><small class="hint">Continua um curso já começado? Ex.: 3 se as semanas 1 e 2 já existem. Defina antes de gerar.</small></label>
               <label class="field"><span>Modo do calendário</span><select id="calendar-mode" name="calendarMode"><option value="week-number" selected>Semana 1, Semana 2…</option><option value="calendar">Data de início real</option></select></label>
               <label class="field calendar-only span-2 hidden"><span>Início do curso</span><input id="start-date" name="startDate" type="date" /></label>
               <div class="calendar-note calendar-only hidden">As semanas serão calculadas em blocos de 7 dias a partir da data escolhida.</div>
@@ -310,8 +311,8 @@
 
     <section class="empty-state" id="empty-state"><span class="empty-mark">01</span><p>Preencha o briefing para montar a primeira trilha semanal.</p></section>
   </main>
-  <footer class="site-footer"><span>ClassAuthor <span class="semver" title="Versionamento Semântico: MAIOR.MENOR.CORREÇÃO">v1.21.0</span> · desenvolvido por Rogério Bittencourt, INOVALAB - IFSC</span><span>Saída compatível com ClassAtelier · revisão humana antes da publicação</span></footer>
+  <footer class="site-footer"><span>ClassAuthor <span class="semver" title="Versionamento Semântico: MAIOR.MENOR.CORREÇÃO">v1.22.0</span> · desenvolvido por Rogério Bittencourt, INOVALAB - IFSC</span><span>Saída compatível com ClassAtelier · revisão humana antes da publicação</span></footer>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script type="module" src="/app.js?v=20261112-v1.21.0"></script>
+  <script type="module" src="/app.js?v=20261126-v1.22.0"></script>
 </body>
 </html>

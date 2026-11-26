@@ -364,6 +364,10 @@ function paragraphsMarkup(value) {
 function slugify(value) { return String(value || "curso").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "curso"; }
 // Unidade "aula": arquivos de texto baixados (JSON, XML, Markdown) e nomes de arquivo dizem "aula".
 function courseUnit() { return $("#course-unit")?.value === "aula" ? "aula" : "semana"; }
+// Número da primeira aula/semana (padrão 1): para um planejamento que continua um curso já começado.
+// Por dentro, tudo conta de 1; o número mostrado e o que vai para os arquivos e para o ClassAtelier é este + posição.
+function firstNumber() { const n = Math.floor(Number($("#first-number")?.value)); return Number.isFinite(n) && n > 1 && n <= 99 ? n : 1; }
+const shownNumber = (index) => index + firstNumber();
 async function downloadBlob(blob, filename) {
   const unit = courseUnit();
   if (unit === "aula") {
@@ -861,6 +865,7 @@ function applyInputToForm(input = {}) {
   renderResourcePlanWeeks(resourcePlan);
   if ($("#pedagogical-approach")) $("#pedagogical-approach").value = input.pedagogicalApproach === "atual" ? "atual" : "nova";
   if ($("#course-unit")) { $("#course-unit").value = input.unit === "aula" ? "aula" : "semana"; applyUnitToUi(); }
+  if ($("#first-number")) $("#first-number").value = Number(input.firstNumber) > 1 ? Number(input.firstNumber) : 1;
   if ($("#methodology-default")) {
     $("#methodology-default").value = methodologyOptionExists(input.methodologyPlan?.default) ? input.methodologyPlan.default : "nenhuma";
     $("#methodology-default").dataset.confirmedValue = $("#methodology-default").value;
@@ -981,7 +986,7 @@ function renderMethodologyWeeks(plan = {}) {
     const weekNumber = index + 1;
     const chosen = byWeek.get(weekNumber) || "";
     const choices = [`<option value="">Padrão (${escapeHtml(defaultLabel)})</option>`, ...options.map((option) => `<option value="${escapeHtml(option.value)}" title="${escapeHtml(option.hint)}" ${option.value === chosen ? "selected" : ""}>${escapeHtml(option.label)}</option>`)].join("");
-    return `<label class="methodology-week ${chosen ? "is-override" : ""}" data-methodology-week="${weekNumber}"><span>Semana ${weekNumber}</span><select data-confirmed-value="${escapeHtml(chosen)}" aria-label="Metodologia ativa da semana ${weekNumber}">${choices}</select></label>`;
+    return `<label class="methodology-week ${chosen ? "is-override" : ""}" data-methodology-week="${weekNumber}"><span>Semana ${weekNumber + firstNumber() - 1}</span><select data-confirmed-value="${escapeHtml(chosen)}" aria-label="Metodologia ativa da semana ${weekNumber}">${choices}</select></label>`;
   }).join("");
 }
 
@@ -1142,7 +1147,7 @@ function renderResourcePlanWeeks(plan = {}) {
   container.innerHTML = Array.from({ length: weeks }, (_, index) => {
     const weekNumber = index + 1;
     const entry = byWeek.get(weekNumber) || {};
-    return `<div class="resource-plan-week" data-resource-week="${weekNumber}"><div class="resource-plan-week-label">Semana ${weekNumber}</div>${field("Vídeos", "videos", entry.videosPerWeek)}${field("Artigos", "articles", entry.articlesPerWeek)}${field("Leituras obrigatórias", "required", entry.requiredReadingsPerWeek)}${field("Nível de leitura", "level", entry.requiredReadingLevel, "select")}</div>`;
+    return `<div class="resource-plan-week" data-resource-week="${weekNumber}"><div class="resource-plan-week-label">Semana ${weekNumber + firstNumber() - 1}</div>${field("Vídeos", "videos", entry.videosPerWeek)}${field("Artigos", "articles", entry.articlesPerWeek)}${field("Leituras obrigatórias", "required", entry.requiredReadingsPerWeek)}${field("Nível de leitura", "level", entry.requiredReadingLevel, "select")}</div>`;
   }).join("");
 }
 
@@ -1201,7 +1206,7 @@ function renderCompositionPlanWeeks(plan = {}) {
     const weekNumber = index + 1;
     const rowPlan = byWeek.get(weekNumber) || {};
     const weekFigures = entries.find((entry) => Number(entry.weekNumber || entry.week) === weekNumber)?.figures || {};
-    return `<details class="composition-week" data-composition-week="${weekNumber}"><summary>Semana ${weekNumber}<small>Deixe vazio para herdar o padrão</small></summary><div class="composition-week-grid">${FIGURE_KINDS.map(([kind, label]) => `<label class="composition-week-cell"><span>🖼️ ${escapeHtml(label)}</span><input data-figure-week="${kind}" type="number" min="0" max="6" step="1" value="${weekFigures[kind] ?? ""}" placeholder="padrão" /></label>`).join("")}${compositionCatalog.map(([key, label, group, defaultCount, itemsPerBlock]) => { const row = rowPlan[key] || {}; return `<label class="composition-week-cell"><span>${escapeHtml(label)}</span><input data-composition-week-count="${key}" type="number" min="0" max="12" step="1" value="${row.count ?? ""}" placeholder="padrão" />${itemsPerBlock > 1 ? `<input data-composition-week-items="${key}" type="number" min="1" max="12" value="${row.itemsPerBlock || ""}" placeholder="${itemsPerBlock} itens" />` : ""}<select data-composition-week-policy="${key}"><option value="">padrão</option><option value="prefer" ${row.policy === "prefer" ? "selected" : ""}>preferir</option><option value="required" ${row.policy === "required" ? "selected" : ""}>obrigatório</option><option value="none" ${row.policy === "none" ? "selected" : ""}>não usar</option></select></label>`; }).join("")}</div></details>`;
+    return `<details class="composition-week" data-composition-week="${weekNumber}"><summary>Semana ${weekNumber + firstNumber() - 1}<small>Deixe vazio para herdar o padrão</small></summary><div class="composition-week-grid">${FIGURE_KINDS.map(([kind, label]) => `<label class="composition-week-cell"><span>🖼️ ${escapeHtml(label)}</span><input data-figure-week="${kind}" type="number" min="0" max="6" step="1" value="${weekFigures[kind] ?? ""}" placeholder="padrão" /></label>`).join("")}${compositionCatalog.map(([key, label, group, defaultCount, itemsPerBlock]) => { const row = rowPlan[key] || {}; return `<label class="composition-week-cell"><span>${escapeHtml(label)}</span><input data-composition-week-count="${key}" type="number" min="0" max="12" step="1" value="${row.count ?? ""}" placeholder="padrão" />${itemsPerBlock > 1 ? `<input data-composition-week-items="${key}" type="number" min="1" max="12" value="${row.itemsPerBlock || ""}" placeholder="${itemsPerBlock} itens" />` : ""}<select data-composition-week-policy="${key}"><option value="">padrão</option><option value="prefer" ${row.policy === "prefer" ? "selected" : ""}>preferir</option><option value="required" ${row.policy === "required" ? "selected" : ""}>obrigatório</option><option value="none" ${row.policy === "none" ? "selected" : ""}>não usar</option></select></label>`; }).join("")}</div></details>`;
   }).join("");
   const defaultFigures = plan.default?.figures || {};
   const figureRows = FIGURE_KINDS.map(([kind, label, hint]) => `<div class="composition-row composition-figure-row"><span class="composition-label"><strong>${escapeHtml(label)}</strong><small>${escapeHtml(hint)}</small></span><input data-figure-default="${kind}" type="number" min="0" max="6" step="1" value="${defaultFigures[kind] ?? ""}" placeholder="IA decide" aria-label="Quantidade de ${escapeHtml(label.toLowerCase())} por semana" /></div>`).join("");
@@ -1731,6 +1736,7 @@ function formInput() {
     didacticMode: $("#didactic-mode").value,
     pedagogicalApproach: $("#pedagogical-approach")?.value || "nova",
     unit: $("#course-unit")?.value || "semana",
+    firstNumber: firstNumber(),
     methodologyPlan: collectMethodologyPlan(),
     requireValidatedMethodologyReferences: true,
     requireValidatedBloomReference: true,
@@ -2302,7 +2308,7 @@ function renderLessonPreview(lesson, index) {
   const mediation = mediationMessagesMarkup(guide.mediationMessages, plan.theme || lesson?.meta?.title || `a semana ${index + 1}`, index + 1)
     + (guide.weekSummary && guide.studentFAQ?.length ? "" : `<section class="reader-warning"><h3>Explicações para o professor</h3><p>Esta semana ainda não tem o resumo, as perguntas prováveis dos alunos, os equívocos comuns e os sinais de alerta que entram no Material de Mediação. O texto da semana não é alterado.</p><button type="button" class="secondary" id="retry-explain-button">Completar explicações do Material de Mediação</button></section>`);
   $("#lesson-modal-eyebrow").textContent = `PRÉVIA · SEMANA ${String(index + 1).padStart(2, "0")}`;
-  $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${index + 1}`;
+  $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${shownNumber(index)}`;
   $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${bncc}${diagnostic}${pendingFigures}${figureListMarkup(index)}${approvedPlanMarkup}${sourceUsed}${sectionsMarkup}${methodology}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}${productionMarkup(index, weekReleased(index) || manuallyApproved || ["ready", "complete"].includes(automaticStatus))}`;
   renderFlowPanel(index);
   $("#retry-derivatives-button")?.addEventListener("click", () => retryDerivatives(index));
@@ -2985,7 +2991,7 @@ async function regenerateSelectedWeek() {
 }
 
 function weekCalendar(input, index) {
-  const weekNumber = index + 1;
+  const weekNumber = index + firstNumber();
   if (input.calendarMode !== "calendar" || !input.startDate) return { weekNumber, label: `Semana ${weekNumber}`, startDate: null, endDate: null };
   const startDate = addDays(input.startDate, index * 7);
   const endDate = addDays(startDate, 6);
@@ -3014,7 +3020,7 @@ function fallbackLesson(input, index) {
     ...input.references.map((href, i) => ({ type: "artigo", title: `Referência ${i + 1}`, source: "Material indicado", href }))
   ].filter((item) => item.title || item.href);
   if (materialItems.length) blocks.push({ id: id("b-materials-", 20), type: "materiais", bg: "neutral-default", pad: "normal", props: { title: "Materiais de apoio", items: materialItems } });
-  const theme = `${input.title} — Semana ${week}`;
+  const theme = `${input.title} — Semana ${calendar.weekNumber}`;
   const objectives = [...input.objectives, `Relacionar ${input.title} a uma situação concreta.`, `Analisar limites e possibilidades do tema.`, `Aplicar o conteúdo em uma produção observável.`, "Sintetizar o que foi aprendido nesta etapa."].filter((item, itemIndex, list) => item && list.indexOf(item) === itemIndex).slice(0, 5);
   const sections = [
     { number: "1", title: "Contexto e pergunta de partida", body: content, resources: [] },
@@ -3028,7 +3034,7 @@ function fallbackLesson(input, index) {
 }
 
 function staticTeacherGuides(input, weeks) {
-  return weeks.map((_, index) => ({ weekNumber: index + 1, title: `${input.title} - Semana ${index + 1}`, purpose: "Orientar a aprendizagem da semana e revisar a coerência entre objetivos, conteúdo, atividades e avaliação.", didacticArc: { id: "descoberta-conceitual", label: "Descoberta conceitual", rationale: "Arco de exemplo para o modo público.", sequence: ["contexto", "conceito", "exemplo", "reflexao", "sintese"] }, objectives: input.objectives, alignmentMatrix: [], mediationQuestions: [], commonMisconceptions: [], interventions: [], differentiation: { support: [], standard: [], extension: [] }, accessibility: [], assessmentNotes: [], qualityReview: { status: "review", checks: [{ label: "Exemplo local: revise a semana antes de usar.", pass: false }] }, mediationMessages: { whatsapp: [{ timing: "Abertura", text: `Oi, pessoal! Nesta semana vamos estudar ${input.title}. Comecem pela abertura e tragam uma pergunta para a conversa.` }, { timing: "Acompanhamento", text: "Um pouco por dia já ajuda bastante. O texto não precisa ser encarado como uma montanha de uma vez." }, { timing: "Fechamento", text: "Antes de encerrar, revisem a síntese e registrem a principal descoberta da semana." }], moodle: [{ timing: "Abertura", text: `Olá, turma! A semana ${index + 1} organiza o estudo de ${input.title} em uma sequência de leitura, aplicação e reflexão.` }, { timing: "Acompanhamento", text: "Reserve um horário para o texto-base e participe do espaço de discussão com uma conexão ou dúvida." }, { timing: "Fechamento", text: "Conclua a atividade prevista, revise a síntese e envie a evidência solicitada." }] }, webPractices: [], webPracticeProjects: [], workloadAdvice: [] }));
+  return weeks.map((_, index) => ({ weekNumber: index + 1, title: `${input.title} - Semana ${shownNumber(index)}`, purpose: "Orientar a aprendizagem da semana e revisar a coerência entre objetivos, conteúdo, atividades e avaliação.", didacticArc: { id: "descoberta-conceitual", label: "Descoberta conceitual", rationale: "Arco de exemplo para o modo público.", sequence: ["contexto", "conceito", "exemplo", "reflexao", "sintese"] }, objectives: input.objectives, alignmentMatrix: [], mediationQuestions: [], commonMisconceptions: [], interventions: [], differentiation: { support: [], standard: [], extension: [] }, accessibility: [], assessmentNotes: [], qualityReview: { status: "review", checks: [{ label: "Exemplo local: revise a semana antes de usar.", pass: false }] }, mediationMessages: { whatsapp: [{ timing: "Abertura", text: `Oi, pessoal! Nesta semana vamos estudar ${input.title}. Comecem pela abertura e tragam uma pergunta para a conversa.` }, { timing: "Acompanhamento", text: "Um pouco por dia já ajuda bastante. O texto não precisa ser encarado como uma montanha de uma vez." }, { timing: "Fechamento", text: "Antes de encerrar, revisem a síntese e registrem a principal descoberta da semana." }], moodle: [{ timing: "Abertura", text: `Olá, turma! A semana ${index + 1} organiza o estudo de ${input.title} em uma sequência de leitura, aplicação e reflexão.` }, { timing: "Acompanhamento", text: "Reserve um horário para o texto-base e participe do espaço de discussão com uma conexão ou dúvida." }, { timing: "Fechamento", text: "Conclua a atividade prevista, revise a síntese e envie a evidência solicitada." }] }, webPractices: [], webPracticeProjects: [], workloadAdvice: [] }));
 }
 
 function staticDemo(input) {
@@ -3162,7 +3168,7 @@ function reviewGuidanceFor(kind, item = {}) {
   const lesson = weekNumber ? state.weeks?.[weekNumber - 1] : null;
   const theme = lesson?.lessonPlan?.theme || lesson?.meta?.title || "tema da semana";
   const courseTitle = state.input?.title || state.generalPlan?.title || "curso";
-  const target = weekNumber ? `Semana ${weekNumber} — ${theme}` : "a semana correspondente ao item";
+  const target = weekNumber ? `Semana ${weekNumber + firstNumber() - 1} — ${theme}` : "a semana correspondente ao item";
   const issue = item.detail || item.status || (item.pass ? "atendido pela análise automática, mas marcado por você para refazer" : "não atendido na análise automática");
   const action = reviewActionFor(kind, item, lesson);
   const limits = action.scope === "full" ? "Mantenha o que já está bom e não altere as outras semanas. Não invente autores, dados, referências, DOI ou URLs; onde faltar base, marque como “a conferir”." : REVIEW_LIMITS_EDIT;
@@ -3194,7 +3200,7 @@ function reviewRowsMarkup(kind, items, reviewMarks) {
     const override = reviewMarks[kind]?.[key];
     const checked = reviewMarkChecked(kind, item, reviewMarks);
     const stateLabel = override === undefined ? (item.pass ? "Atendido automaticamente pela IA" : "Pendente na análise automática") : (override ? "Marcado por você" : "Desmarcado por você para refazer");
-    const scope = item.weekNumber ? `Semana ${item.weekNumber}` : "Curso";
+    const scope = item.weekNumber ? `Semana ${item.weekNumber + firstNumber() - 1}` : "Curso";
     const active = state.activeReviewGuidance?.kind === kind && state.activeReviewGuidance.key === key;
     const label = item.label || item.title || "Item de revisão";
     return `<div class="review-item"><label class="review-row ${checked ? "is-marked" : ""}"><input type="checkbox" data-review-kind="${escapeHtml(kind)}" data-review-key="${escapeHtml(key)}" ${checked ? "checked" : ""} /><span class="review-row-copy" role="button" tabindex="0" data-review-guidance-kind="${escapeHtml(kind)}" data-review-guidance-key="${escapeHtml(key)}" aria-expanded="${active ? "true" : "false"}"><strong>${escapeHtml(scope)} · ${escapeHtml(label)}</strong><small>${escapeHtml(item.detail || item.status || stateLabel)}${override !== undefined ? ` · ${stateLabel}` : ""}</small></span></label>${reviewGuidanceMarkup(kind, item, key, active)}</div>`;
@@ -3340,7 +3346,7 @@ function renderGeneralPlan(plan) {
   const weeklyLoads = (state.workload?.weeks || plan.weeks || []).map((week) => {
     const items = (week.items || []).filter((item) => Number(item.minutes || item.learnerMinutes) > 0);
     const itemMarkup = items.map((item) => `<li><strong>${escapeHtml(workloadItemLabel(item))}</strong><span>${escapeHtml(item.title || "")}</span><em>${formatLoad(item.minutes || item.learnerMinutes)}</em></li>`).join("");
-    return `<details class="load-week"><summary><strong>Semana ${escapeHtml(week.weekNumber)}</strong><span>${formatLoad(week.calculatedMinutes)} calculados · ${formatLoad(week.targetMinutes)} de meta</span></summary><ul>${itemMarkup || "<li>Sem itens calculáveis ainda.</li>"}</ul></details>`;
+    return `<details class="load-week"><summary><strong>Semana ${escapeHtml(Number(week.weekNumber) + firstNumber() - 1)}</strong><span>${formatLoad(week.calculatedMinutes)} calculados · ${formatLoad(week.targetMinutes)} de meta</span></summary><ul>${itemMarkup || "<li>Sem itens calculáveis ainda.</li>"}</ul></details>`;
   }).join("");
   const timeBreakdownMarkup = `<section class="time-breakdown"><p class="eyebrow">CARGA ABERTA POR ATIVIDADE</p><h3>De onde vem o tempo calculado?</h3><p>O texto-base é contado separadamente das leituras, vídeos, quiz, fórum, revisão e práticas. Artigos/leitura aparecem como obrigatórios ou complementares conforme a marcação do recurso.</p><div class="breakdown-summary">${breakdownSummary || "<span>A carga será calculada depois da redação.</span>"}</div><div class="load-weeks">${weeklyLoads}</div></section>`;
   const overviewMarkup = `<div class="plan-overview"><p class="eyebrow">PLANEJAMENTO GERAL</p><h3>${escapeHtml(plan.title || "Curso")}</h3><p>O total considera todas as semanas depois da redação do conteúdo, dos recursos e das atividades. A experiência do aluno e o Material de Mediação são entregues separadamente.</p><div class="general-plan-grid"><div class="general-metric"><strong>${formatMinutes(totals.targetLearnerMinutes)}</strong><small>meta de estudo do aluno</small></div><div class="general-metric"><strong>${formatMinutes(totals.calculatedLearnerMinutes)}</strong><small>carga calculada</small></div><div class="general-metric"><strong>${formatMinutes(totals.requiredMinutes)}</strong><small>itens obrigatórios</small></div><div class="general-metric"><strong>${formatMinutes(totals.instructionalMinutes)}</strong><small>atividade instrucional eq.</small></div></div><div class="general-category-list">${categoryMarkup || "<span>Itens serão dimensionados após a geração</span>"}</div><div class="arc-list">${arcs}</div></div>`;
@@ -3415,7 +3421,7 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
     const qualityLabel = manuallyApproved ? "conferida e liberada por você" : ({ ready: "conteúdo pronto", complete: "conteúdo completo", blocked: "bloqueada: pendência crítica", review: "revisão recomendada", "needs-review": "revisão recomendada", insufficient: "conteúdo insuficiente" }[automaticStatus] || "qualidade não medida");
     const approvalButton = automaticStatus !== "ready" && automaticStatus !== "complete" ? `<button class="week-approve ${manuallyApproved ? "is-approved" : ""}" data-index="${index}" type="button">${manuallyApproved ? "Desfazer liberação" : "Liberar após conferência"}</button>` : "";
     const statusDetail = reasons.length ? `<small class="week-status-detail">${escapeHtml(manuallyApproved ? `Diagnóstico automático: ${reasons.join(" · ")}` : reasons.join(" · "))}</small>` : "";
-    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div>${methodologyForWeekLabel(index, lesson) ? `<span class="week-method">${escapeHtml(methodologyForWeekLabel(index, lesson))}</span>` : ""}${flowBadge(index)}<h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div>${compositionSummary ? `<small class="week-composition-summary"><strong>Composição materializada:</strong> ${escapeHtml(compositionSummary)}</small>` : ""}${resourceCoverage ? `<small class="week-resource-coverage"><strong>Cobertura:</strong> ${escapeHtml(resourceCoverage)}</small>` : pendingResources ? `<small class="week-resource-coverage is-pending"><strong>Cobertura:</strong> ${escapeHtml(pendingResources)}</small>` : ""}${pendingGeneration ? `<small class="week-generation-pending">${escapeHtml(pendingGeneration)}</small>` : ""}${figureBadgeText(index) ? `<small class="week-images-pending">${escapeHtml(figureBadgeText(index))}</small>` : ""}<span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(automaticStatus)}">${escapeHtml(qualityLabel)}</span>${statusDetail}<div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-download" data-index="${index}" type="button" title="Arquivo para abrir no ClassAtelier (sem o quiz)">JSON ClassAtelier <span>↓</span></button><button class="button button-secondary week-download-full" data-index="${index}" type="button" title="Semana completa do ClassAuthor, com quiz, feedbacks e guia do professor">JSON ClassAuthor <span>↓</span></button><button class="button button-secondary week-download-quiz" data-index="${index}" type="button" ${quizQuestions(lesson).length ? "" : "disabled"} title="Quiz da semana em Moodle XML, com feedback em todas as alternativas">Quiz XML <span>↓</span></button><button class="button button-secondary week-open-studio" data-index="${index}" type="button" title="Abre o ClassAtelier em outra aba já com esta semana carregada">Abrir esta semana no <strong class="wordmark"><b>Class</b><i>Atelier</i></strong> <span>↗</span></button>${approvalButton}</div>${studioEditMarkup(index)}</article>`;
+    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(shownNumber(index)).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div>${methodologyForWeekLabel(index, lesson) ? `<span class="week-method">${escapeHtml(methodologyForWeekLabel(index, lesson))}</span>` : ""}${flowBadge(index)}<h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div>${compositionSummary ? `<small class="week-composition-summary"><strong>Composição materializada:</strong> ${escapeHtml(compositionSummary)}</small>` : ""}${resourceCoverage ? `<small class="week-resource-coverage"><strong>Cobertura:</strong> ${escapeHtml(resourceCoverage)}</small>` : pendingResources ? `<small class="week-resource-coverage is-pending"><strong>Cobertura:</strong> ${escapeHtml(pendingResources)}</small>` : ""}${pendingGeneration ? `<small class="week-generation-pending">${escapeHtml(pendingGeneration)}</small>` : ""}${figureBadgeText(index) ? `<small class="week-images-pending">${escapeHtml(figureBadgeText(index))}</small>` : ""}<span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(automaticStatus)}">${escapeHtml(qualityLabel)}</span>${statusDetail}<div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-download" data-index="${index}" type="button" title="Arquivo para abrir no ClassAtelier (sem o quiz)">JSON ClassAtelier <span>↓</span></button><button class="button button-secondary week-download-full" data-index="${index}" type="button" title="Semana completa do ClassAuthor, com quiz, feedbacks e guia do professor">JSON ClassAuthor <span>↓</span></button><button class="button button-secondary week-download-quiz" data-index="${index}" type="button" ${quizQuestions(lesson).length ? "" : "disabled"} title="Quiz da semana em Moodle XML, com feedback em todas as alternativas">Quiz XML <span>↓</span></button><button class="button button-secondary week-open-studio" data-index="${index}" type="button" title="Abre o ClassAtelier em outra aba já com esta semana carregada">Abrir esta semana no <strong class="wordmark"><b>Class</b><i>Atelier</i></strong> <span>↗</span></button>${approvalButton}</div>${studioEditMarkup(index)}</article>`;
   }).join("");
   $("#week-grid").innerHTML = cards;
   const weeksTitle = $("#weeks-sector-title");
@@ -3446,7 +3452,7 @@ function weekFileName(lesson, index, suffix) {
   let slug = slugify(lesson.meta?.title || "aula").replace(/^semana-0*\d+-?/, "");
   if (slug.length > 60) slug = slug.slice(0, 60).replace(/-[^-]*$/, "") || slug.slice(0, 60);
   slug = slug.replace(/(-(de|da|do|das|dos|em|na|no|nas|nos|e|a|o|as|os|para|com|por|que|um|uma))+$/, "").replace(/-$/, "") || "aula";
-  return `Semana${String(index + 1).padStart(2, "0")}-${slug}-${suffix}`;
+  return `Semana${String(shownNumber(index)).padStart(2, "0")}-${slug}-${suffix}`;
 }
 
 function downloadWeek(index) {
@@ -3483,7 +3489,7 @@ function refreshStudioWeekSelect() {
   pick.classList.toggle("hidden", !weeks.length);
   if (!weeks.length) { select.innerHTML = ""; return; }
   const chosen = select.value;
-  select.innerHTML = [`<option value="">editor em branco</option>`, ...weeks.map((lesson, index) => `<option value="${index}">Semana ${index + 1} · ${escapeHtml(String(lesson.lessonPlan?.theme || lesson.meta?.title || "").slice(0, 38))}</option>`)].join("");
+  select.innerHTML = [`<option value="">editor em branco</option>`, ...weeks.map((lesson, index) => `<option value="${index}">Semana ${shownNumber(index)} · ${escapeHtml(String(lesson.lessonPlan?.theme || lesson.meta?.title || "").slice(0, 38))}</option>`)].join("");
   select.value = chosen !== "" && Number(chosen) < weeks.length ? chosen : String(weeks.length - 1);
 }
 
@@ -3577,7 +3583,7 @@ function openInStudio(index) {
   const onMessage = (event) => {
     if (event.source !== win || event.origin !== STUDIO_ORIGIN || !event.data) return;
     if (event.data.type === "classatelier:ready") { win.postMessage({ type: "classauthor:lesson", lesson: payload, fileName }, STUDIO_ORIGIN); return; }
-    if (event.data.type === "classatelier:loaded") { finish(); showStudioToast(`Semana ${index + 1} aberta no ClassAtelier.${event.data.savedPrevious ? " A aula que estava aberta lá ficou na Biblioteca." : ""}`); }
+    if (event.data.type === "classatelier:loaded") { finish(); showStudioToast(`Semana ${shownNumber(index)} aberta no ClassAtelier.${event.data.savedPrevious ? " A aula que estava aberta lá ficou na Biblioteca." : ""}`); }
     else if (event.data.type === "classatelier:declined") { finish(); showStudioToast("Você manteve a versão que já estava na Biblioteca do ClassAtelier."); }
     else if (event.data.type === "classatelier:error") { finish(); showStudioToast(`O editor não conseguiu abrir a semana: ${event.data.message || "arquivo inválido"}. Baixe o JSON ClassAtelier e use "Abrir projeto".`); }
   };
@@ -3986,8 +3992,8 @@ async function generateDistributed(input, accessCode, button, options = {}) {
     const resourceNote = data.resourcesPending ? " A aula foi preservada; a curadoria de recursos desta semana ficou pendente." : "";
     const pauseForApproval = Boolean(options.stepMode) && index + 1 < input.weeks;
     alert.textContent = pauseForApproval
-      ? `Semana ${index + 1} de ${input.weeks} gerada e preservada. Revise, refaça se quiser e aprove para gerar a semana ${index + 2}.${resourceNote}`
-      : `Semana ${index + 1} de ${input.weeks} gerada e preservada. A consolidação acontece ao final.${resourceNote}`;
+      ? `Semana ${shownNumber(index)} de ${shownNumber(input.weeks - 1)} gerada e preservada. Revise, refaça se quiser e aprove para gerar a semana ${shownNumber(index + 1)}.${resourceNote}`
+      : `Semana ${shownNumber(index)} de ${shownNumber(input.weeks - 1)} gerada e preservada. A consolidação acontece ao final.${resourceNote}`;
     alert.classList.remove("hidden");
     if (pauseForApproval) {
       state.generation = { status: "partial", nextWeekIndex: index + 1, total: input.weeks, formSignature, awaitingApproval: true };
@@ -4711,6 +4717,12 @@ $("#methodology-weeks")?.addEventListener("change", async (event) => {
   const row = event.target.closest("[data-methodology-week]");
   if (!row || event.target.tagName !== "SELECT") return;
   await handleMethodologyChoice(event.target, () => { row.classList.toggle("is-override", Boolean(event.target.value)); scheduleSave(); });
+});
+// Número da primeira semana/aula: refaz os rótulos que mostram o número. Mudar depois de gerar não renumera o texto já escrito.
+$("#first-number")?.addEventListener("input", () => {
+  renderResourcePlanWeeks(collectResourcePlan()); renderMethodologyWeeks(collectMethodologyPlan()); renderCompositionPlanWeeks(collectCompositionPlan());
+  if (state.weeks?.length) { try { rerenderWeeks(); } catch { /* sem cartões ainda */ } }
+  scheduleSave();
 });
 $("#weeks").addEventListener("input", () => { const resourcePlan = collectResourcePlan(); const compositionPlan = collectCompositionPlan(); renderResourcePlanWeeks(resourcePlan); renderMethodologyWeeks(collectMethodologyPlan()); renderCompositionPlanWeeks(compositionPlan); updateSummary(); updateProgress(); scheduleSave(); });
 $("#practice-enabled").addEventListener("change", () => { togglePractice(); scheduleSave(); });

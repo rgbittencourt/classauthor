@@ -8,6 +8,17 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.22.0 · 26/11/2026 · Número da primeira aula (continuar um curso já começado)
+
+**Acrescentado**
+- Campo **Número da primeira semana/aula** em «Tempo e calendário» (padrão 1). Use quando este planejamento continua um curso que já tem aulas prontas: com **3**, as aulas geradas viram Aula 3, Aula 4… em tudo o que chega ao professor e ao estudante. Isso inclui o texto escrito pela IA («como vimos na Aula 3»), o rótulo e o número salvos na aula (`meta.weekNumber`, que o ClassAtelier usa para nomear `Aula03-…`), os nomes de arquivo (`Semana03-…`), o PDF, o DOCX, o ZIP e os rótulos da tela.
+- Por dentro nada muda: índices, cálculos de carga e pedidos à IA continuam contando de 1. A conversão acontece na entrada e na saída da API (o mesmo lugar onde «semana» vira «aula»), nos dois sentidos, então refazer uma aula ou gerar derivados mantém a numeração.
+- Teste novo: `tests/first-number.test.mjs`.
+
+**Observações**
+- Defina o número antes de gerar. Mudar depois não renumera o texto já escrito (no ClassAtelier, «Montar o curso → Numerar as aulas pela ordem do curso» atualiza as referências).
+- No briefing, cite aulas do conjunto anterior pelo nome, não pelo número: «Aula 1» num planejamento que começa na 3 fica igual, mas a IA o lê como a primeira aula deste planejamento.
+
 ## 1.21.0 · 12/11/2026 · Diagramas nos slides
 
 - Novo tipo `diagram` em `/api/slides`, com sete figuras montadas a partir de peças prontas (`kind`): `echo` (sinal que vai até o alvo e volta), `wave` (comparação de comprimentos de onda), `curve` (gráfico qualitativo), `reflection` (superfície lisa × rugosa), `geometry` (nadir e visada oblíqua), `layers` (camadas atravessadas por um feixe) e `bragg` (ressonância de Bragg). A IA escolhe o kind e os rótulos; o desenho é do ClassAtelier.

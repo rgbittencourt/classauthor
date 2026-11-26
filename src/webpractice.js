@@ -1,4 +1,4 @@
-import { localizeUnit } from "./unit.js";
+import { localizeUnit, localizeForOutput } from "./unit.js";
 import {
   AlignmentType,
   Document,
@@ -99,7 +99,7 @@ function practicePackageMarkdownRaw(input, practice, index = 0) {
 }
 
 function paragraph(value, options = {}) {
-  value = localizeUnit(String(value ?? ""));
+  value = localizeForOutput(String(value ?? ""));
   const content = text(value);
   if (!content) return new Paragraph({ spacing: { after: 100 } });
   return new Paragraph({
