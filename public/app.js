@@ -1,4 +1,4 @@
-import { initializeStudio } from "./studio-ui.js?v=20261126-planning-steps";
+import { initializeStudio } from "./studio-ui.js?v=20261126-import-stage";
 import { toStudentLesson, toGeneratorWeek } from "./student-export.js";
 import { normalizeAbntCitation, sortReferencesAbnt, abntIssues } from "./abnt.js";
 import { parseSavedWeek, planPlacement } from "./week-import.js";
@@ -2448,7 +2448,7 @@ function persistFicha() {
 }
 
 function openFicha() {
-  if (!state.weeks?.some((lesson) => lesson?.lessonPlan)) { showError("Gere pelo menos uma semana para montar a ficha da disciplina."); return; }
+  if (!state.weeks?.some((lesson) => lesson?.lessonPlan)) { showError("Gere pelo menos uma semana para montar o Plano de Ensino."); return; }
   if (!state.ficha) state.ficha = fichaBase();
   renderFichaForm(state.ficha);
   $("#ficha-modal").classList.remove("hidden");
@@ -4513,7 +4513,7 @@ $("#ficha-button")?.addEventListener("click", openFicha);
 $("#close-ficha-modal")?.addEventListener("click", closeFicha);
 $("#ficha-close-button")?.addEventListener("click", closeFicha);
 $("#ficha-docx-button")?.addEventListener("click", downloadFicha);
-$("#ficha-reset-button")?.addEventListener("click", () => { if (!window.confirm("Descartar o que você editou na ficha e montar de novo a partir do planejamento?")) return; state.ficha = fichaBase(); renderFichaForm(state.ficha); scheduleSave(); });
+$("#ficha-reset-button")?.addEventListener("click", () => { if (!window.confirm("Descartar o que você editou no Plano de Ensino e montar de novo a partir do planejamento?")) return; state.ficha = fichaBase(); renderFichaForm(state.ficha); scheduleSave(); });
 $("#ficha-body")?.addEventListener("input", persistFicha);
 $("#ficha-body")?.addEventListener("change", (event) => {
   // Referência editada na ficha: nada é corrigido sozinho; a correção e a ordenação só acontecem no botão «Organizar lista».
