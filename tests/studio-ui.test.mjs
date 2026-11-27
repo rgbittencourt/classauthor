@@ -216,23 +216,45 @@ function fixture() {
   document.body.append(intro, form, alert);
   const recovery = document.createElement("div");
   recovery.id = "recovery-dock";
+  recovery.className = "hidden";
+  const projectFolder = document.createElement("section");
+  projectFolder.id = "project-folder-bar";
+  const projectFolderStatus = document.createElement("div");
+  projectFolderStatus.id = "project-folder-status";
+  projectFolder.append(projectFolderStatus);
+  ["project-folder-choose", "project-folder-reconnect", "project-folder-open", "project-folder-forget"].forEach((id) => {
+    const button = document.createElement("button");
+    button.id = id;
+    button.type = "button";
+    projectFolder.append(button);
+  });
+  const backupBar = document.createElement("section");
+  backupBar.id = "recovery-bar";
+  backupBar.className = "hidden";
   const recoveryActions = document.createElement("div");
   recoveryActions.className = "recovery-actions";
-  ["restore-backup-button", "open-week-button"].forEach((id) => {
+  ["save-backup-button", "restore-backup-button", "open-week-button"].forEach((id) => {
     const button = document.createElement("button");
     button.id = id;
     button.type = "button";
     recoveryActions.append(button);
   });
-  recovery.append(recoveryActions);
+  backupBar.append(recoveryActions);
   const draftRecovery = document.createElement("div");
   draftRecovery.id = "draft-recovery";
   draftRecovery.className = "hidden";
+  ["restore-draft-button", "discard-draft-button"].forEach((id) => {
+    const button = document.createElement("button");
+    button.id = id;
+    button.type = "button";
+    draftRecovery.append(button);
+  });
+  recovery.append(projectFolder, backupBar, draftRecovery);
   const newProject = document.createElement("a");
   newProject.id = "new-project-link";
   const credits = document.createElement("footer");
   credits.className = "site-footer";
-  document.body.append(recovery, draftRecovery, newProject, credits);
+  document.body.append(recovery, newProject, credits);
 
   // Geometria previsível: linkedom não faz layout e não há dependência de navegador real.
   const elementPrototype = Object.getPrototypeOf(document.createElement("div"));
@@ -317,7 +339,7 @@ test("initializeStudio coloca a navegação real na barra superior e preserva os
   assert.equal(stageTrack.getAttribute("aria-label"), "Etapas da autoria");
   assert.equal(substeps.getAttribute("aria-label"), "Etapas de Planejar");
   assert.deepEqual([...substeps.querySelectorAll("[data-plan-group] strong")].map((node) => node.textContent), EXPECTED_GROUPS.map(({ label }) => label));
-  assert.deepEqual([...document.querySelectorAll("[data-studio-stage] strong")].map((node) => node.textContent), ["Planejar", "Revisar", "Exportar", "Importar"]);
+  assert.deepEqual([...document.querySelectorAll("[data-studio-stage] strong")].map((node) => node.textContent), ["Planejar", "Revisar", "Exportar", "Importar", "Projeto"]);
   assert.equal(substeps.classList.contains("studio-hidden"), true);
   assert.equal(substeps.hidden, true);
   assert.equal(document.body.dataset.studioSubstepsOpen, "false");
@@ -331,6 +353,40 @@ test("initializeStudio coloca a navegação real na barra superior e preserva os
   assert.equal(center.querySelector(".studio-plan-group-track"), null);
   assert.equal(center.querySelector(".studio-stage-track"), null);
   assert.equal(center.querySelector(".journey-step"), null);
+});
+
+test("Projeto reúne pasta, backup, recuperação e estilo sem remover os controles originais da importação", (t) => {
+  const { document, window, navigation } = installBrowserStubs(t);
+  const projectButton = document.querySelector('[data-studio-stage="project"]');
+  const projectTools = document.getElementById("studio-project-tools");
+  const storage = document.querySelector(".studio-storage");
+  const dock = document.getElementById("recovery-dock");
+  const styleButton = document.getElementById("style-button");
+  const projectFolder = document.getElementById("project-folder-bar");
+  const backupButton = document.getElementById("save-backup-button");
+  const restoreDraft = document.getElementById("restore-draft-button");
+
+  assert.ok(projectButton);
+  assert.equal(projectButton.getAttribute("aria-controls"), "studio-project-tools");
+  assert.ok(projectTools.classList.contains("studio-hidden"), "a nova área não substitui Planejar ao abrir o workspace");
+  assert.equal(storage.closest("#studio-project-tools"), projectTools);
+  assert.equal(dock.parentElement, storage);
+  assert.equal(projectFolder.closest("#studio-project-tools"), projectTools);
+  assert.equal(backupButton.closest("#studio-project-tools"), projectTools);
+  assert.equal(restoreDraft.closest("#studio-project-tools"), projectTools);
+  assert.equal(styleButton.closest(".studio-project-preferences"), projectTools.querySelector(".studio-project-preferences"));
+  assert.equal(navigation.querySelector(".studio-storage"), null);
+  assert.equal(navigation.querySelector("#style-button"), null);
+  assert.equal(document.getElementById("restore-backup-button").closest(".studio-import-tools"), document.querySelector(".studio-import-tools"));
+  assert.equal(document.getElementById("open-week-button").closest(".studio-import-tools"), document.querySelector(".studio-import-tools"));
+
+  click(window, document.querySelector('[data-studio-stage="plan"]'));
+  click(window, projectButton);
+  assert.equal(document.body.dataset.studioView, "project");
+  assert.ok(!projectTools.classList.contains("studio-hidden"));
+  assert.equal(storage.open, true, "os arquivos ficam expostos ao entrar na nova etapa");
+  assert.equal(document.getElementById("studio-plan-substeps").hidden, true);
+  assert.equal(projectButton.getAttribute("aria-current"), "step");
 });
 
 test("clicks das quatro etapas e dos 13 passos navegam sem iniciar IA", async (t) => {
@@ -500,7 +556,7 @@ test("Exportar não reabre Planejar quando os resultados e os avisos são atuali
   click(window, document.querySelector('[data-studio-stage="import"]'));
   assert.ok(results.classList.contains("studio-hidden"));
   assert.equal(progress.hidden, true);
-  for (const view of ["export", "import"]) {
+  for (const view of ["export", "import", "project"]) {
     click(window, document.querySelector(`[data-studio-stage="${view}"]`));
     for (const hidden of [true, false, true, false]) {
       results.classList.toggle("hidden", hidden);
@@ -559,6 +615,9 @@ test("IDs, elementos originais e handlers sobrevivem ao reposicionamento dos con
   nodes.export.addEventListener("click", () => { events.export += 1; });
   nodes.restore.addEventListener("click", () => { events.restore += 1; });
   nodes.openWeek.addEventListener("click", () => { events.openWeek += 1; });
+  const projectNodes = ["project-folder-choose", "project-folder-reconnect", "project-folder-open", "project-folder-forget", "save-backup-button", "restore-draft-button", "discard-draft-button", "style-button"].map((id) => document.getElementById(id));
+  const projectEvents = new Map(projectNodes.map((node) => [node.id, 0]));
+  projectNodes.forEach((node) => node.addEventListener("click", () => projectEvents.set(node.id, projectEvents.get(node.id) + 1)));
   // Reutiliza o DOM acima no setup de browser: evita recriar ou substituir os nós sob teste.
   const previous = new Map(["document", "window", "MutationObserver", "ResizeObserver", "requestAnimationFrame"].map((key) => [key, Object.prototype.hasOwnProperty.call(globalThis, key) ? globalThis[key] : undefined]));
   const frames = [];
@@ -599,4 +658,10 @@ test("IDs, elementos originais e handlers sobrevivem ao reposicionamento dos con
   click(window, nodes.restore);
   click(window, nodes.openWeek);
   assert.deepEqual(events, { assist: 1, input: 1, generate: 1, export: 1, restore: 1, openWeek: 1 });
+  click(window, document.querySelector('[data-studio-stage="project"]'));
+  projectNodes.forEach((node) => {
+    assert.equal(node.closest("#studio-project-tools"), document.getElementById("studio-project-tools"), `#${node.id} permanece em Projeto`);
+    click(window, node);
+    assert.equal(projectEvents.get(node.id), 1, `#${node.id} mantém o handler já registrado`);
+  });
 });

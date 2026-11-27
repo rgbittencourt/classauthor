@@ -18,7 +18,7 @@ export function initializeStudio() {
 
   const journey = document.createElement("div");
   journey.className = "studio-journey-bar";
-  journey.innerHTML = `<nav class="studio-stage-track" aria-label="Etapas da autoria"><button type="button" class="studio-stage" data-studio-stage="plan" aria-controls="studio-plan-substeps"><span class="stage-number">01</span><span><strong>Planejar</strong><small>4 etapas · 13 passos</small></span></button><button type="button" class="studio-stage" data-studio-stage="review"><span class="stage-number">02</span><span><strong>Revisar</strong><small>Aulas · alinhamento · rubricas</small></span></button><button type="button" class="studio-stage" data-studio-stage="export"><span class="stage-number">03</span><span><strong>Exportar</strong><small>Plano de Ensino · materiais</small></span></button><button type="button" class="studio-stage" data-studio-stage="import" aria-controls="studio-import-tools"><span class="stage-number">04</span><span><strong>Importar</strong><small>Backups · aulas salvas</small></span></button><span class="studio-step-status" id="studio-step-status"></span></nav>`;
+  journey.innerHTML = `<nav class="studio-stage-track" aria-label="Etapas da autoria"><button type="button" class="studio-stage" data-studio-stage="plan" aria-controls="studio-plan-substeps"><span class="stage-number">01</span><span><strong>Planejar</strong><small>4 etapas · 13 passos</small></span></button><button type="button" class="studio-stage" data-studio-stage="review"><span class="stage-number">02</span><span><strong>Revisar</strong><small>Aulas · alinhamento · rubricas</small></span></button><button type="button" class="studio-stage" data-studio-stage="export"><span class="stage-number">03</span><span><strong>Exportar</strong><small>Plano de Ensino · materiais</small></span></button><button type="button" class="studio-stage" data-studio-stage="import" aria-controls="studio-import-tools"><span class="stage-number">04</span><span><strong>Importar</strong><small>Backups · aulas salvas</small></span></button><button type="button" class="studio-stage" data-studio-stage="project" aria-controls="studio-project-tools"><span class="stage-number">05</span><span><strong>Projeto</strong><small>Arquivos · recuperação</small></span></button><span class="studio-step-status" id="studio-step-status"></span></nav>`;
   $(".workspace-grid").before(journey);
 
   const intro = $(".intro");
@@ -79,12 +79,33 @@ export function initializeStudio() {
   const exportTools = makeTools("studio-export-tools", "Central de entrega", "Baixe o Plano de Ensino, o pacote do curso, os materiais docentes e a planilha audiovisual. Os arquivos de cada aula continuam nos cartões abaixo.", ["zip-button", "teacher-pdf-button", "ficha-button", "production-sheet-button"]);
   const importTools = makeTools("studio-import-tools", "Importar um backup ou uma aula", "Restaure um backup do ClassAuthor ou abra uma semana já salva. Os controles originais e seus formatos foram mantidos.", ["restore-backup-button", "open-week-button"]);
   importTools.id = "studio-import-tools";
+  const storage = document.createElement("details");
+  storage.className = "studio-storage";
+  storage.innerHTML = `<summary>Arquivos e recuperação <span aria-hidden="true">⌄</span></summary>`;
+  const dock = $("#recovery-dock");
+  if (dock) storage.append(dock);
+  const projectTools = document.createElement("section");
+  projectTools.className = "studio-project-tools";
+  projectTools.id = "studio-project-tools";
+  projectTools.innerHTML = `<div class="studio-project-heading"><p class="eyebrow">ESPAÇO DO PROJETO</p><h2>Arquivos e preferências</h2><p>Organize onde seu planejamento fica salvo e cuide das opções que acompanham sua autoria.</p></div><div class="studio-project-grid"></div>`;
+  const projectGrid = projectTools.querySelector(".studio-project-grid");
+  const projectFiles = document.createElement("article");
+  projectFiles.className = "studio-project-card studio-project-files";
+  projectFiles.innerHTML = `<p class="eyebrow">PASTA E RECUPERAÇÃO</p><h3>Seus arquivos, sob seu controle.</h3><p>Crie ou abra a pasta do projeto, baixe um backup e retome um rascunho salvo.</p>`;
+  projectFiles.append(storage);
+  const projectPreferences = document.createElement("article");
+  projectPreferences.className = "studio-project-card studio-project-preferences";
+  projectPreferences.innerHTML = `<p class="eyebrow">PREFERÊNCIAS</p><h3>Meu estilo de escrita</h3><p>Revise as regras que o ClassAuthor aprende com as correções que você faz no ClassAtelier, somente quando você pedir.</p>`;
+  const styleButton = $("#style-button");
+  if (styleButton) projectPreferences.append(styleButton);
+  projectGrid.append(projectFiles, projectPreferences);
   footer.after(reviewTools, exportTools, importTools);
   const empty = document.createElement("section");
   empty.className = "studio-empty-view";
   empty.setAttribute("aria-live", "polite");
   empty.innerHTML = `<span class="studio-empty-index" aria-hidden="true">—</span><h2 id="studio-empty-title"></h2><p id="studio-empty-copy"></p><button type="button" class="button button-secondary" id="studio-return-plan">Voltar ao planejamento →</button>`;
   importTools.after(empty);
+  empty.after(projectTools);
 
   const navHeading = document.createElement("div");
   navHeading.className = "studio-nav-heading";
@@ -127,17 +148,6 @@ export function initializeStudio() {
     nav.append(link);
   });
   const links = [...nav.querySelectorAll("[data-plan-step]")];
-  const storage = document.createElement("details");
-  storage.className = "studio-storage";
-  storage.innerHTML = `<summary>Arquivos e recuperação <span aria-hidden="true">⌄</span></summary>`;
-  const dock = $("#recovery-dock");
-  navigation.append(storage);
-  if (dock) storage.append(dock);
-  const navFooter = document.createElement("div");
-  navFooter.className = "studio-nav-footer";
-  const styleButton = $("#style-button");
-  if (styleButton) navFooter.append(styleButton);
-  navigation.append(navFooter);
   summary.querySelector(".sidebar-actions")?.remove();
   const contextNote = document.createElement("section");
   contextNote.className = "studio-context-note";
@@ -222,12 +232,13 @@ export function initializeStudio() {
     hide(reviewTools, view !== "review");
     hide(exportTools, view !== "export");
     hide(importTools, view !== "import");
-    hide(results, planning || view === "import" || !hasResults());
-    hide(empty, planning || view === "import" || hasResults());
+    hide(projectTools, view !== "project");
+    hide(results, planning || view === "import" || view === "project" || !hasResults());
+    hide(empty, planning || view === "import" || view === "project" || hasResults());
     if (!planning && hasResults()) { results.open = true; $("#results-weeks").open = true; }
-    $("#studio-task-title").textContent = planning ? allSectors ? "Seu briefing completo." : step.title : view === "review" ? "Revise antes de liberar." : view === "export" ? "Do seu curso à sala de aula." : "Traga um projeto ou uma aula salva.";
-    $("#studio-task-description").textContent = planning ? allSectors ? "Todos os campos e escolhas, preservados. Volte ao foco por passo quando quiser." : step.description : view === "review" ? "Leia as aulas, confira os recursos e aprove o conteúdo com os critérios do seu curso." : view === "export" ? "Escolha o formato de entrega. O ClassAtelier recebe as aulas; você mantém os materiais de mediação." : "Restaure um backup do ClassAuthor ou abra um arquivo de semana salvo neste computador.";
-    $("#studio-sector-position").textContent = planning ? `PASSO ${String(activeStep + 1).padStart(2, "0")} / ${PLAN_STEPS.length}` : view === "review" ? "REVISÃO HUMANA" : view === "export" ? "ARQUIVOS E FORMATOS" : "IMPORTAÇÃO DE ARQUIVOS";
+    $("#studio-task-title").textContent = planning ? allSectors ? "Seu briefing completo." : step.title : view === "review" ? "Revise antes de liberar." : view === "export" ? "Do seu curso à sala de aula." : view === "import" ? "Traga um projeto ou uma aula salva." : "Cuide dos arquivos do seu projeto.";
+    $("#studio-task-description").textContent = planning ? allSectors ? "Todos os campos e escolhas, preservados. Volte ao foco por passo quando quiser." : step.description : view === "review" ? "Leia as aulas, confira os recursos e aprove o conteúdo com os critérios do seu curso." : view === "export" ? "Escolha o formato de entrega. O ClassAtelier recebe as aulas; você mantém os materiais de mediação." : view === "import" ? "Restaure um backup do ClassAuthor ou abra um arquivo de semana salvo neste computador." : "Escolha onde manter seus arquivos, recupere um rascunho ou ajuste suas preferências de escrita.";
+    $("#studio-sector-position").textContent = planning ? `PASSO ${String(activeStep + 1).padStart(2, "0")} / ${PLAN_STEPS.length}` : view === "review" ? "REVISÃO HUMANA" : view === "export" ? "ARQUIVOS E FORMATOS" : view === "import" ? "IMPORTAÇÃO DE ARQUIVOS" : "ARQUIVOS E PREFERÊNCIAS";
     $("#studio-current-area").textContent = `${activeStep + 1} de ${PLAN_STEPS.length}`;
     $("#studio-prev").disabled = activeStep === 0;
     $("#studio-next").disabled = activeStep === PLAN_STEPS.length - 1;
@@ -276,6 +287,7 @@ export function initializeStudio() {
       sync();
       return;
     }
+    if (button.dataset.studioStage === "project") storage.open = true;
     planMenuOpen = false;
     select(button.dataset.studioStage);
   });
