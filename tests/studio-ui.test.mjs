@@ -273,6 +273,14 @@ function installBrowserStubs(t) {
   env.window.fetch = async () => { env.fetchCalls += 1; return { ok: true }; };
   env.fetchCalls = 0;
 
+  // Linkedom só propaga em bubble. Emular a captura do document antes do alvo
+  // permite testar cliques laterais que usam stopImmediatePropagation.
+  env.window.__documentClickCapture = [];
+  const addDocumentListener = env.document.addEventListener.bind(env.document);
+  env.document.addEventListener = (type, listener, options) => {
+    if (type === "click" && (options === true || options?.capture)) env.window.__documentClickCapture.push(listener);
+    addDocumentListener(type, listener, options);
+  };
   initializeStudio();
   while (frames.length) frames.shift()(0);
   env.observed = observed;
@@ -283,6 +291,7 @@ function installBrowserStubs(t) {
 }
 
 function click(window, node) {
+  for (const listener of window.__documentClickCapture || []) listener({ target: node });
   const event = new window.Event("click", { bubbles: true, cancelable: true });
   node.dispatchEvent(event);
   return event;
@@ -293,7 +302,7 @@ function dispatch(window, node, type) {
 }
 
 test("initializeStudio coloca a navegação real na barra superior e preserva os quatro nomes", (t) => {
-  const { document, workspace, center } = installBrowserStubs(t);
+  const { document, window, workspace, center } = installBrowserStubs(t);
   const journey = document.querySelector(".studio-journey-bar");
   const stageTrack = journey.querySelector(":scope > .studio-stage-track");
   const substeps = stageTrack.querySelector(":scope > #studio-plan-substeps");
@@ -309,7 +318,15 @@ test("initializeStudio coloca a navegação real na barra superior e preserva os
   assert.equal(substeps.getAttribute("aria-label"), "Etapas de Planejar");
   assert.deepEqual([...substeps.querySelectorAll("[data-plan-group] strong")].map((node) => node.textContent), EXPECTED_GROUPS.map(({ label }) => label));
   assert.deepEqual([...document.querySelectorAll("[data-studio-stage] strong")].map((node) => node.textContent), ["Planejar", "Revisar", "Exportar", "Importar"]);
+  assert.equal(substeps.classList.contains("studio-hidden"), true);
+  assert.equal(substeps.hidden, true);
+  assert.equal(document.body.dataset.studioSubstepsOpen, "false");
+  assert.equal(stageTrack.querySelector('[data-studio-stage="plan"]').getAttribute("aria-expanded"), "false");
+  click(window, stageTrack.querySelector('[data-studio-stage="plan"]'));
   assert.equal(substeps.classList.contains("studio-hidden"), false);
+  assert.equal(substeps.hidden, false);
+  assert.equal(document.body.dataset.studioSubstepsOpen, "true");
+  assert.equal(stageTrack.querySelector('[data-studio-stage="plan"]').getAttribute("aria-expanded"), "true");
   assert.equal(center.querySelector(".studio-plan-progress"), null);
   assert.equal(center.querySelector(".studio-plan-group-track"), null);
   assert.equal(center.querySelector(".studio-stage-track"), null);
@@ -322,6 +339,8 @@ test("clicks das quatro etapas e dos 13 passos navegam sem iniciar IA", async (t
   let aiActions = 0;
   document.getElementById("assist-button").addEventListener("click", () => { aiActions += 1; });
   document.getElementById("generate-button").addEventListener("click", () => { aiActions += 1; });
+  click(window, document.querySelector('[data-studio-stage="plan"]'));
+  assert.equal(document.getElementById("studio-plan-substeps").hidden, false);
 
   for (const group of EXPECTED_GROUPS) {
     const button = document.querySelector(`[data-plan-group="${group.id}"]`);
@@ -339,6 +358,71 @@ test("clicks das quatro etapas e dos 13 passos navegam sem iniciar IA", async (t
   }
   assert.equal(env.fetchCalls, 0);
   assert.equal(aiActions, 0);
+});
+
+test("a lista vertical só abre por Planejar ou por subetapa e fecha ao clicar fora", (t) => {
+  const { document, window } = installBrowserStubs(t);
+  const progress = document.getElementById("studio-plan-substeps");
+  const planButton = document.querySelector('[data-studio-stage="plan"]');
+
+  assert.equal(progress.hidden, true, "não abre automaticamente ao entrar no workspace");
+  click(window, document.querySelector('[data-plan-step="course"]'));
+  assert.equal(document.body.dataset.studioView, "plan");
+  assert.equal(progress.hidden, true, "um clique num passo lateral não abre a lista das quatro etapas");
+
+  click(window, planButton);
+  assert.equal(progress.hidden, false, "o botão Planejar abre a lista vertical");
+  click(window, document.querySelector('[data-plan-group="pedagogy"]'));
+  assert.equal(document.body.dataset.planningStep, "objectives");
+  assert.equal(progress.hidden, false, "selecionar uma das quatro etapas mantém a lista durante a escolha");
+
+  click(window, document.getElementById("studio-task-title"));
+  assert.equal(document.body.dataset.studioView, "plan");
+  assert.equal(progress.hidden, true, "um clique fora fecha a lista sem alterar a área atual");
+  assert.equal(planButton.getAttribute("aria-expanded"), "false");
+
+  click(window, document.querySelector('[data-studio-stage="review"]'));
+  click(window, document.querySelector('[data-studio-stage="export"]'));
+  assert.equal(document.body.dataset.studioView, "export");
+  assert.equal(progress.hidden, true, "cliques em outras áreas não abrem as subetapas");
+});
+
+test("cliques laterais, campos e espaço livre da barra fecham sem reabrir o menu", (t) => {
+  const { document, window, observed, flushFrames } = installBrowserStubs(t);
+  const progress = document.getElementById("studio-plan-substeps");
+  const planButton = document.querySelector('[data-studio-stage="plan"]');
+  const results = document.getElementById("results-section");
+  const observer = observed.find((item) => item.targets.some(({ target }) => target === results));
+  for (const target of [
+    document.querySelector('[data-plan-step="objectives"]'),
+    document.getElementById("objectives"),
+    document.getElementById("studio-step-status"),
+    document.getElementById("studio-all-sectors"),
+    document.getElementById("studio-next"),
+    document.querySelector(".site-footer")
+  ]) {
+    click(window, planButton);
+    assert.equal(progress.hidden, false);
+    click(window, target);
+    assert.equal(progress.hidden, true, `clique fora em ${target.id || target.dataset.planStep || target.className}`);
+    assert.equal(planButton.getAttribute("aria-expanded"), "false");
+    observer.callback([{ target: document.getElementById("result-alert"), type: "childList" }]);
+    flushFrames();
+    assert.equal(progress.hidden, true, "atualização posterior não reabre");
+  }
+});
+
+test("clicar novamente em Planejar fecha a lista sem sair do passo atual", (t) => {
+  const { document, window } = installBrowserStubs(t);
+  const progress = document.getElementById("studio-plan-substeps");
+  const planButton = document.querySelector('[data-studio-stage="plan"]');
+  click(window, planButton);
+  click(window, document.querySelector('[data-plan-group="materials"]'));
+  assert.equal(progress.hidden, false);
+  click(window, planButton);
+  assert.equal(progress.hidden, true);
+  assert.equal(document.body.dataset.studioView, "plan");
+  assert.equal(document.body.dataset.planningStep, "resources");
 });
 
 test("Revisar, Exportar e Importar ocultam subetapas; voltar a Planejar conserva o passo atual", (t) => {

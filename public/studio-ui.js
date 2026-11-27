@@ -12,6 +12,7 @@ export function initializeStudio() {
   if (sectors.length !== 7) return;
   let activeStep = 0;
   let view = "plan";
+  let planMenuOpen = false;
   let allSectors = false;
   let hadResults = false;
 
@@ -200,8 +201,10 @@ export function initializeStudio() {
   function hide(node, hidden) { node?.classList.toggle("studio-hidden", hidden); }
   function sync() {
     const planning = view === "plan";
+    const planMenuVisible = planning && planMenuOpen;
     const step = PLAN_STEPS[activeStep];
     document.body.dataset.studioView = view;
+    document.body.dataset.studioSubstepsOpen = String(planMenuVisible);
     document.body.dataset.planningStep = step.id;
     document.body.classList.toggle("studio-all-sectors", allSectors);
     sectors.forEach((sector, index) => {
@@ -212,9 +215,9 @@ export function initializeStudio() {
     });
     chunks.forEach((chunk, id) => hide(chunk, !planning || (!allSectors && id !== step.id)));
     hide(planToolbar, !planning);
-    hide(planProgress, !planning);
-    planProgress.hidden = !planning;
-    journey.querySelector('[data-studio-stage="plan"]').setAttribute("aria-expanded", String(planning));
+    hide(planProgress, !planMenuVisible);
+    planProgress.hidden = !planMenuVisible;
+    planStage.setAttribute("aria-expanded", String(planMenuVisible));
     hide(footer, !planning);
     hide(reviewTools, view !== "review");
     hide(exportTools, view !== "export");
@@ -254,6 +257,7 @@ export function initializeStudio() {
     if (planning && (step.id === "check" || allSectors)) syncCheck();
   }
   function select(nextView, stepIndex = activeStep, focusTitle = false) {
+    if (nextView !== "plan") planMenuOpen = false;
     view = nextView;
     activeStep = Math.max(0, Math.min(PLAN_STEPS.length - 1, stepIndex));
     sync();
@@ -262,14 +266,36 @@ export function initializeStudio() {
     if (focusTitle) $("#studio-task-title").focus({ preventScroll: true });
   }
   const goToStep = (index, focusTitle = false) => { allSectors = false; select("plan", index, focusTitle); };
-  journey.addEventListener("click", (event) => { const button = event.target.closest("[data-studio-stage]"); if (button) select(button.dataset.studioStage); });
+  const planStage = journey.querySelector('[data-studio-stage="plan"]');
+  journey.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-studio-stage]");
+    if (!button) return;
+    if (button.dataset.studioStage === "plan") {
+      if (view === "plan") planMenuOpen = !planMenuOpen;
+      else { planMenuOpen = true; select("plan"); return; }
+      sync();
+      return;
+    }
+    planMenuOpen = false;
+    select(button.dataset.studioStage);
+  });
+  // Captura antes da navegação lateral, que interrompe a propagação do clique.
+  document.addEventListener("click", (event) => {
+    if (planMenuOpen && !planStage.contains(event.target) && !planProgress.contains(event.target)) {
+      planMenuOpen = false;
+      sync();
+    }
+  }, true);
   $("#studio-prev").addEventListener("click", () => goToStep(activeStep - 1, true));
   $("#studio-next").addEventListener("click", () => goToStep(activeStep + 1, true));
   $("#studio-return-plan").addEventListener("click", () => select("plan"));
   $("#studio-all-sectors").addEventListener("click", () => { allSectors = !allSectors; sync(); });
   planProgress.addEventListener("click", (event) => {
     const button = event.target.closest("[data-plan-group]");
-    if (button) goToStep(PLAN_STEPS.findIndex((step) => step.group === button.dataset.planGroup), true);
+    if (button) {
+      planMenuOpen = true;
+      goToStep(PLAN_STEPS.findIndex((step) => step.group === button.dataset.planGroup), true);
+    }
   });
   check.addEventListener("click", (event) => {
     const button = event.target.closest("[data-edit-step]");
